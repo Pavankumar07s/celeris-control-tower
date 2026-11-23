@@ -174,3 +174,63 @@ Compact JSON written by `celeris export`; the dashboard reads nothing else and n
 - `WAPE = Σ|actual − forecast| / Σ actual` over the selected cells (never an average of per-series WAPEs).
 - `bias = Σ(forecast − actual) / Σ actual`.
 - Backtests score against unconstrained demand, with a 19-month horizon and rolling origins.
+
+## Contracts for the modelling and dashboard builds
+
+These were fixed before modelling and the dashboard were built in parallel. Change them only by editing this section.
+
+### Ownership
+
+| Area | Owner | Paths |
+|---|---|---|
+| Features, models, backtest, forecast | modelling | `src/celeris/{features,models,backtest}/`, stages `features`, `backtest`, `forecast`, `outputs/{features,backtest,forecast}/`, `tests/test_model_*.py`, `tests/test_backtest_*.py`, `tests/test_forecast_*.py`, `docs/modelling.md` |
+| Export and web app | dashboard | `src/celeris/export/`, stage `export`, `dashboard/`, `tests/test_export_*.py`, `docs/dashboard.md` |
+
+Shared files (`src/celeris/cli.py`, `config.py`, `tables.py`, `Makefile`, `pyproject.toml`, this file): re-read immediately
+before editing and make small additive edits in your own part only.
+
+### `outputs/forecast/forecast.parquet` — one row per `test.csv` row (58,219), in `test.csv` order
+
+| Column | Meaning |
+|---|---|
+| `date`, `sku_id`, `region` | keys |
+| `forecast` | submitted value: non-negative integer |
+| `mean` | conditional mean of the order in that month before rounding (0 on structural zeros) |
+| `p10`, `p50`, `p90` | row-level quantiles of the order, integers, `p10 ≤ p50 ≤ p90` |
+| `latent_mean` | monthly-equivalent latent demand for the month, defined on every row including off-phase months (0 only for lost accounts, after end of life and before launch) |
+| `level`, `f_season`, `f_holiday`, `f_macro`, `f_ev`, `f_lifecycle`, `f_event` | multiplicative components; their product equals `latent_mean` |
+| `accum_span`, `carry_weight`, `structural_zero_reason` | cycle placement, copied from `outputs/clean/test_grid.parquet` |
+| `pred_<member>` | each ensemble member's mean for the row |
+| `var_noise` | variance of the order noise, independent across rows |
+| `cv_level` | relative standard deviation of the series-level error, common to every month of the series |
+| `cv_group` | relative standard deviation of the error shared by all series of the same family × region |
+| `price_usd`, `revenue_mean` | assumed invoice price for the month and `mean × price_usd` |
+
+`order(t) = Σ weight × latent_mean(month)` over the months the order carries (`celeris.demand.cycles.accumulation_weights`),
+so a consumer can recompute orders after scaling latent demand (used by the what-if view).
+
+**Quantiles of any aggregate** (any filter selection, one month or several):
+
+```
+M = Σ mean
+V = Σ var_noise
+  + Σ over series  (cv_level × Σ of that series' selected means)²
+  + Σ over groups  (cv_group × Σ of that family×region's selected means)²
+sigma² = ln(1 + V / M²),  mu = ln M − sigma² / 2,  Pq = exp(mu + z_q × sigma)      (0 when M = 0)
+```
+
+with `z = −1.2816, 0, +1.2816` for P10, P50, P90. `celeris.models.quantiles.aggregate_quantiles` is the reference
+implementation; the dashboard ports it exactly. The modelling stage calibrates `cv_level` and `cv_group` on the backtests
+so that P10–P90 covers about 80 % at series, SKU, family × region and total level, and writes the parameters and the
+measured coverage to `outputs/forecast/uncertainty.json`. For a single row the dashboard shows the row-level `p10/p50/p90`.
+
+### Other modelling outputs
+
+| File | Contents |
+|---|---|
+| `outputs/forecast/submission.csv` | `Date, SKU_ID, Region, Units_Sold_Forecast` in `test.csv` order |
+| `outputs/forecast/macro_sensitivity.csv` | `sku_id, channel_group` (`aftermarket` / `other`), `indicator`, `lag`, `beta` = change in log latent demand per +1 unit of the cleaned indicator at that lag |
+| `outputs/features/macro_leadlag.csv` | `product_family, indicator, lag` (0–12), `corr`, `era` (`all`, `2019-2022`, `2023-2026`), `is_driver` |
+| `outputs/backtest/predictions.parquet` | `origin, model, date, sku_id, region, horizon` (1–19), `actual` (unconstrained demand, null if masked), `pred`, `is_scored`; `p10, p50, p90` for the final model |
+| `outputs/backtest/metrics.csv` | `origin` (or `mean`), `model`, `level` (`series`, `sku`, `family_region`, `family`, `region`, `total`), `slice_type` (`all`, `family`, `region`, `channel`, `horizon`, `horizon_bucket`, `calendar_month`, `cycle_kind`, `intermittency`), `slice_value`, `n_cells`, `actual_sum`, `pred_sum`, `abs_err_sum`, `wape`, `bias` |
+| `outputs/backtest/summary.json` | model ladder (naive → seasonal naive → cycle-aware → structural → final) with mean WAPE and bias across origins, noise-floor estimate, quantile coverage by level, the chosen model and why |
