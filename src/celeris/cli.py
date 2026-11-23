@@ -2,7 +2,9 @@
 
 Stages run in the order of ``STAGE_ORDER`` (architecture: clean, demand, anomalies, features, backtest, forecast,
 export). Only registered stages can be called; ``all`` runs every registered stage in order. To plug in a later stage,
-write a function ``run_<stage>(paths: Paths) -> object`` in its sub-package and add one ``Stage`` entry to ``STAGES``.
+write a function ``run_<stage>(paths: Paths) -> StageRecord`` in its sub-package (wrapping its body with
+``celeris.quality.stagelog.run_stage``, which stores its checks, fix-log rows and outputs and republishes the quality
+files) and add one ``Stage`` entry to ``STAGES``.
 """
 
 from __future__ import annotations
@@ -13,10 +15,12 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from celeris.anomalies.stage import run_anomalies
 from celeris.cleaning.stage import run_clean
-from celeris.config import Paths
+from celeris.config import STAGE_ORDER, Paths
+from celeris.demand.stage import run_demand
 
-STAGE_ORDER: tuple[str, ...] = ("clean", "demand", "anomalies", "features", "backtest", "forecast", "export")
+__all__ = ["STAGES", "STAGE_ORDER", "Stage", "main"]
 
 
 @dataclass(frozen=True)
@@ -28,6 +32,8 @@ class Stage:
 
 STAGES: dict[str, Stage] = {
     "clean": Stage("clean", run_clean, "part A: clean every raw file, write outputs/clean and outputs/quality"),
+    "demand": Stage("demand", run_demand, "part B: unconstrained demand, ordering cycles, account events, test grid"),
+    "anomalies": Stage("anomalies", run_anomalies, "part B: one-off orders, event masks, anomaly register, series profile"),
 }
 
 

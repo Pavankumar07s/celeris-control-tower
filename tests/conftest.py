@@ -1,8 +1,10 @@
-"""Shared fixtures: one in-process run of the ``clean`` stage per test session, plus the raw inputs."""
+"""Shared fixtures: one in-process run of the ``clean`` stage per test session, one of ``demand`` + ``anomalies`` on a
+copy of its outputs, and the raw inputs."""
 
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -10,8 +12,10 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from celeris.anomalies.stage import run_anomalies
 from celeris.cleaning.stage import run_clean
 from celeris.config import PROJECT_ROOT, RAW_FILES, Paths
+from celeris.demand.stage import run_demand
 from celeris.io import hash_files, read_raw_csv
 
 RESEARCH = PROJECT_ROOT / "research" / "scratch"
@@ -48,6 +52,33 @@ def clean_run(tmp_path_factory: pytest.TempPathFactory) -> CleanRun:
     before = hash_files(paths.raw(name) for name in RAW_FILES)
     run_clean(paths)
     return CleanRun(paths=paths, raw_hashes_before=before)
+
+
+@pytest.fixture(scope="session")
+def pipeline_run(clean_run: CleanRun, tmp_path_factory: pytest.TempPathFactory) -> CleanRun:
+    """``demand`` and ``anomalies`` run in process on a copy of the clean outputs (part-A tests keep their own copy)."""
+    root = tmp_path_factory.mktemp("pipeline") / "outputs"
+    shutil.copytree(clean_run.paths.outputs_dir, root)
+    paths = Paths(outputs_dir=root)
+    run_demand(paths)
+    run_anomalies(paths)
+    return CleanRun(paths=paths, raw_hashes_before=clean_run.raw_hashes_before)
+
+
+@pytest.fixture(scope="session")
+def cells(pipeline_run: CleanRun) -> pd.DataFrame:
+    """``train_clean.parquet`` with the demand and anomaly columns."""
+    return pd.read_parquet(pipeline_run.clean / "train_clean.parquet")
+
+
+@pytest.fixture(scope="session")
+def test_grid(pipeline_run: CleanRun) -> pd.DataFrame:
+    return pd.read_parquet(pipeline_run.clean / "test_grid.parquet")
+
+
+@pytest.fixture(scope="session")
+def register(pipeline_run: CleanRun) -> pd.DataFrame:
+    return pd.read_csv(pipeline_run.paths.anomalies_dir / "anomaly_register.csv", keep_default_na=False, na_values=[""])
 
 
 @pytest.fixture(scope="session")

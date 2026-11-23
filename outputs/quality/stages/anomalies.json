@@ -1,0 +1,238 @@
+{
+  "record_version": "1.0",
+  "stage": "anomalies",
+  "outputs": [
+    "anomalies/anomaly_register.csv",
+    "anomalies/series_profile.csv",
+    "clean/train_clean.parquet"
+  ],
+  "rows_raw": {},
+  "rows_clean": {},
+  "headline": {
+    "one_offs": 507,
+    "register_rows": 11799,
+    "register_by_class_level": {
+      "data_error.cell": 2558,
+      "data_error.episode": 37,
+      "real_event.cell": 8905,
+      "real_event.episode": 299
+    },
+    "register_by_type": {
+      "DE.BLANK_KEY": 3,
+      "DE.CURRENCY_BLOCK": 1,
+      "DE.DATE_FORMAT": 1,
+      "DE.DATE_TYPO": 1,
+      "DE.DUPLICATE": 1,
+      "DE.LABEL_VARIANT": 4,
+      "DE.MACRO_BLANK": 1,
+      "DE.MACRO_DECIMAL": 1,
+      "DE.MACRO_DUPLICATE": 1,
+      "DE.MACRO_REBASE": 1,
+      "DE.MACRO_UNIT": 1,
+      "DE.MISSING_ROW": 983,
+      "DE.MONTH_COLUMN": 1,
+      "DE.PRICE_CENTS": 1,
+      "DE.PRICE_ZEROED": 1,
+      "DE.RESTATEMENT": 1,
+      "DE.REVENUE_SCALE": 1,
+      "DE.REVENUE_TRANSPOSITION": 1,
+      "DE.SIGN": 492,
+      "DE.STOCKOUT_OVERLAY": 1,
+      "DE.SYSTEM_BLANKING": 333,
+      "DE.THOUSANDS_SEPARATOR": 1,
+      "DE.UNITS_BLANK": 3,
+      "DE.UNITS_SCALE": 370,
+      "DE.UOM_BLOCK": 386,
+      "RC.DOCUMENTATION": 1,
+      "RC.MASTER_BU": 1,
+      "RC.MASTER_LAUNCH": 1,
+      "RC.SALES_BEFORE_MASTER_LAUNCH": 1,
+      "RE.BACKORDER_CATCHUP": 1074,
+      "RE.CUSTOMER_SHUTDOWN": 1,
+      "RE.DISRUPTION": 5,
+      "RE.HOLIDAY": 48,
+      "RE.LOGISTICS": 1,
+      "RE.NO_EFFECT": 5,
+      "RE.ONE_OFF_ORDER": 508,
+      "RE.PREBUY_PRICE_RISE": 1,
+      "RE.PRICE_CHANGE": 10,
+      "RE.PROGRAM_STEP": 1,
+      "RE.REGION_OPENING": 1,
+      "RE.SEMICONDUCTOR_ALLOCATION": 1926,
+      "RE.STOCKOUT_LISTED": 5007,
+      "RE.STOCKOUT_UNLISTED": 164,
+      "RE.STRIKE": 1,
+      "RE.SURCHARGE": 1,
+      "ST.COLD_START": 3,
+      "ST.CUSTOMER_SWITCH": 23,
+      "ST.CYCLE_CHANGE": 27,
+      "ST.EOL_DECLINE": 9,
+      "ST.LAUNCH_RAMP": 138,
+      "ST.LOST_ACCOUNT": 16,
+      "ST.ONPHASE_ZERO": 234
+    },
+    "train_mask_cells": 23186,
+    "sbc_classes": {
+      "erratic": 101,
+      "intermittent": 749,
+      "lumpy": 36,
+      "smooth": 2197
+    }
+  },
+  "checks": [
+    {
+      "stage": "anomalies",
+      "check_id": "ANM-ONE-OFFS",
+      "file": "train.csv",
+      "rule": "RE.ONE_OFF_ORDER",
+      "title": "One-off bulk orders on the phase-aware unconstrained expectation",
+      "description": "507 one-offs after two passes (first pass 502); dossier range 438-541. Outside Direct OEM / Tier-1: 3. Expectation smearing factor 1.0224.",
+      "dimension": "accuracy",
+      "severity": "info",
+      "unit": "cells",
+      "affected": 507,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "Direct OEM": 264,
+        "Tier-1 Distributor": 240,
+        "Export": 3
+      },
+      "action": "is_one_off; masked from level estimation (train_mask one_off), replaced by expected_demand",
+      "examples": []
+    },
+    {
+      "stage": "anomalies",
+      "check_id": "ANM-REGISTER-COVERAGE",
+      "file": "train.csv",
+      "rule": "workstream 2",
+      "title": "Anomaly register covers every Core / Advanced / Expert anomaly item",
+      "description": "336 episodes and 11,463 cells; required types missing: none.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "types",
+      "affected": 45,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "data_error.cell": 2558,
+        "data_error.episode": 37,
+        "real_event.cell": 8905,
+        "real_event.episode": 299
+      },
+      "action": "anomaly_register.csv",
+      "examples": []
+    },
+    {
+      "stage": "anomalies",
+      "check_id": "ANM-TRAIN-MASK",
+      "file": "train.csv",
+      "rule": "6.1",
+      "title": "Cells excluded from model fitting, by reason",
+      "description": "train_mask on 23,186 cells; level_mask adds the semiconductor window, EOL phase-out and pre-switch months; weight 0.7 on imputed semiconductor cells, 0.5 on suspected hidden stock-outs.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "cells",
+      "affected": 23186,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "missing_onphase": 837,
+        "erp_unknown": 330,
+        "d3_hidden_second_month": 7,
+        "lost_account_tail": 204,
+        "one_off": 507,
+        "covid_2020": 16356,
+        "prebuy_price_rise": 4035,
+        "strike": 93,
+        "red_sea_export": 817
+      },
+      "action": "train_mask / level_mask / train_weight columns",
+      "examples": [
+        {
+          "anomaly_id": "DE.BLANK_KEY:train.csv:K11",
+          "type": "DE.BLANK_KEY",
+          "class": "data_error"
+        },
+        {
+          "anomaly_id": "DE.BLANK_KEY:train.csv:K12",
+          "type": "DE.BLANK_KEY",
+          "class": "data_error"
+        },
+        {
+          "anomaly_id": "DE.BLANK_KEY:train.csv:K7",
+          "type": "DE.BLANK_KEY",
+          "class": "data_error"
+        },
+        {
+          "anomaly_id": "DE.CURRENCY_BLOCK:train.csv:N10",
+          "type": "DE.CURRENCY_BLOCK",
+          "class": "data_error"
+        },
+        {
+          "anomaly_id": "DE.DATE_FORMAT:train.csv:K3",
+          "type": "DE.DATE_FORMAT",
+          "class": "data_error"
+        }
+      ]
+    },
+    {
+      "stage": "anomalies",
+      "check_id": "ANM-SERIES-PROFILE",
+      "file": "train.csv",
+      "rule": "workstream 3 Core",
+      "title": "Series profile with the Syntetos-Boylan intermittency class",
+      "description": "One row per series; SBC class on unconstrained demand (full life) in the breakdown.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "series",
+      "affected": 3083,
+      "expected": 3083,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "erratic": 101,
+        "intermittent": 749,
+        "lumpy": 36,
+        "smooth": 2197
+      },
+      "action": "series_profile.csv",
+      "examples": []
+    }
+  ]
+}

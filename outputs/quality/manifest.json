@@ -53,6 +53,30 @@
   ],
   "outputs": [
     {
+      "path": "anomalies/anomaly_register.csv",
+      "sha256": "f58ca602b02e2f3707770e9f11362304d7a41d8fe6022bf1e92d166151a9ffa4",
+      "bytes": 4350334,
+      "rows": 11799
+    },
+    {
+      "path": "anomalies/series_profile.csv",
+      "sha256": "f2f5c0033c20dbefa0ecb6eeb99e25ce5d55d23e1b1e77dfff2e11d093b412fa",
+      "bytes": 881430,
+      "rows": 3083
+    },
+    {
+      "path": "clean/account_events.csv",
+      "sha256": "fd16f9178525335c85ad5bd729eaa84d35c89bfbf1f30162b4c8c24ba5b0fec5",
+      "bytes": 5424,
+      "rows": 66
+    },
+    {
+      "path": "clean/customer_history.csv",
+      "sha256": "5d0bcb0562ea5179f5823e6fbcd0b4852a44494e30ac927be6cf7714ead453dd",
+      "bytes": 103477,
+      "rows": 3106
+    },
+    {
       "path": "clean/events_clean.csv",
       "sha256": "f51ba2d6433eb64386551f33f34ec03e78efbd46c332b1c905542c1e2c66475c",
       "bytes": 11111,
@@ -71,9 +95,27 @@
       "rows": 4894
     },
     {
+      "path": "clean/regional_index.csv",
+      "sha256": "d3bb1684141ad3a676c33195a66ee587d6cd0b9046d6a1f89ca57dc7d4d140ef",
+      "bytes": 5829,
+      "rows": 94
+    },
+    {
+      "path": "clean/semiconductor_depth.csv",
+      "sha256": "eb1b94afe4552fb565431ee91516c37450b73495be974912b0dd409bd727d48d",
+      "bytes": 399,
+      "rows": 19
+    },
+    {
       "path": "clean/series_blocks.csv",
       "sha256": "d31e7ccc952d91a3c4579d87e7caf006344c4884fbaa0fa6aa4d305d8ea27e4a",
       "bytes": 192942,
+      "rows": 3083
+    },
+    {
+      "path": "clean/series_state.csv",
+      "sha256": "7648efb4f426935eccb7e938fdb1778e5184bb0605d1c1d9aa5bbebf69dfcb3e",
+      "bytes": 520955,
       "rows": 3083
     },
     {
@@ -89,9 +131,15 @@
       "rows": 5830
     },
     {
+      "path": "clean/test_grid.parquet",
+      "sha256": "f084399d8e0934b4809fe5bebc19c10d08915775267493c7e60404a1d159eade",
+      "bytes": 90953,
+      "rows": 58219
+    },
+    {
       "path": "clean/train_clean.parquet",
-      "sha256": "b611f6eb63c599eb489469e595cd5f997d572e860ff6eba3fcb0852006a722ad",
-      "bytes": 2352657,
+      "sha256": "b13128ebe0915015411aff0e32355d247d8e7e56f150888afb5f69687e41e92a",
+      "bytes": 4050628,
       "rows": 245548
     },
     {
@@ -102,20 +150,53 @@
     },
     {
       "path": "quality/dq_report.json",
-      "sha256": "26f338affc0a2d03e60f9ad9895651d103015ebae20467a7337a6df27ddc2b39",
-      "bytes": 118707
+      "sha256": "81b3c6074cbbf7387e0030370f234429b1aa7b20c2e0206fff895c527bbe0c5c",
+      "bytes": 150421
     },
     {
       "path": "quality/fix_log.parquet",
-      "sha256": "27d3e2232ac12f32127d5319424fc5708067c9d21df97412c017930c832a2c7c",
-      "bytes": 939346,
-      "rows": 77432
+      "sha256": "055de564f4a3aa8b1625de7b37c2589f11cd087c6b9c42eba63263444f52d804",
+      "bytes": 940861,
+      "rows": 77558
     },
     {
       "path": "quality/macro_change_log.csv",
       "sha256": "adfca067f0d7f65de84ac5fa3068659393ab2a7eb0b822712d5a10b2a33d151c",
       "bytes": 8710,
       "rows": 57
+    },
+    {
+      "path": "quality/stages/anomalies.json",
+      "sha256": "7aabbe5dca4affc028dc0976d3ff60ce883524366a1e66ce762889501e30e593",
+      "bytes": 6688
+    },
+    {
+      "path": "quality/stages/anomalies_fix_log.parquet",
+      "sha256": "489acd87108d0cd3c261810485cd82c02b0ab1b8b5fe83317fb028d56f9bddd0",
+      "bytes": 5859,
+      "rows": 0
+    },
+    {
+      "path": "quality/stages/clean.json",
+      "sha256": "613829c3d37a246fdfe0483b02ac6ebf39de287a6f4b2ead1237472d30c93840",
+      "bytes": 107090
+    },
+    {
+      "path": "quality/stages/clean_fix_log.parquet",
+      "sha256": "27d3e2232ac12f32127d5319424fc5708067c9d21df97412c017930c832a2c7c",
+      "bytes": 939346,
+      "rows": 77432
+    },
+    {
+      "path": "quality/stages/demand.json",
+      "sha256": "fdfa6c66af21fff6358265b07ae8cd6faac6e5187463e8f2713f3ee711dc6894",
+      "bytes": 21280
+    },
+    {
+      "path": "quality/stages/demand_fix_log.parquet",
+      "sha256": "06a4b99879f949d010d44be36322cad5336ecbe07db742c7c94a43cfca3b02d7",
+      "bytes": 9393,
+      "rows": 126
     }
   ]
 }

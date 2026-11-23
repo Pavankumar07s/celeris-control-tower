@@ -4,26 +4,26 @@
   "evidence": "research/DATA_DOSSIER.md",
   "summary": {
     "files": 7,
-    "checks": 84,
-    "checks_failing_before": 48,
+    "checks": 105,
+    "checks_failing_before": 55,
     "checks_failing_after": {
       "error": 0,
-      "warning": 2,
-      "info": 1
+      "warning": 4,
+      "info": 4
     },
-    "cells_changed": 73749,
+    "cells_changed": 73875,
     "cells_changed_by_method": {
       "approximate": 385,
       "convention": 36057,
       "derived": 2952,
-      "exact": 8261,
+      "exact": 8387,
       "format": 25762,
       "unknown": 332
     },
     "cells_changed_by_file": {
       "macro_indicators.csv": 56,
       "sku_master.csv": 2,
-      "train.csv": 73691
+      "train.csv": 73817
     },
     "rows_dropped": 3683,
     "train_rows_raw": 248248,
@@ -50,26 +50,145 @@
     "train_units_naive": 12030253.0,
     "train_units_clean": 11723379.0,
     "train_revenue_naive_usd": 8684426206.34,
-    "train_revenue_clean_usd": 8575853814.24
+    "train_revenue_clean_usd": 8575853814.24,
+    "stages_run": [
+      "clean",
+      "demand",
+      "anomalies"
+    ],
+    "stages": {
+      "demand": {
+        "overlay_cells": 69,
+        "units_shipped": 11724013.0,
+        "demand_unconstrained": 11831099.5,
+        "uplift_pct": 0.913,
+        "lost_units": 106924.5,
+        "lost_revenue_usd": 109949626.71,
+        "demand_uc_methods": {
+          "shipped": 235329,
+          "S1_listed_requested": 5830,
+          "S5_semiconductor_imputed": 1925,
+          "S2_carry_removed": 1034,
+          "D2_hidden_stockout": 62,
+          "D1_hidden_stockout": 29,
+          "D1_phantom_removed": 29,
+          "D3_hidden_second_month": 14,
+          "spill_removed": 10,
+          "missing_after_backorder": 4,
+          "erp_unknown_order": 330,
+          "missing_offphase_zero": 118,
+          "missing_lost_tail_zero": 1,
+          "missing_onphase_unknown": 833
+        },
+        "cycle_kinds": {
+          "A": 775,
+          "B": 297,
+          "M": 1539,
+          "Q": 242,
+          "T": 230
+        },
+        "cycle_changes": 27,
+        "lost_accounts": 16,
+        "customer_switches": 23,
+        "cycle_iterations": 1,
+        "test_grid_rows": 58219,
+        "test_grid_structural_zeros": {
+          "lost_account": 304,
+          "off_phase": 8382,
+          "post_eol": 156
+        }
+      },
+      "anomalies": {
+        "one_offs": 507,
+        "register_rows": 11799,
+        "register_by_class_level": {
+          "data_error.cell": 2558,
+          "data_error.episode": 37,
+          "real_event.cell": 8905,
+          "real_event.episode": 299
+        },
+        "register_by_type": {
+          "DE.BLANK_KEY": 3,
+          "DE.CURRENCY_BLOCK": 1,
+          "DE.DATE_FORMAT": 1,
+          "DE.DATE_TYPO": 1,
+          "DE.DUPLICATE": 1,
+          "DE.LABEL_VARIANT": 4,
+          "DE.MACRO_BLANK": 1,
+          "DE.MACRO_DECIMAL": 1,
+          "DE.MACRO_DUPLICATE": 1,
+          "DE.MACRO_REBASE": 1,
+          "DE.MACRO_UNIT": 1,
+          "DE.MISSING_ROW": 983,
+          "DE.MONTH_COLUMN": 1,
+          "DE.PRICE_CENTS": 1,
+          "DE.PRICE_ZEROED": 1,
+          "DE.RESTATEMENT": 1,
+          "DE.REVENUE_SCALE": 1,
+          "DE.REVENUE_TRANSPOSITION": 1,
+          "DE.SIGN": 492,
+          "DE.STOCKOUT_OVERLAY": 1,
+          "DE.SYSTEM_BLANKING": 333,
+          "DE.THOUSANDS_SEPARATOR": 1,
+          "DE.UNITS_BLANK": 3,
+          "DE.UNITS_SCALE": 370,
+          "DE.UOM_BLOCK": 386,
+          "RC.DOCUMENTATION": 1,
+          "RC.MASTER_BU": 1,
+          "RC.MASTER_LAUNCH": 1,
+          "RC.SALES_BEFORE_MASTER_LAUNCH": 1,
+          "RE.BACKORDER_CATCHUP": 1074,
+          "RE.CUSTOMER_SHUTDOWN": 1,
+          "RE.DISRUPTION": 5,
+          "RE.HOLIDAY": 48,
+          "RE.LOGISTICS": 1,
+          "RE.NO_EFFECT": 5,
+          "RE.ONE_OFF_ORDER": 508,
+          "RE.PREBUY_PRICE_RISE": 1,
+          "RE.PRICE_CHANGE": 10,
+          "RE.PROGRAM_STEP": 1,
+          "RE.REGION_OPENING": 1,
+          "RE.SEMICONDUCTOR_ALLOCATION": 1926,
+          "RE.STOCKOUT_LISTED": 5007,
+          "RE.STOCKOUT_UNLISTED": 164,
+          "RE.STRIKE": 1,
+          "RE.SURCHARGE": 1,
+          "ST.COLD_START": 3,
+          "ST.CUSTOMER_SWITCH": 23,
+          "ST.CYCLE_CHANGE": 27,
+          "ST.EOL_DECLINE": 9,
+          "ST.LAUNCH_RAMP": 138,
+          "ST.LOST_ACCOUNT": 16,
+          "ST.ONPHASE_ZERO": 234
+        },
+        "train_mask_cells": 23186,
+        "sbc_classes": {
+          "erratic": 101,
+          "intermittent": 749,
+          "lumpy": 36,
+          "smooth": 2197
+        }
+      }
+    }
   },
   "files": [
     {
       "file": "train.csv",
       "rows_raw": 248248,
       "rows_clean": 245548,
-      "checks": 48,
-      "checks_failing_before": 37,
+      "checks": 63,
+      "checks_failing_before": 44,
       "checks_failing_after": {
         "error": 0,
-        "warning": 1,
-        "info": 0
+        "warning": 3,
+        "info": 3
       },
-      "cells_changed": 73691,
+      "cells_changed": 73817,
       "cells_changed_by_method": {
         "approximate": 385,
         "convention": 36057,
         "derived": 2947,
-        "exact": 8208,
+        "exact": 8334,
         "format": 25762,
         "unknown": 332
       },
@@ -370,14 +489,70 @@
           "unit": "records",
           "affected": 244566,
           "severity": "error"
+        },
+        {
+          "check_id": "DEM-S0-SHIPPED-OVERLAY",
+          "rule": "7.1/7(0)",
+          "title": "Listed cells whose units only the stock-out file knows",
+          "unit": "cells",
+          "affected": 69,
+          "severity": "error"
+        },
+        {
+          "check_id": "DEM-UC-OFFPHASE-SPILL",
+          "rule": "3/RE.BACKORDER_CATCHUP",
+          "title": "Positive shipments in off-phase months (back-order spill)",
+          "unit": "cells",
+          "affected": 225,
+          "severity": "error"
+        },
+        {
+          "check_id": "DEM-CYCLE-CHANGES",
+          "rule": "ST.CYCLE_CHANGE",
+          "title": "Ordering-cycle changes (real events)",
+          "unit": "series",
+          "affected": 27,
+          "severity": "info"
+        },
+        {
+          "check_id": "DEM-LOST-ACCOUNTS",
+          "rule": "ST.LOST_ACCOUNT",
+          "title": "Lost accounts (>= 6 silent months on a live series)",
+          "unit": "series",
+          "affected": 16,
+          "severity": "info"
+        },
+        {
+          "check_id": "DEM-CUSTOMER-SWITCHES",
+          "rule": "ST.CUSTOMER_SWITCH",
+          "title": "Customer switches (one per series, no gap)",
+          "unit": "series",
+          "affected": 23,
+          "severity": "info"
+        },
+        {
+          "check_id": "DEM-MISSING-TREATMENT",
+          "rule": "K13/7.1-9",
+          "title": "Missing rows treated from the ordering cycle",
+          "unit": "cells",
+          "affected": 982,
+          "severity": "warning"
+        },
+        {
+          "check_id": "DEM-ERP-BLANKS",
+          "rule": "N12/EV-033",
+          "title": "ERP-migration blanks: positive orders of unknown size",
+          "unit": "cells",
+          "affected": 332,
+          "severity": "warning"
         }
       ]
     },
     {
       "file": "test.csv",
       "rows_raw": 58219,
-      "rows_clean": null,
-      "checks": 5,
+      "rows_clean": 58219,
+      "checks": 9,
       "checks_failing_before": 1,
       "checks_failing_after": {
         "error": 0,
@@ -521,7 +696,7 @@
       "file": "inventory_stockouts.csv",
       "rows_raw": 5830,
       "rows_clean": 5830,
-      "checks": 10,
+      "checks": 12,
       "checks_failing_before": 2,
       "checks_failing_after": {
         "error": 0,
@@ -569,6 +744,7 @@
   ],
   "checks": [
     {
+      "stage": "clean",
       "check_id": "TRN-K3-DATE-FORMAT",
       "file": "train.csv",
       "rule": "K3",
@@ -627,6 +803,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K3-DATE-FORMAT-IDS",
       "file": "train.csv",
       "rule": "K3",
@@ -652,6 +829,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K4-YEAR-TYPO",
       "file": "train.csv",
       "rule": "K4",
@@ -703,6 +881,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K5-MONTH-COLUMN",
       "file": "train.csv",
       "rule": "K5",
@@ -757,6 +936,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K6-REGION",
       "file": "train.csv",
       "rule": "K6",
@@ -819,6 +999,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K6-REGION-IDS",
       "file": "train.csv",
       "rule": "K6",
@@ -844,6 +1025,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K8-CHANNEL",
       "file": "train.csv",
       "rule": "K8",
@@ -906,6 +1088,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K8-CHANNEL-IDS",
       "file": "train.csv",
       "rule": "K8",
@@ -931,6 +1114,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K9-SKU",
       "file": "train.csv",
       "rule": "K9",
@@ -993,6 +1177,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K9-SKU-IDS",
       "file": "train.csv",
       "rule": "K9",
@@ -1018,6 +1203,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K10-CUSTOMER",
       "file": "train.csv",
       "rule": "K10",
@@ -1080,6 +1266,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K10-CUSTOMER-IDS",
       "file": "train.csv",
       "rule": "K10",
@@ -1105,6 +1292,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K11-FAMILY-BLANK",
       "file": "train.csv",
       "rule": "K11",
@@ -1156,6 +1344,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K11-FAMILY-BLANK-IDS",
       "file": "train.csv",
       "rule": "K11",
@@ -1181,6 +1370,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K12-DESCRIPTION-BLANK",
       "file": "train.csv",
       "rule": "K12",
@@ -1232,6 +1422,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K12-DESCRIPTION-BLANK-IDS",
       "file": "train.csv",
       "rule": "K12",
@@ -1257,6 +1448,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-UNQ-RECORD-ID",
       "file": "train.csv",
       "rule": "K1/K2",
@@ -1282,6 +1474,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K1-EXACT-DUPLICATE",
       "file": "train.csv",
       "rule": "K1",
@@ -1333,6 +1526,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K2-SUPERSEDED-LOAD",
       "file": "train.csv",
       "rule": "K2",
@@ -1391,6 +1585,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-GRID-BLOCKS",
       "file": "train.csv",
       "rule": "2.0",
@@ -1419,6 +1614,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-GRID-REGION-ORDER",
       "file": "train.csv",
       "rule": "2.0",
@@ -1446,6 +1642,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K7-REGION-BLANK",
       "file": "train.csv",
       "rule": "K7",
@@ -1509,6 +1706,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K7-WITNESS",
       "file": "train.csv",
       "rule": "K7",
@@ -1534,6 +1732,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-UNQ-KEY",
       "file": "train.csv",
       "rule": "2.0",
@@ -1559,6 +1758,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-GRID-CELLS",
       "file": "train.csv",
       "rule": "2.0",
@@ -1584,6 +1784,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-K13-MISSING-ROW",
       "file": "train.csv",
       "rule": "K13",
@@ -1639,6 +1840,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-PRICE-TABLE",
       "file": "train.csv",
       "rule": "2.2",
@@ -1666,6 +1868,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-PRICE-SURCHARGE",
       "file": "train.csv",
       "rule": "2.2",
@@ -1697,6 +1900,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-NUM-STATES",
       "file": "train.csv",
       "rule": "2.2",
@@ -1739,6 +1943,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-NUM-STATES-RAW",
       "file": "train.csv",
       "rule": "2.2",
@@ -1780,6 +1985,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N1-UNITS-BLANK-RECOVERED",
       "file": "train.csv",
       "rule": "N1",
@@ -1866,6 +2072,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N2-UNITS-BLANK-ZERO-ROW",
       "file": "train.csv",
       "rule": "N2",
@@ -1954,6 +2161,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N3-UNITS-DASH",
       "file": "train.csv",
       "rule": "N3",
@@ -2040,6 +2248,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N4-SIGN-ERROR",
       "file": "train.csv",
       "rule": "N4",
@@ -2126,6 +2335,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N5-UNITS-X10",
       "file": "train.csv",
       "rule": "N5",
@@ -2212,6 +2422,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N6-UNITS-X100",
       "file": "train.csv",
       "rule": "N6",
@@ -2298,6 +2509,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N7-REVENUE-X10",
       "file": "train.csv",
       "rule": "N7",
@@ -2384,6 +2596,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N8-REVENUE-DIGIT-SWAP",
       "file": "train.csv",
       "rule": "N8",
@@ -2470,6 +2683,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N9-PRICE-IN-CENTS",
       "file": "train.csv",
       "rule": "N9",
@@ -2556,6 +2770,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N10-PRICE-IN-EUR",
       "file": "train.csv",
       "rule": "N10",
@@ -2642,6 +2857,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N11-PACK-OF-10",
       "file": "train.csv",
       "rule": "N11",
@@ -2728,6 +2944,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N12-ERP-UNITS-LOST",
       "file": "train.csv",
       "rule": "N12",
@@ -2814,6 +3031,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N13-PRICE-ZEROED",
       "file": "train.csv",
       "rule": "N13",
@@ -2900,6 +3118,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-N6B-THOUSANDS-SEPARATOR",
       "file": "train.csv",
       "rule": "N6b",
@@ -2960,6 +3179,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TRN-NUM-REVENUE-IDENTITY",
       "file": "train.csv",
       "rule": "2.2",
@@ -2985,6 +3205,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-NUM-UNITS-VALID",
       "file": "train.csv",
       "rule": "2.2",
@@ -3010,6 +3231,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TRN-NUM-TOTALS",
       "file": "train.csv",
       "rule": "2.2",
@@ -3038,6 +3260,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MST-UNQ-001",
       "file": "sku_master.csv",
       "rule": "2.5",
@@ -3063,6 +3286,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MST-S1-BU",
       "file": "sku_master.csv",
       "rule": "S1",
@@ -3093,6 +3317,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "MST-S2-LAUNCH",
       "file": "sku_master.csv",
       "rule": "S2",
@@ -3124,6 +3349,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "MST-STATUS-001",
       "file": "sku_master.csv",
       "rule": "2.5",
@@ -3149,6 +3375,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MST-DESC-001",
       "file": "sku_master.csv",
       "rule": "2.5",
@@ -3174,6 +3401,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MST-VAL-001",
       "file": "sku_master.csv",
       "rule": "2.5",
@@ -3199,6 +3427,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MST-STATUS-ACTIVE",
       "file": "sku_master.csv",
       "rule": "2.5",
@@ -3224,6 +3453,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MST-STATUS-DISCONTINUED",
       "file": "sku_master.csv",
       "rule": "2.5",
@@ -3249,6 +3479,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MST-STATUS-EOL-ANNOUNCED",
       "file": "sku_master.csv",
       "rule": "2.5",
@@ -3274,6 +3505,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MST-STATUS-PLANNED-LAUNCH",
       "file": "sku_master.csv",
       "rule": "2.5",
@@ -3299,6 +3531,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "MAC-M1-DUPLICATE-MONTH",
       "file": "macro_indicators.csv",
       "rule": "M1",
@@ -3337,6 +3570,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "MAC-M2-FRACTION",
       "file": "macro_indicators.csv",
       "rule": "M2",
@@ -3393,6 +3627,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "MAC-M3-DECIMAL-SHIFT",
       "file": "macro_indicators.csv",
       "rule": "M3",
@@ -3425,6 +3660,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "MAC-M4-REBASE",
       "file": "macro_indicators.csv",
       "rule": "M4",
@@ -3481,6 +3717,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "MAC-M5-BLANK",
       "file": "macro_indicators.csv",
       "rule": "M5",
@@ -3537,6 +3774,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "MAC-COMPLETE",
       "file": "macro_indicators.csv",
       "rule": "2.4",
@@ -3565,6 +3803,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "EVT-FORMAT",
       "file": "events_calendar.csv",
       "rule": "2.6",
@@ -3594,6 +3833,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "EVT-SCOPE",
       "file": "events_calendar.csv",
       "rule": "2.6",
@@ -3635,6 +3875,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "EVT-HOLIDAY-LENGTH",
       "file": "events_calendar.csv",
       "rule": "2.6",
@@ -3660,6 +3901,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "EVT-FORECAST-WINDOW",
       "file": "events_calendar.csv",
       "rule": "2.6",
@@ -3716,6 +3958,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "STK-FORMAT",
       "file": "inventory_stockouts.csv",
       "rule": "I1",
@@ -3747,6 +3990,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "STK-IDENTITY-LOST",
       "file": "inventory_stockouts.csv",
       "rule": "2.7",
@@ -3772,6 +4016,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "STK-IDENTITY-CARRY",
       "file": "inventory_stockouts.csv",
       "rule": "2.7",
@@ -3797,6 +4042,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "STK-IDENTITY-BACKORDER",
       "file": "inventory_stockouts.csv",
       "rule": "2.7",
@@ -3825,6 +4071,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "STK-IDENTITY-FILL",
       "file": "inventory_stockouts.csv",
       "rule": "2.7",
@@ -3850,6 +4097,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "STK-I2-FILL-DOCUMENTATION",
       "file": "inventory_stockouts.csv",
       "rule": "I2",
@@ -3911,6 +4159,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "STK-I3-NO-IMPACT",
       "file": "inventory_stockouts.csv",
       "rule": "I3",
@@ -3938,6 +4187,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "STK-I5-SEMICONDUCTOR-CARRY",
       "file": "inventory_stockouts.csv",
       "rule": "I5",
@@ -3963,6 +4213,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "ORC-UNITS-SHIPPED",
       "file": "inventory_stockouts.csv",
       "rule": "2.2/N0-N13",
@@ -3992,6 +4243,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "ORC-MISSING-ROWS-LISTED",
       "file": "inventory_stockouts.csv",
       "rule": "K13",
@@ -4048,6 +4300,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "ORC-RESTATEMENT-LATEST",
       "file": "train.csv",
       "rule": "K2",
@@ -4104,6 +4357,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TST-SHAPE",
       "file": "test.csv",
       "rule": "2.3",
@@ -4129,6 +4383,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TST-SERIES",
       "file": "test.csv",
       "rule": "2.3",
@@ -4156,6 +4411,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TST-POST-EOL",
       "file": "test.csv",
       "rule": "2.3",
@@ -4197,6 +4453,7 @@
       ]
     },
     {
+      "stage": "clean",
       "check_id": "TST-BEFORE-LAUNCH",
       "file": "test.csv",
       "rule": "2.3",
@@ -4222,6 +4479,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "TST-BU-MASTER",
       "file": "test.csv",
       "rule": "S1",
@@ -4247,6 +4505,7 @@
       "examples": []
     },
     {
+      "stage": "clean",
       "check_id": "SMP-FORMAT",
       "file": "sample_submission.csv",
       "rule": "2.8",
@@ -4269,6 +4528,802 @@
       },
       "breakdown": {},
       "action": "submission = 58,219 rows in test order, rounded to the nearest integer",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-S0-SHIPPED-OVERLAY",
+      "file": "train.csv",
+      "rule": "7.1/7(0)",
+      "title": "Listed cells whose units only the stock-out file knows",
+      "description": "Units := Shipped_Units on 69 listed cells: 26 missing rows, 1 ERP blank, 42 pack-of-10 rows (63 unit values and 63 revenues changed; revenue recomputed as units x invoice price).",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 69,
+      "expected": 69,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 69,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "missing_row": 26,
+        "erp_blank": 1,
+        "pack_of_10": 42
+      },
+      "action": "units = Shipped_Units, revenue = units x invoice price (fix-log rule S0)",
+      "examples": [
+        {
+          "date": "2025-07",
+          "sku_id": "BSS-058",
+          "region": "Europe",
+          "numeric_state": null,
+          "units_sold": 39,
+          "revenue_usd": 24992.37
+        },
+        {
+          "date": "2024-05",
+          "sku_id": "CSS-048",
+          "region": "Europe",
+          "numeric_state": null,
+          "units_sold": 17,
+          "revenue_usd": 17860.37
+        },
+        {
+          "date": "2021-05",
+          "sku_id": "ELA-001",
+          "region": "India",
+          "numeric_state": null,
+          "units_sold": 24,
+          "revenue_usd": 39741.6
+        },
+        {
+          "date": "2021-08",
+          "sku_id": "ELA-006",
+          "region": "India",
+          "numeric_state": "N11_pack_of_10",
+          "units_sold": 35,
+          "revenue_usd": 47624.85
+        },
+        {
+          "date": "2021-11",
+          "sku_id": "ELA-006",
+          "region": "India",
+          "numeric_state": "N11_pack_of_10",
+          "units_sold": 67,
+          "revenue_usd": 91167.57
+        }
+      ]
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-S0-ORACLE",
+      "file": "train.csv",
+      "rule": "7.1/7(0)",
+      "title": "Units = Shipped_Units on every listed cell after the overlay",
+      "description": "5,761 comparable records already equal before the overlay; every listed cell equals after it.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 5761,
+      "expected": 5761,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "fail the build on any mismatch",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-METHODS",
+      "file": "train.csv",
+      "rule": "7.1/7",
+      "title": "Unconstrained demand: every grid cell has one derivation method",
+      "description": "Rules S1, S5, S2, D2, D1, D3, spill and the missing-cell treatment in the dossier's order; method counts per cell in the breakdown (dossier / SU section 9 counts asserted).",
+      "dimension": "completeness",
+      "severity": "info",
+      "unit": "cells",
+      "affected": 245548,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "S1_listed_requested": 5830,
+        "S5_semiconductor_imputed": 1925,
+        "S2_carry_removed": 1034,
+        "D2_hidden_stockout": 62,
+        "D1_hidden_stockout": 29,
+        "D1_phantom_removed": 29,
+        "D3_hidden_second_month": 14,
+        "missing_after_backorder": 4
+      },
+      "action": "demand_uc / demand_uc_method columns",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-IDENTITIES",
+      "file": "inventory_stockouts.csv",
+      "rule": "2.7",
+      "title": "Stock-out accounting on the demand columns",
+      "description": "Listed cells: demand_uc = Requested_Units and shortfall = backorder_out + lost_units; S2 cells: demand_uc + backorder_in = shipped units; every cell: shortfall = backorder_out + lost_units.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 6864,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "fail the build on any violation",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-OFFPHASE-SPILL",
+      "file": "train.csv",
+      "rule": "3/RE.BACKORDER_CATCHUP",
+      "title": "Positive shipments in off-phase months (back-order spill)",
+      "description": "Off-phase months carry no own demand (Requested = 0 on 855 / 858 listed off-phase rows). Shipments there are back-order spill; after unconstraining no unlisted off-phase cell has positive demand.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 225,
+      "expected": null,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 225,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "spill -> 0 demand (S2 / D1 / spill rules); month t-1 flagged as a stock-out",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-UPLIFT",
+      "file": "train.csv",
+      "rule": "2.7/7",
+      "title": "Unconstrained demand vs shipments",
+      "description": "Uplift over shipped units 0.91 % (dossier +0.91 %); ELA 2021 44.8 % (+44.8 %), ELA 2022 29.2 % (+29.2 %); lost units 106,924 (listed + imputed semiconductor + D1-D3; dossier 106,925).",
+      "dimension": "accuracy",
+      "severity": "info",
+      "unit": "units",
+      "affected": 11831100,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "units_shipped_where_demand_known": 11724013,
+        "demand_uc_where_shipped_known": 11831100,
+        "lost_units": 106924
+      },
+      "action": "report",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-INFERRED-STOCKOUTS",
+      "file": "inventory_stockouts.csv",
+      "rule": "I4",
+      "title": "Unlisted stock-out months recovered from arithmetic signatures",
+      "description": "D2 (listed carry-in after an unlisted month), D1 (phantom off-phase order), D3 (shipped less than the carry-in) and spill origins are inferred exactly; S2 cells below 0.35 x their local level are suspected hidden second months (flag only, down-weighted).",
+      "dimension": "completeness",
+      "severity": "info",
+      "unit": "cells",
+      "affected": 113,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "suspected_second_month": 50,
+        "semiconductor_unlisted": 1925
+      },
+      "action": "is_stockout_inferred / stockout_suspect",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-CYCLE-PATTERNS",
+      "file": "train.csv",
+      "rule": "4.9/7.1-8",
+      "title": "Every series has a calendar-anchored ordering cycle",
+      "description": "Template segmentation over 21 calendar templates; current regime by kind in the breakdown. After unconstraining P(order | on-phase) = 99.89 %, P(zero | off-phase) = 100.000 % (dossier on shipments: 99.87 % / 99.37 %). Error rates estimated: P(zero | on) 0.00055, P(order | off) 0.00004, ramp ages 0-3 [0.0919, 0.0254, 0.0123, 0.0094].",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "series",
+      "affected": 3083,
+      "expected": 3083,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "M": 1539,
+        "A": 775,
+        "B": 297,
+        "Q": 242,
+        "T": 230
+      },
+      "action": "cycle_pattern / on_phase / accum_span / carry_weight columns; series_state.csv",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-CYCLE-CHANGES",
+      "file": "train.csv",
+      "rule": "ST.CYCLE_CHANGE",
+      "title": "Ordering-cycle changes (real events)",
+      "description": "Single change point per series, at least 4 mismatches removed, 6 months on each side; change month = first month of the tie window.",
+      "dimension": "consistency",
+      "severity": "info",
+      "unit": "series",
+      "affected": 27,
+      "expected": 27,
+      "before": {
+        "metric": "series_with_issue",
+        "value": 27,
+        "passed": false
+      },
+      "after": {
+        "metric": "series_with_issue",
+        "value": 27,
+        "passed": false
+      },
+      "breakdown": {
+        "Q>M": 18,
+        "M>B": 6,
+        "M>Q": 3
+      },
+      "action": "regime in force at the origin projected into the window; no level break",
+      "examples": [
+        {
+          "sku_id": "BSS-008",
+          "region": "India",
+          "cycle_pattern_before": "M",
+          "cycle_pattern": "B0",
+          "change_month": "2023-07"
+        },
+        {
+          "sku_id": "BSS-014",
+          "region": "Europe",
+          "cycle_pattern_before": "Q0",
+          "cycle_pattern": "M",
+          "change_month": "2022-06"
+        },
+        {
+          "sku_id": "BSS-019",
+          "region": "India",
+          "cycle_pattern_before": "Q1",
+          "cycle_pattern": "M",
+          "change_month": "2023-05"
+        },
+        {
+          "sku_id": "BSS-050",
+          "region": "North America",
+          "cycle_pattern_before": "Q1",
+          "cycle_pattern": "M",
+          "change_month": "2022-04"
+        },
+        {
+          "sku_id": "BSS-069",
+          "region": "Asia Pacific",
+          "cycle_pattern_before": "Q1",
+          "cycle_pattern": "M",
+          "change_month": "2023-05"
+        }
+      ]
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-LOST-ACCOUNTS",
+      "file": "train.csv",
+      "rule": "ST.LOST_ACCOUNT",
+      "title": "Lost accounts (>= 6 silent months on a live series)",
+      "description": "16 series silent for 10-19 months at the origin; 204 tail cells; pre-loss level 1,019.0 units / month.",
+      "dimension": "completeness",
+      "severity": "info",
+      "unit": "series",
+      "affected": 16,
+      "expected": 16,
+      "before": {
+        "metric": "series_with_issue",
+        "value": 16,
+        "passed": false
+      },
+      "after": {
+        "metric": "series_with_issue",
+        "value": 16,
+        "passed": false
+      },
+      "breakdown": {
+        "tail_cells": 204
+      },
+      "action": "forecast 0; tail masked from training",
+      "examples": [
+        {
+          "sku_id": "BSS-034",
+          "region": "North America",
+          "lost_since": "2025-12",
+          "silent_months": 10,
+          "pre_loss_level": 69.58333333333333
+        },
+        {
+          "sku_id": "BSS-082",
+          "region": "India",
+          "lost_since": "2026-01",
+          "silent_months": 10,
+          "pre_loss_level": 95.08333333333333
+        },
+        {
+          "sku_id": "CSS-045",
+          "region": "India",
+          "lost_since": "2025-11",
+          "silent_months": 12,
+          "pre_loss_level": 71.0
+        },
+        {
+          "sku_id": "CSS-062",
+          "region": "Asia Pacific",
+          "lost_since": "2025-10",
+          "silent_months": 13,
+          "pre_loss_level": 44.166666666666664
+        },
+        {
+          "sku_id": "CSS-085",
+          "region": "Europe",
+          "lost_since": "2025-12",
+          "silent_months": 11,
+          "pre_loss_level": 59.75
+        }
+      ]
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-CUSTOMER-SWITCHES",
+      "file": "train.csv",
+      "rule": "ST.CUSTOMER_SWITCH",
+      "title": "Customer switches (one per series, no gap)",
+      "description": "23 switches; region-adjusted level ratio 0.53-2.08; months with a gap between customers: 0.",
+      "dimension": "consistency",
+      "severity": "info",
+      "unit": "series",
+      "affected": 23,
+      "expected": 23,
+      "before": {
+        "metric": "series_with_issue",
+        "value": 23,
+        "passed": false
+      },
+      "after": {
+        "metric": "series_with_issue",
+        "value": 23,
+        "passed": false
+      },
+      "breakdown": {},
+      "action": "customer at time for event joins; level from post-switch months",
+      "examples": [
+        {
+          "sku_id": "BSS-001",
+          "region": "Asia Pacific",
+          "customer_before": "Helios Auto Parts",
+          "customer_after": "Crestline Manufacturing",
+          "switch_month": "2022-09"
+        },
+        {
+          "sku_id": "BSS-024",
+          "region": "Asia Pacific",
+          "customer_before": "Solaris Automotive",
+          "customer_after": "Meridian Assembly",
+          "switch_month": "2024-04"
+        },
+        {
+          "sku_id": "BSS-081",
+          "region": "North America",
+          "customer_before": "Nexon Motor Group",
+          "customer_after": "Apex Tier One",
+          "switch_month": "2025-01"
+        },
+        {
+          "sku_id": "CSS-066",
+          "region": "Latin America",
+          "customer_before": "Helios Auto Parts",
+          "customer_after": "Apex Tier One",
+          "switch_month": "2024-12"
+        },
+        {
+          "sku_id": "CSS-085",
+          "region": "India",
+          "customer_before": "Crestline Manufacturing",
+          "customer_after": "Helios Auto Parts",
+          "switch_month": "2022-07"
+        }
+      ]
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-MISSING-TREATMENT",
+      "file": "train.csv",
+      "rule": "K13/7.1-9",
+      "title": "Missing rows treated from the ordering cycle",
+      "description": "Listed: demand = Requested_Units, units = Shipped_Units; off-phase or lost-tail: demand 0 (imputed zero); on-phase: demand unknown (NaN, masked), demand_filled = local level x accumulated regional index.",
+      "dimension": "completeness",
+      "severity": "warning",
+      "unit": "cells",
+      "affected": 982,
+      "expected": 982,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 982,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 837,
+        "passed": false
+      },
+      "breakdown": {
+        "listed": 26,
+        "zero": 119,
+        "unknown": 837
+      },
+      "action": "never 0 on an on-phase month (business rule 3)",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-ERP-BLANKS",
+      "file": "train.csv",
+      "rule": "N12/EV-033",
+      "title": "ERP-migration blanks: positive orders of unknown size",
+      "description": "332 records with units and revenue blank and a price: 1 restored from Shipped_Units (THM-033 Latin America 2023-04), CSS-062 Latin America 2023-03 is off-phase back-order spill (demand 0), the rest stay unknown (the dossier's 331 counts the off-phase spill among them).",
+      "dimension": "completeness",
+      "severity": "warning",
+      "unit": "cells",
+      "affected": 332,
+      "expected": null,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 332,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 330,
+        "passed": false
+      },
+      "breakdown": {
+        "restored_from_shipped": 1,
+        "offphase_spill": 1,
+        "unknown": 330
+      },
+      "action": "demand_uc NaN, masked in training, demand_filled imputed (never 0)",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "TST-GRID-ROWS",
+      "file": "test.csv",
+      "rule": "2.3",
+      "title": "Forecast-window grid: one row per test.csv row, test customer = customer at the origin",
+      "description": "58,219 rows in test order; the test customer equals the train customer at the origin for 3,058 / 3,058 continuing series.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 58219,
+      "expected": 58219,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "cold_start_rows": 117
+      },
+      "action": "test_grid.parquet",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "TST-STRUCTURAL-ZEROS",
+      "file": "test.csv",
+      "rule": "5.1-5.3",
+      "title": "Structural zeros in the forecast window",
+      "description": "Post-EOL rows, lost accounts and months with p_order < 0.5 are forecast exactly 0 (3 off-phase rows rest on a young series' posterior between 0 and 0.5).",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 8842,
+      "expected": 8842,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "off_phase": 8382,
+        "lost_account": 304,
+        "post_eol": 156
+      },
+      "action": "force 0 after modelling",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "TST-ACCUMULATION",
+      "file": "test.csv",
+      "rule": "4.9/5.1",
+      "title": "Accumulation of latent months per on-phase test row",
+      "description": "Rows that are neither structural zeros nor cold starts: an order carries the latent months since the previous on-phase month; after an annual shutdown the carried month weighs 0.5 (never a 1.5 multiplier).",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 49260,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "1_month": 42373,
+        "2_months": 4243,
+        "3_months": 1505,
+        "after_shutdown": 1139
+      },
+      "action": "accum_span / carry_weight columns",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "TST-UNCERTAIN-ZEROS",
+      "file": "test.csv",
+      "rule": "5.1",
+      "title": "Low-confidence young-series zeros (cycle posterior < 0.99, p_order < 0.5)",
+      "description": "Each rests on a single zero observation (PMP-019 Europe A-Aug, ELA-017 India A-Jun, THM-011 Asia Pacific A-Jun).",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 3,
+      "expected": 3,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "forced to 0 (absolute-error optimal)",
+      "examples": []
+    },
+    {
+      "stage": "anomalies",
+      "check_id": "ANM-ONE-OFFS",
+      "file": "train.csv",
+      "rule": "RE.ONE_OFF_ORDER",
+      "title": "One-off bulk orders on the phase-aware unconstrained expectation",
+      "description": "507 one-offs after two passes (first pass 502); dossier range 438-541. Outside Direct OEM / Tier-1: 3. Expectation smearing factor 1.0224.",
+      "dimension": "accuracy",
+      "severity": "info",
+      "unit": "cells",
+      "affected": 507,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "Direct OEM": 264,
+        "Tier-1 Distributor": 240,
+        "Export": 3
+      },
+      "action": "is_one_off; masked from level estimation (train_mask one_off), replaced by expected_demand",
+      "examples": []
+    },
+    {
+      "stage": "anomalies",
+      "check_id": "ANM-REGISTER-COVERAGE",
+      "file": "train.csv",
+      "rule": "workstream 2",
+      "title": "Anomaly register covers every Core / Advanced / Expert anomaly item",
+      "description": "336 episodes and 11,463 cells; required types missing: none.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "types",
+      "affected": 45,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "data_error.cell": 2558,
+        "data_error.episode": 37,
+        "real_event.cell": 8905,
+        "real_event.episode": 299
+      },
+      "action": "anomaly_register.csv",
+      "examples": []
+    },
+    {
+      "stage": "anomalies",
+      "check_id": "ANM-TRAIN-MASK",
+      "file": "train.csv",
+      "rule": "6.1",
+      "title": "Cells excluded from model fitting, by reason",
+      "description": "train_mask on 23,186 cells; level_mask adds the semiconductor window, EOL phase-out and pre-switch months; weight 0.7 on imputed semiconductor cells, 0.5 on suspected hidden stock-outs.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "cells",
+      "affected": 23186,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "missing_onphase": 837,
+        "erp_unknown": 330,
+        "d3_hidden_second_month": 7,
+        "lost_account_tail": 204,
+        "one_off": 507,
+        "covid_2020": 16356,
+        "prebuy_price_rise": 4035,
+        "strike": 93,
+        "red_sea_export": 817
+      },
+      "action": "train_mask / level_mask / train_weight columns",
+      "examples": [
+        {
+          "anomaly_id": "DE.BLANK_KEY:train.csv:K11",
+          "type": "DE.BLANK_KEY",
+          "class": "data_error"
+        },
+        {
+          "anomaly_id": "DE.BLANK_KEY:train.csv:K12",
+          "type": "DE.BLANK_KEY",
+          "class": "data_error"
+        },
+        {
+          "anomaly_id": "DE.BLANK_KEY:train.csv:K7",
+          "type": "DE.BLANK_KEY",
+          "class": "data_error"
+        },
+        {
+          "anomaly_id": "DE.CURRENCY_BLOCK:train.csv:N10",
+          "type": "DE.CURRENCY_BLOCK",
+          "class": "data_error"
+        },
+        {
+          "anomaly_id": "DE.DATE_FORMAT:train.csv:K3",
+          "type": "DE.DATE_FORMAT",
+          "class": "data_error"
+        }
+      ]
+    },
+    {
+      "stage": "anomalies",
+      "check_id": "ANM-SERIES-PROFILE",
+      "file": "train.csv",
+      "rule": "workstream 3 Core",
+      "title": "Series profile with the Syntetos-Boylan intermittency class",
+      "description": "One row per series; SBC class on unconstrained demand (full life) in the breakdown.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "series",
+      "affected": 3083,
+      "expected": 3083,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "erratic": 101,
+        "intermittent": 749,
+        "lumpy": 36,
+        "smooth": 2197
+      },
+      "action": "series_profile.csv",
       "examples": []
     }
   ]

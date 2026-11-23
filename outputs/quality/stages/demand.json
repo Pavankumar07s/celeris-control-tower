@@ -1,0 +1,702 @@
+{
+  "record_version": "1.0",
+  "stage": "demand",
+  "outputs": [
+    "clean/account_events.csv",
+    "clean/customer_history.csv",
+    "clean/regional_index.csv",
+    "clean/semiconductor_depth.csv",
+    "clean/series_state.csv",
+    "clean/test_grid.parquet",
+    "clean/train_clean.parquet"
+  ],
+  "rows_raw": {},
+  "rows_clean": {
+    "test.csv": 58219
+  },
+  "headline": {
+    "overlay_cells": 69,
+    "units_shipped": 11724013.0,
+    "demand_unconstrained": 11831099.5,
+    "uplift_pct": 0.913,
+    "lost_units": 106924.5,
+    "lost_revenue_usd": 109949626.71,
+    "demand_uc_methods": {
+      "shipped": 235329,
+      "S1_listed_requested": 5830,
+      "S5_semiconductor_imputed": 1925,
+      "S2_carry_removed": 1034,
+      "D2_hidden_stockout": 62,
+      "D1_hidden_stockout": 29,
+      "D1_phantom_removed": 29,
+      "D3_hidden_second_month": 14,
+      "spill_removed": 10,
+      "missing_after_backorder": 4,
+      "erp_unknown_order": 330,
+      "missing_offphase_zero": 118,
+      "missing_lost_tail_zero": 1,
+      "missing_onphase_unknown": 833
+    },
+    "cycle_kinds": {
+      "A": 775,
+      "B": 297,
+      "M": 1539,
+      "Q": 242,
+      "T": 230
+    },
+    "cycle_changes": 27,
+    "lost_accounts": 16,
+    "customer_switches": 23,
+    "cycle_iterations": 1,
+    "test_grid_rows": 58219,
+    "test_grid_structural_zeros": {
+      "lost_account": 304,
+      "off_phase": 8382,
+      "post_eol": 156
+    }
+  },
+  "checks": [
+    {
+      "stage": "demand",
+      "check_id": "DEM-S0-SHIPPED-OVERLAY",
+      "file": "train.csv",
+      "rule": "7.1/7(0)",
+      "title": "Listed cells whose units only the stock-out file knows",
+      "description": "Units := Shipped_Units on 69 listed cells: 26 missing rows, 1 ERP blank, 42 pack-of-10 rows (63 unit values and 63 revenues changed; revenue recomputed as units x invoice price).",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 69,
+      "expected": 69,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 69,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "missing_row": 26,
+        "erp_blank": 1,
+        "pack_of_10": 42
+      },
+      "action": "units = Shipped_Units, revenue = units x invoice price (fix-log rule S0)",
+      "examples": [
+        {
+          "date": "2025-07",
+          "sku_id": "BSS-058",
+          "region": "Europe",
+          "numeric_state": null,
+          "units_sold": 39,
+          "revenue_usd": 24992.37
+        },
+        {
+          "date": "2024-05",
+          "sku_id": "CSS-048",
+          "region": "Europe",
+          "numeric_state": null,
+          "units_sold": 17,
+          "revenue_usd": 17860.37
+        },
+        {
+          "date": "2021-05",
+          "sku_id": "ELA-001",
+          "region": "India",
+          "numeric_state": null,
+          "units_sold": 24,
+          "revenue_usd": 39741.6
+        },
+        {
+          "date": "2021-08",
+          "sku_id": "ELA-006",
+          "region": "India",
+          "numeric_state": "N11_pack_of_10",
+          "units_sold": 35,
+          "revenue_usd": 47624.85
+        },
+        {
+          "date": "2021-11",
+          "sku_id": "ELA-006",
+          "region": "India",
+          "numeric_state": "N11_pack_of_10",
+          "units_sold": 67,
+          "revenue_usd": 91167.57
+        }
+      ]
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-S0-ORACLE",
+      "file": "train.csv",
+      "rule": "7.1/7(0)",
+      "title": "Units = Shipped_Units on every listed cell after the overlay",
+      "description": "5,761 comparable records already equal before the overlay; every listed cell equals after it.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 5761,
+      "expected": 5761,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "fail the build on any mismatch",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-METHODS",
+      "file": "train.csv",
+      "rule": "7.1/7",
+      "title": "Unconstrained demand: every grid cell has one derivation method",
+      "description": "Rules S1, S5, S2, D2, D1, D3, spill and the missing-cell treatment in the dossier's order; method counts per cell in the breakdown (dossier / SU section 9 counts asserted).",
+      "dimension": "completeness",
+      "severity": "info",
+      "unit": "cells",
+      "affected": 245548,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "S1_listed_requested": 5830,
+        "S5_semiconductor_imputed": 1925,
+        "S2_carry_removed": 1034,
+        "D2_hidden_stockout": 62,
+        "D1_hidden_stockout": 29,
+        "D1_phantom_removed": 29,
+        "D3_hidden_second_month": 14,
+        "missing_after_backorder": 4
+      },
+      "action": "demand_uc / demand_uc_method columns",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-IDENTITIES",
+      "file": "inventory_stockouts.csv",
+      "rule": "2.7",
+      "title": "Stock-out accounting on the demand columns",
+      "description": "Listed cells: demand_uc = Requested_Units and shortfall = backorder_out + lost_units; S2 cells: demand_uc + backorder_in = shipped units; every cell: shortfall = backorder_out + lost_units.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 6864,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "fail the build on any violation",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-OFFPHASE-SPILL",
+      "file": "train.csv",
+      "rule": "3/RE.BACKORDER_CATCHUP",
+      "title": "Positive shipments in off-phase months (back-order spill)",
+      "description": "Off-phase months carry no own demand (Requested = 0 on 855 / 858 listed off-phase rows). Shipments there are back-order spill; after unconstraining no unlisted off-phase cell has positive demand.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 225,
+      "expected": null,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 225,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "spill -> 0 demand (S2 / D1 / spill rules); month t-1 flagged as a stock-out",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-UPLIFT",
+      "file": "train.csv",
+      "rule": "2.7/7",
+      "title": "Unconstrained demand vs shipments",
+      "description": "Uplift over shipped units 0.91 % (dossier +0.91 %); ELA 2021 44.8 % (+44.8 %), ELA 2022 29.2 % (+29.2 %); lost units 106,924 (listed + imputed semiconductor + D1-D3; dossier 106,925).",
+      "dimension": "accuracy",
+      "severity": "info",
+      "unit": "units",
+      "affected": 11831100,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "units_shipped_where_demand_known": 11724013,
+        "demand_uc_where_shipped_known": 11831100,
+        "lost_units": 106924
+      },
+      "action": "report",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-UC-INFERRED-STOCKOUTS",
+      "file": "inventory_stockouts.csv",
+      "rule": "I4",
+      "title": "Unlisted stock-out months recovered from arithmetic signatures",
+      "description": "D2 (listed carry-in after an unlisted month), D1 (phantom off-phase order), D3 (shipped less than the carry-in) and spill origins are inferred exactly; S2 cells below 0.35 x their local level are suspected hidden second months (flag only, down-weighted).",
+      "dimension": "completeness",
+      "severity": "info",
+      "unit": "cells",
+      "affected": 113,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "suspected_second_month": 50,
+        "semiconductor_unlisted": 1925
+      },
+      "action": "is_stockout_inferred / stockout_suspect",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-CYCLE-PATTERNS",
+      "file": "train.csv",
+      "rule": "4.9/7.1-8",
+      "title": "Every series has a calendar-anchored ordering cycle",
+      "description": "Template segmentation over 21 calendar templates; current regime by kind in the breakdown. After unconstraining P(order | on-phase) = 99.89 %, P(zero | off-phase) = 100.000 % (dossier on shipments: 99.87 % / 99.37 %). Error rates estimated: P(zero | on) 0.00055, P(order | off) 0.00004, ramp ages 0-3 [0.0919, 0.0254, 0.0123, 0.0094].",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "series",
+      "affected": 3083,
+      "expected": 3083,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "M": 1539,
+        "A": 775,
+        "B": 297,
+        "Q": 242,
+        "T": 230
+      },
+      "action": "cycle_pattern / on_phase / accum_span / carry_weight columns; series_state.csv",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-CYCLE-CHANGES",
+      "file": "train.csv",
+      "rule": "ST.CYCLE_CHANGE",
+      "title": "Ordering-cycle changes (real events)",
+      "description": "Single change point per series, at least 4 mismatches removed, 6 months on each side; change month = first month of the tie window.",
+      "dimension": "consistency",
+      "severity": "info",
+      "unit": "series",
+      "affected": 27,
+      "expected": 27,
+      "before": {
+        "metric": "series_with_issue",
+        "value": 27,
+        "passed": false
+      },
+      "after": {
+        "metric": "series_with_issue",
+        "value": 27,
+        "passed": false
+      },
+      "breakdown": {
+        "Q>M": 18,
+        "M>B": 6,
+        "M>Q": 3
+      },
+      "action": "regime in force at the origin projected into the window; no level break",
+      "examples": [
+        {
+          "sku_id": "BSS-008",
+          "region": "India",
+          "cycle_pattern_before": "M",
+          "cycle_pattern": "B0",
+          "change_month": "2023-07"
+        },
+        {
+          "sku_id": "BSS-014",
+          "region": "Europe",
+          "cycle_pattern_before": "Q0",
+          "cycle_pattern": "M",
+          "change_month": "2022-06"
+        },
+        {
+          "sku_id": "BSS-019",
+          "region": "India",
+          "cycle_pattern_before": "Q1",
+          "cycle_pattern": "M",
+          "change_month": "2023-05"
+        },
+        {
+          "sku_id": "BSS-050",
+          "region": "North America",
+          "cycle_pattern_before": "Q1",
+          "cycle_pattern": "M",
+          "change_month": "2022-04"
+        },
+        {
+          "sku_id": "BSS-069",
+          "region": "Asia Pacific",
+          "cycle_pattern_before": "Q1",
+          "cycle_pattern": "M",
+          "change_month": "2023-05"
+        }
+      ]
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-LOST-ACCOUNTS",
+      "file": "train.csv",
+      "rule": "ST.LOST_ACCOUNT",
+      "title": "Lost accounts (>= 6 silent months on a live series)",
+      "description": "16 series silent for 10-19 months at the origin; 204 tail cells; pre-loss level 1,019.0 units / month.",
+      "dimension": "completeness",
+      "severity": "info",
+      "unit": "series",
+      "affected": 16,
+      "expected": 16,
+      "before": {
+        "metric": "series_with_issue",
+        "value": 16,
+        "passed": false
+      },
+      "after": {
+        "metric": "series_with_issue",
+        "value": 16,
+        "passed": false
+      },
+      "breakdown": {
+        "tail_cells": 204
+      },
+      "action": "forecast 0; tail masked from training",
+      "examples": [
+        {
+          "sku_id": "BSS-034",
+          "region": "North America",
+          "lost_since": "2025-12",
+          "silent_months": 10,
+          "pre_loss_level": 69.58333333333333
+        },
+        {
+          "sku_id": "BSS-082",
+          "region": "India",
+          "lost_since": "2026-01",
+          "silent_months": 10,
+          "pre_loss_level": 95.08333333333333
+        },
+        {
+          "sku_id": "CSS-045",
+          "region": "India",
+          "lost_since": "2025-11",
+          "silent_months": 12,
+          "pre_loss_level": 71.0
+        },
+        {
+          "sku_id": "CSS-062",
+          "region": "Asia Pacific",
+          "lost_since": "2025-10",
+          "silent_months": 13,
+          "pre_loss_level": 44.166666666666664
+        },
+        {
+          "sku_id": "CSS-085",
+          "region": "Europe",
+          "lost_since": "2025-12",
+          "silent_months": 11,
+          "pre_loss_level": 59.75
+        }
+      ]
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-CUSTOMER-SWITCHES",
+      "file": "train.csv",
+      "rule": "ST.CUSTOMER_SWITCH",
+      "title": "Customer switches (one per series, no gap)",
+      "description": "23 switches; region-adjusted level ratio 0.53-2.08; months with a gap between customers: 0.",
+      "dimension": "consistency",
+      "severity": "info",
+      "unit": "series",
+      "affected": 23,
+      "expected": 23,
+      "before": {
+        "metric": "series_with_issue",
+        "value": 23,
+        "passed": false
+      },
+      "after": {
+        "metric": "series_with_issue",
+        "value": 23,
+        "passed": false
+      },
+      "breakdown": {},
+      "action": "customer at time for event joins; level from post-switch months",
+      "examples": [
+        {
+          "sku_id": "BSS-001",
+          "region": "Asia Pacific",
+          "customer_before": "Helios Auto Parts",
+          "customer_after": "Crestline Manufacturing",
+          "switch_month": "2022-09"
+        },
+        {
+          "sku_id": "BSS-024",
+          "region": "Asia Pacific",
+          "customer_before": "Solaris Automotive",
+          "customer_after": "Meridian Assembly",
+          "switch_month": "2024-04"
+        },
+        {
+          "sku_id": "BSS-081",
+          "region": "North America",
+          "customer_before": "Nexon Motor Group",
+          "customer_after": "Apex Tier One",
+          "switch_month": "2025-01"
+        },
+        {
+          "sku_id": "CSS-066",
+          "region": "Latin America",
+          "customer_before": "Helios Auto Parts",
+          "customer_after": "Apex Tier One",
+          "switch_month": "2024-12"
+        },
+        {
+          "sku_id": "CSS-085",
+          "region": "India",
+          "customer_before": "Crestline Manufacturing",
+          "customer_after": "Helios Auto Parts",
+          "switch_month": "2022-07"
+        }
+      ]
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-MISSING-TREATMENT",
+      "file": "train.csv",
+      "rule": "K13/7.1-9",
+      "title": "Missing rows treated from the ordering cycle",
+      "description": "Listed: demand = Requested_Units, units = Shipped_Units; off-phase or lost-tail: demand 0 (imputed zero); on-phase: demand unknown (NaN, masked), demand_filled = local level x accumulated regional index.",
+      "dimension": "completeness",
+      "severity": "warning",
+      "unit": "cells",
+      "affected": 982,
+      "expected": 982,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 982,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 837,
+        "passed": false
+      },
+      "breakdown": {
+        "listed": 26,
+        "zero": 119,
+        "unknown": 837
+      },
+      "action": "never 0 on an on-phase month (business rule 3)",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "DEM-ERP-BLANKS",
+      "file": "train.csv",
+      "rule": "N12/EV-033",
+      "title": "ERP-migration blanks: positive orders of unknown size",
+      "description": "332 records with units and revenue blank and a price: 1 restored from Shipped_Units (THM-033 Latin America 2023-04), CSS-062 Latin America 2023-03 is off-phase back-order spill (demand 0), the rest stay unknown (the dossier's 331 counts the off-phase spill among them).",
+      "dimension": "completeness",
+      "severity": "warning",
+      "unit": "cells",
+      "affected": 332,
+      "expected": null,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 332,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 330,
+        "passed": false
+      },
+      "breakdown": {
+        "restored_from_shipped": 1,
+        "offphase_spill": 1,
+        "unknown": 330
+      },
+      "action": "demand_uc NaN, masked in training, demand_filled imputed (never 0)",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "TST-GRID-ROWS",
+      "file": "test.csv",
+      "rule": "2.3",
+      "title": "Forecast-window grid: one row per test.csv row, test customer = customer at the origin",
+      "description": "58,219 rows in test order; the test customer equals the train customer at the origin for 3,058 / 3,058 continuing series.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 58219,
+      "expected": 58219,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "cold_start_rows": 117
+      },
+      "action": "test_grid.parquet",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "TST-STRUCTURAL-ZEROS",
+      "file": "test.csv",
+      "rule": "5.1-5.3",
+      "title": "Structural zeros in the forecast window",
+      "description": "Post-EOL rows, lost accounts and months with p_order < 0.5 are forecast exactly 0 (3 off-phase rows rest on a young series' posterior between 0 and 0.5).",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 8842,
+      "expected": 8842,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "off_phase": 8382,
+        "lost_account": 304,
+        "post_eol": 156
+      },
+      "action": "force 0 after modelling",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "TST-ACCUMULATION",
+      "file": "test.csv",
+      "rule": "4.9/5.1",
+      "title": "Accumulation of latent months per on-phase test row",
+      "description": "Rows that are neither structural zeros nor cold starts: an order carries the latent months since the previous on-phase month; after an annual shutdown the carried month weighs 0.5 (never a 1.5 multiplier).",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 49260,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "1_month": 42373,
+        "2_months": 4243,
+        "3_months": 1505,
+        "after_shutdown": 1139
+      },
+      "action": "accum_span / carry_weight columns",
+      "examples": []
+    },
+    {
+      "stage": "demand",
+      "check_id": "TST-UNCERTAIN-ZEROS",
+      "file": "test.csv",
+      "rule": "5.1",
+      "title": "Low-confidence young-series zeros (cycle posterior < 0.99, p_order < 0.5)",
+      "description": "Each rests on a single zero observation (PMP-019 Europe A-Aug, ELA-017 India A-Jun, THM-011 Asia Pacific A-Jun).",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 3,
+      "expected": 3,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "forced to 0 (absolute-error optimal)",
+      "examples": []
+    }
+  ]
+}

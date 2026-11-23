@@ -40,8 +40,16 @@ class Paths:
     def quality_dir(self) -> Path:
         return self.outputs_dir / "quality"
 
+    @property
+    def anomalies_dir(self) -> Path:
+        return self.outputs_dir / "anomalies"
+
     def raw(self, name: str) -> Path:
         return self.raw_dir / name
+
+
+# Pipeline stages in execution order (docs/architecture.md). Every stage depends on the outputs of the stages before it.
+STAGE_ORDER: Final[tuple[str, ...]] = ("clean", "demand", "anomalies", "features", "backtest", "forecast", "export")
 
 
 # --- calendar -------------------------------------------------------------------------------------------------------
@@ -255,5 +263,47 @@ EXPECTED: Final = MappingProxyType(
         "test.post_eol_rows": 156,
         "test.cold_start_series": 10,
         "sample.rows": 5,
+        # demand stage: stock-out overlay (dossier 7.1 step 7(0))
+        "demand.overlay_cells": 69,
+        "demand.overlay.missing_row": 26,
+        "demand.overlay.erp_blank": 1,
+        "demand.overlay.pack_of_10": 42,
+        # unconstrained-demand methods (dossier 7.1 step 7; SU section 9 source counts)
+        "demand.method.S1_listed_requested": 5_830,
+        "demand.method.S5_semiconductor_imputed": 1_925,
+        "demand.method.S2_carry_removed": 1_034,
+        "demand.method.D2_hidden_stockout": 62,
+        "demand.method.D1_hidden_stockout": 29,
+        "demand.method.D1_phantom_removed": 29,
+        "demand.method.D3_hidden_second_month": 14,
+        "demand.method.missing_after_backorder": 4,
+        # ordering cycles and account events (dossier 1 #3, 3, 5.2; PZ findings 7, 10-12)
+        "demand.cycle.M": 1_539,
+        "demand.cycle.A": 775,
+        "demand.cycle.B": 297,
+        "demand.cycle.Q": 242,
+        "demand.cycle.T": 230,
+        "demand.cycle_changes": 27,
+        "demand.cycle_change.Q>M": 18,
+        "demand.cycle_change.M>B": 6,
+        "demand.cycle_change.M>Q": 3,
+        "demand.lost_accounts": 16,
+        "demand.lost.tail_cells": 204,
+        "demand.customer_switches": 23,
+        # missing-cell treatment (K13, step 9): 26 listed + 119 zero + 837 unknown
+        "demand.missing.listed": 26,
+        "demand.missing.zero": 119,
+        "demand.missing.unknown": 837,
+        # forecast-window grid (dossier 5.1, 5.4)
+        "test_grid.structural_zero": 8_842,
+        "test_grid.zero.off_phase": 8_382,
+        "test_grid.zero.lost_account": 304,
+        "test_grid.zero.post_eol": 156,
+        "test_grid.accum.1_month": 42_373,
+        "test_grid.accum.after_shutdown": 1_139,
+        "test_grid.accum.2_months": 4_243,
+        "test_grid.accum.3_months": 1_505,
+        "test_grid.cold_start_rows": 117,
+        "test_grid.uncertain_zero_rows": 3,
     }
 )
