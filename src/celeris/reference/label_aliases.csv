@@ -1,0 +1,11 @@
+column,alias_key,canonical,kind
+Region,na,North America,abbreviation
+Region,namerica,North America,abbreviation
+Region,eu,Europe,abbreviation
+Region,apac,Asia Pacific,abbreviation
+Region,latam,Latin America,abbreviation
+Region,mea,Middle East & Africa,abbreviation
+Region,me&a,Middle East & Africa,abbreviation
+Region,middleeastandafrica,Middle East & Africa,wording
+Sales_Channel,t1distributor,Tier-1 Distributor,abbreviation
+Sales_Channel,oemdirect,Direct OEM,word_order

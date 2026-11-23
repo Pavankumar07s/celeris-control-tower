@@ -1,0 +1,69 @@
+event_id,event_type,scope_type,scope_value,scope_region,scope_customer,scope_family,scope_channel,start_day,end_day,start_month,end_month,start_precision,end_precision,open_ended,n_days,in_forecast_window,after_forecast_window,announced_pct,description
+EV-001,Price Change,Global,All,,,,,2019-01-01,2019-01-31,2019-01,2019-01,month,month,False,31,False,False,2.0,Annual list-price increase of about 2.0% effective 1 January
+EV-002,Holiday,Region,Asia Pacific,Asia Pacific,,,,2019-02-05,2019-02-14,2019-02,2019-02,day,day,False,10,False,False,,Lunar New Year holiday period
+EV-003,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2019-05-06,2019-06-04,2019-05,2019-06,day,day,False,30,False,False,,Ramadan
+EV-004,Holiday,Region,North America,North America,,,,2019-07-01,2019-07-31,2019-07,2019-07,month,month,False,31,False,False,,North American summer retooling weeks
+EV-005,Holiday,Region,Europe,Europe,,,,2019-08-01,2019-08-31,2019-08,2019-08,month,month,False,31,False,False,,European summer plant shutdowns
+EV-006,Corporate,Global,All,,,,,2019-10-01,2019-10-31,2019-10,2019-10,month,month,False,31,False,False,,Celeris rebrands product catalogue
+EV-007,Price Change,Global,All,,,,,2020-01-01,2020-01-31,2020-01,2020-01,month,month,False,31,False,False,2.0,Annual list-price increase of about 2.0% effective 1 January
+EV-008,Holiday,Region,Asia Pacific,Asia Pacific,,,,2020-01-25,2020-02-03,2020-01,2020-02,day,day,False,10,False,False,,Lunar New Year holiday period
+EV-009,Disruption,Region,Asia Pacific,Asia Pacific,,,,2020-02-01,2020-03-31,2020-02,2020-03,month,month,False,60,False,False,,COVID-19 lockdowns and plant closures
+EV-010,Disruption,Region,Europe,Europe,,,,2020-03-01,2020-05-31,2020-03,2020-05,month,month,False,92,False,False,,COVID-19 lockdowns and plant closures
+EV-011,Disruption,Region,India,India,,,,2020-04-01,2020-06-30,2020-04,2020-06,month,month,False,91,False,False,,COVID-19 lockdowns and plant closures
+EV-012,Disruption,Region,Latin America,Latin America,,,,2020-04-01,2020-06-30,2020-04,2020-06,month,month,False,91,False,False,,COVID-19 lockdowns and plant closures
+EV-013,Disruption,Region,North America,North America,,,,2020-04-01,2020-06-30,2020-04,2020-06,month,month,False,91,False,False,,COVID-19 lockdowns and plant closures
+EV-014,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2020-04-24,2020-05-23,2020-04,2020-05,day,day,False,30,False,False,,Ramadan
+EV-015,Holiday,Region,North America,North America,,,,2020-07-01,2020-07-31,2020-07,2020-07,month,month,False,31,False,False,,North American summer retooling weeks
+EV-016,Holiday,Region,Europe,Europe,,,,2020-08-01,2020-08-31,2020-08,2020-08,month,month,False,31,False,False,,European summer plant shutdowns
+EV-017,Price Change,Global,All,,,,,2021-01-01,2021-01-31,2021-01,2021-01,month,month,False,31,False,False,2.5,Annual list-price increase of about 2.5% effective 1 January
+EV-018,Holiday,Region,Asia Pacific,Asia Pacific,,,,2021-02-12,2021-02-21,2021-02,2021-02,day,day,False,10,False,False,,Lunar New Year holiday period
+EV-019,Supply Constraint,Product_Family,Electrical Assemblies,,,Electrical Assemblies,,2021-03-01,2022-09-30,2021-03,2022-09,month,month,False,579,False,False,,Global semiconductor shortage - Celeris shipments allocated below customer demand
+EV-020,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2021-04-13,2021-05-12,2021-04,2021-05,day,day,False,30,False,False,,Ramadan
+EV-021,Holiday,Region,North America,North America,,,,2021-07-01,2021-07-31,2021-07,2021-07,month,month,False,31,False,False,,North American summer retooling weeks
+EV-022,Holiday,Region,Europe,Europe,,,,2021-08-01,2021-08-31,2021-08,2021-08,month,month,False,31,False,False,,European summer plant shutdowns
+EV-023,Price Change,Global,All,,,,,2022-01-01,2022-01-31,2022-01,2022-01,month,month,False,31,False,False,5.0,Annual list-price increase of about 5.0% effective 1 January
+EV-024,Market Entry,Region,Middle East & Africa,Middle East & Africa,,,,2022-01-01,2022-01-31,2022-01,2022-01,month,month,False,31,False,False,,Celeris opens Middle East & Africa sales region
+EV-025,Holiday,Region,Asia Pacific,Asia Pacific,,,,2022-02-01,2022-02-10,2022-02,2022-02,day,day,False,10,False,False,,Lunar New Year holiday period
+EV-026,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2022-04-02,2022-05-01,2022-04,2022-05,day,day,False,30,False,False,,Ramadan
+EV-027,Price Change,Global,All,,,,,2022-07-01,2022-12-31,2022-07,2022-12,month,month,False,184,False,False,6.0,Temporary 6% raw-material surcharge on all invoices
+EV-028,Holiday,Region,North America,North America,,,,2022-07-01,2022-07-31,2022-07,2022-07,month,month,False,31,False,False,,North American summer retooling weeks
+EV-029,Holiday,Region,Europe,Europe,,,,2022-08-01,2022-08-31,2022-08,2022-08,month,month,False,31,False,False,,European summer plant shutdowns
+EV-030,Announcement,Global,All,,,,,2022-11-01,2022-11-30,2022-11,2022-11,month,month,False,30,False,False,9.0,2023 price increase (about 9%) announced to customers on 15 November 2022
+EV-031,Price Change,Global,All,,,,,2023-01-01,2023-01-31,2023-01,2023-01,month,month,False,31,False,False,9.0,Annual list-price increase of about 9.0% effective 1 January
+EV-032,Holiday,Region,Asia Pacific,Asia Pacific,,,,2023-01-22,2023-01-31,2023-01,2023-01,day,day,False,10,False,False,,Lunar New Year holiday period
+EV-033,System,Region,Latin America,Latin America,,,,2023-03-01,2023-05-31,2023-03,2023-05,month,month,False,92,False,False,,ERP migration in Latin America - some transactions were not migrated
+EV-034,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2023-03-23,2023-04-21,2023-03,2023-04,day,day,False,30,False,False,,Ramadan
+EV-035,Corporate,Region,Asia Pacific,Asia Pacific,,,,2023-07-01,2023-07-31,2023-07,2023-07,month,month,False,31,False,False,,New regional sales director appointed
+EV-036,Holiday,Region,North America,North America,,,,2023-07-01,2023-07-31,2023-07,2023-07,month,month,False,31,False,False,,North American summer retooling weeks
+EV-037,Holiday,Region,Europe,Europe,,,,2023-08-01,2023-08-31,2023-08,2023-08,month,month,False,31,False,False,,European summer plant shutdowns
+EV-038,Customer Event,Customer,Nexon Motor Group | Europe,Europe,Nexon Motor Group,,,2023-10-01,2023-11-30,2023-10,2023-11,month,month,False,61,False,False,,Labour strike at Nexon Motor Group European assembly plants
+EV-039,Logistics,Channel,Export,,,,Export,2024-01-01,2024-03-31,2024-01,2024-03,month,month,False,91,False,False,,Red Sea shipping disruption delays export shipments to Europe and MEA
+EV-040,Price Change,Global,All,,,,,2024-01-01,2024-01-31,2024-01,2024-01,month,month,False,31,False,False,4.5,Annual list-price increase of about 4.5% effective 1 January
+EV-041,Holiday,Region,Asia Pacific,Asia Pacific,,,,2024-02-10,2024-02-19,2024-02,2024-02,day,day,False,10,False,False,,Lunar New Year holiday period
+EV-042,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2024-03-11,2024-04-09,2024-03,2024-04,day,day,False,30,False,False,,Ramadan
+EV-043,Marketing,Global,All,,,,,2024-04-01,2024-04-30,2024-04,2024-04,month,month,False,30,False,False,,Hannover Messe trade fair participation
+EV-044,Holiday,Region,North America,North America,,,,2024-07-01,2024-07-31,2024-07,2024-07,month,month,False,31,False,False,,North American summer retooling weeks
+EV-045,Holiday,Region,Europe,Europe,,,,2024-08-01,2024-08-31,2024-08,2024-08,month,month,False,31,False,False,,European summer plant shutdowns
+EV-046,Price Change,Global,All,,,,,2025-01-01,2025-01-31,2025-01,2025-01,month,month,False,31,False,False,3.7,Annual list-price increase of about 3.7% effective 1 January
+EV-047,Holiday,Region,Asia Pacific,Asia Pacific,,,,2025-01-29,2025-02-07,2025-01,2025-02,day,day,False,10,False,False,,Lunar New Year holiday period
+EV-048,System,Global,All,,,,,2025-02-01,2025-02-28,2025-02,2025-02,month,month,False,28,False,False,,CRM platform upgrade
+EV-049,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2025-03-01,2025-03-30,2025-03,2025-03,day,day,False,30,False,False,,Ramadan
+EV-050,Holiday,Region,North America,North America,,,,2025-07-01,2025-07-31,2025-07,2025-07,month,month,False,31,False,False,,North American summer retooling weeks
+EV-051,Holiday,Region,Europe,Europe,,,,2025-08-01,2025-08-31,2025-08,2025-08,month,month,False,31,False,False,,European summer plant shutdowns
+EV-052,Customer Event,Customer,Helios Auto Parts | India,India,Helios Auto Parts,,,2025-09-01,,2025-09,2028-05,month,open,True,,True,False,,Helios Auto Parts commissions second Indian assembly line (permanent capacity increase)
+EV-053,Price Change,Global,All,,,,,2026-01-01,2026-01-31,2026-01,2026-01,month,month,False,31,False,False,3.7,Annual list-price increase of about 3.7% effective 1 January
+EV-054,Holiday,Region,Asia Pacific,Asia Pacific,,,,2026-02-17,2026-02-26,2026-02,2026-02,day,day,False,10,False,False,,Lunar New Year holiday period
+EV-055,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2026-02-18,2026-03-19,2026-02,2026-03,day,day,False,30,False,False,,Ramadan
+EV-056,Holiday,Region,North America,North America,,,,2026-07-01,2026-07-31,2026-07,2026-07,month,month,False,31,False,False,,North American summer retooling weeks
+EV-057,Holiday,Region,Europe,Europe,,,,2026-08-01,2026-08-31,2026-08,2026-08,month,month,False,31,False,False,,European summer plant shutdowns
+EV-058,Marketing,Region,India,India,,,,2026-09-01,2026-09-30,2026-09,2026-09,month,month,False,30,False,False,,"Dealer conference, Pune"
+EV-059,Price Change,Global,All,,,,,2027-01-01,2027-01-31,2027-01,2027-01,month,month,False,31,True,False,4.5,Annual list-price increase of about 4.5% effective 1 January
+EV-060,Holiday,Region,Asia Pacific,Asia Pacific,,,,2027-02-06,2027-02-15,2027-02,2027-02,day,day,False,10,True,False,,Lunar New Year holiday period
+EV-061,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2027-02-08,2027-03-09,2027-02,2027-03,day,day,False,30,True,False,,Ramadan
+EV-062,Customer Event,Customer,Orion Driveline | North America,North America,Orion Driveline,,,2027-07-01,2027-08-31,2027-07,2027-08,month,month,False,62,True,False,,Planned retooling shutdown at Orion Driveline North American plants
+EV-063,Holiday,Region,North America,North America,,,,2027-07-01,2027-07-31,2027-07,2027-07,month,month,False,31,True,False,,North American summer retooling weeks
+EV-064,Holiday,Region,Europe,Europe,,,,2027-08-01,2027-08-31,2027-08,2027-08,month,month,False,31,True,False,,European summer plant shutdowns
+EV-065,Price Change,Global,All,,,,,2028-01-01,2028-01-31,2028-01,2028-01,month,month,False,31,True,False,4.0,Annual list-price increase of about 4.0% effective 1 January
+EV-066,Holiday,Region,Asia Pacific,Asia Pacific,,,,2028-01-26,2028-02-04,2028-01,2028-02,day,day,False,10,True,False,,Lunar New Year holiday period
+EV-067,Holiday,Region,Middle East & Africa,Middle East & Africa,,,,2028-01-28,2028-02-26,2028-01,2028-02,day,day,False,30,True,False,,Ramadan
+EV-068,Holiday,Region,Europe,Europe,,,,2028-08-01,2028-08-31,2028-08,2028-08,month,month,False,31,False,True,,European summer plant shutdowns

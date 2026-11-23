@@ -1,0 +1,121 @@
+{
+  "package": "celeris",
+  "package_version": "0.1.0",
+  "software": {
+    "python": "3.12.13",
+    "pandas": "3.1.1",
+    "numpy": "2.5.5",
+    "pyarrow": "26.0.1"
+  },
+  "inputs": [
+    {
+      "path": "events_calendar.csv",
+      "sha256": "bf45c00afcf946eee0339037348f930d847a55cc3f1cd2c461fdffb9eaf77942",
+      "bytes": 6406,
+      "rows": 68
+    },
+    {
+      "path": "inventory_stockouts.csv",
+      "sha256": "eaa92ac8336523b2f28e3c5684b67db2069f1191eefdb3725eb262fbd668cb3c",
+      "bytes": 419781,
+      "rows": 5830
+    },
+    {
+      "path": "macro_indicators.csv",
+      "sha256": "f6fd249574436affbbdf07e56483899e4143307c5eb6f0a5e427c73a71ee0d26",
+      "bytes": 6709,
+      "rows": 114
+    },
+    {
+      "path": "sample_submission.csv",
+      "sha256": "1d12013567bb1d4373cf610db757f56e908d012326042252f9758effaca9247f",
+      "bytes": 210,
+      "rows": 5
+    },
+    {
+      "path": "sku_master.csv",
+      "sha256": "95664b05e0b7d1a03f346b2ece5e0f2c420c12ec9acb461634ea6254c9816a98",
+      "bytes": 76253,
+      "rows": 601
+    },
+    {
+      "path": "test.csv",
+      "sha256": "25dc8d435f44a3fa34706f605c56aa75916a79895cadc33698c00934bd5df18e",
+      "bytes": 8619404,
+      "rows": 58219
+    },
+    {
+      "path": "train.csv",
+      "sha256": "2bfc753f147f61c65e701d003332833eb0a582540d9f0fb3d1fc43153c8a0bc4",
+      "bytes": 48834690,
+      "rows": 248248
+    }
+  ],
+  "outputs": [
+    {
+      "path": "clean/events_clean.csv",
+      "sha256": "f51ba2d6433eb64386551f33f34ec03e78efbd46c332b1c905542c1e2c66475c",
+      "bytes": 11111,
+      "rows": 68
+    },
+    {
+      "path": "clean/macro_clean.csv",
+      "sha256": "e2d223e41f6464ec7b673e4da61cbe6dc35c595ef2a40c7a707f737d70846fc6",
+      "bytes": 7239,
+      "rows": 113
+    },
+    {
+      "path": "clean/price_table.csv",
+      "sha256": "29d679548e6ec12a8b5404ee20333f289575f444919ac1f9727da60f30423acf",
+      "bytes": 251873,
+      "rows": 4894
+    },
+    {
+      "path": "clean/series_blocks.csv",
+      "sha256": "d31e7ccc952d91a3c4579d87e7caf006344c4884fbaa0fa6aa4d305d8ea27e4a",
+      "bytes": 192942,
+      "rows": 3083
+    },
+    {
+      "path": "clean/sku_master_clean.csv",
+      "sha256": "2801ac81f8c38d49a57f5b47fb72b60db5559e2f8a1e9f52652a6a899b7009d9",
+      "bytes": 143083,
+      "rows": 601
+    },
+    {
+      "path": "clean/stockouts_clean.csv",
+      "sha256": "0dc7646e174c826501839c8f6808abad1ff6f5c79cff9f36e5fa15442d85f54e",
+      "bytes": 590200,
+      "rows": 5830
+    },
+    {
+      "path": "clean/train_clean.parquet",
+      "sha256": "b611f6eb63c599eb489469e595cd5f997d572e860ff6eba3fcb0852006a722ad",
+      "bytes": 2352657,
+      "rows": 245548
+    },
+    {
+      "path": "quality/dedup_decisions.csv",
+      "sha256": "6597636ba9dfb251e266fc1894d8d43f58c3f2dcc15b9a8a2d0dbf053190fe31",
+      "bytes": 519820,
+      "rows": 3682
+    },
+    {
+      "path": "quality/dq_report.json",
+      "sha256": "26f338affc0a2d03e60f9ad9895651d103015ebae20467a7337a6df27ddc2b39",
+      "bytes": 118707
+    },
+    {
+      "path": "quality/fix_log.parquet",
+      "sha256": "27d3e2232ac12f32127d5319424fc5708067c9d21df97412c017930c832a2c7c",
+      "bytes": 939346,
+      "rows": 77432
+    },
+    {
+      "path": "quality/macro_change_log.csv",
+      "sha256": "adfca067f0d7f65de84ac5fa3068659393ab2a7eb0b822712d5a10b2a33d151c",
+      "bytes": 8710,
+      "rows": 57
+    }
+  ]
+}

@@ -1,0 +1,4275 @@
+{
+  "report_version": "1.0",
+  "package_version": "0.1.0",
+  "evidence": "research/DATA_DOSSIER.md",
+  "summary": {
+    "files": 7,
+    "checks": 84,
+    "checks_failing_before": 48,
+    "checks_failing_after": {
+      "error": 0,
+      "warning": 2,
+      "info": 1
+    },
+    "cells_changed": 73749,
+    "cells_changed_by_method": {
+      "approximate": 385,
+      "convention": 36057,
+      "derived": 2952,
+      "exact": 8261,
+      "format": 25762,
+      "unknown": 332
+    },
+    "cells_changed_by_file": {
+      "macro_indicators.csv": 56,
+      "sku_master.csv": 2,
+      "train.csv": 73691
+    },
+    "rows_dropped": 3683,
+    "train_rows_raw": 248248,
+    "train_records": 244566,
+    "train_grid_cells": 245548,
+    "train_missing_rows": 982,
+    "train_numeric_states": {
+      "N0_ok": 202244,
+      "N0z_zero_row": 35390,
+      "N10_price_in_eur": 498,
+      "N11_pack_of_10": 385,
+      "N12_erp_units_lost": 332,
+      "N13_price_zeroed": 295,
+      "N1_units_blank_recovered": 2545,
+      "N2_units_blank_zero_row": 450,
+      "N3_units_dash": 217,
+      "N4_sign_error": 491,
+      "N5_units_x10": 293,
+      "N6_units_x100": 75,
+      "N7_revenue_x10": 425,
+      "N8_revenue_digit_swap": 312,
+      "N9_price_in_cents": 614
+    },
+    "train_units_naive": 12030253.0,
+    "train_units_clean": 11723379.0,
+    "train_revenue_naive_usd": 8684426206.34,
+    "train_revenue_clean_usd": 8575853814.24
+  },
+  "files": [
+    {
+      "file": "train.csv",
+      "rows_raw": 248248,
+      "rows_clean": 245548,
+      "checks": 48,
+      "checks_failing_before": 37,
+      "checks_failing_after": {
+        "error": 0,
+        "warning": 1,
+        "info": 0
+      },
+      "cells_changed": 73691,
+      "cells_changed_by_method": {
+        "approximate": 385,
+        "convention": 36057,
+        "derived": 2947,
+        "exact": 8208,
+        "format": 25762,
+        "unknown": 332
+      },
+      "rows_dropped": 3682,
+      "issues": [
+        {
+          "check_id": "TRN-K3-DATE-FORMAT",
+          "rule": "K3",
+          "title": "Date written in a non-standard format",
+          "unit": "raw_rows",
+          "affected": 9967,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K3-DATE-FORMAT-IDS",
+          "rule": "K3",
+          "title": "Records with a non-standard date format",
+          "unit": "records",
+          "affected": 9821,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K4-YEAR-TYPO",
+          "rule": "K4",
+          "title": "Year typo 2062",
+          "unit": "raw_rows",
+          "affected": 30,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K5-MONTH-COLUMN",
+          "rule": "K5",
+          "title": "Month column holds the load month",
+          "unit": "raw_rows",
+          "affected": 246,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K6-REGION",
+          "rule": "K6",
+          "title": "Region label variant",
+          "unit": "raw_rows",
+          "affected": 6199,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K6-REGION-IDS",
+          "rule": "K6",
+          "title": "Region label variant (records)",
+          "unit": "records",
+          "affected": 6117,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K8-CHANNEL",
+          "rule": "K8",
+          "title": "Sales_Channel label variant",
+          "unit": "raw_rows",
+          "affected": 3745,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K8-CHANNEL-IDS",
+          "rule": "K8",
+          "title": "Sales_Channel label variant (records)",
+          "unit": "records",
+          "affected": 3683,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K9-SKU",
+          "rule": "K9",
+          "title": "SKU_ID format variant",
+          "unit": "raw_rows",
+          "affected": 3741,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K9-SKU-IDS",
+          "rule": "K9",
+          "title": "SKU_ID format variant (records)",
+          "unit": "records",
+          "affected": 3683,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K10-CUSTOMER",
+          "rule": "K10",
+          "title": "Customer_Name variant",
+          "unit": "raw_rows",
+          "affected": 2490,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K10-CUSTOMER-IDS",
+          "rule": "K10",
+          "title": "Customer_Name variant (records)",
+          "unit": "records",
+          "affected": 2455,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K11-FAMILY-BLANK",
+          "rule": "K11",
+          "title": "Product_Family blank",
+          "unit": "raw_rows",
+          "affected": 1252,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K11-FAMILY-BLANK-IDS",
+          "rule": "K11",
+          "title": "Product_Family blank (records)",
+          "unit": "records",
+          "affected": 1228,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K12-DESCRIPTION-BLANK",
+          "rule": "K12",
+          "title": "SKU_Description blank",
+          "unit": "raw_rows",
+          "affected": 996,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K12-DESCRIPTION-BLANK-IDS",
+          "rule": "K12",
+          "title": "SKU_Description blank (records)",
+          "unit": "records",
+          "affected": 982,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-UNQ-RECORD-ID",
+          "rule": "K1/K2",
+          "title": "One row per Record_ID",
+          "unit": "raw_rows",
+          "affected": 248248,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K1-EXACT-DUPLICATE",
+          "rule": "K1",
+          "title": "Exact duplicate load",
+          "unit": "raw_rows",
+          "affected": 2946,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K2-SUPERSEDED-LOAD",
+          "rule": "K2",
+          "title": "Superseded load (restatement)",
+          "unit": "raw_rows",
+          "affected": 736,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K7-REGION-BLANK",
+          "rule": "K7",
+          "title": "Region blank",
+          "unit": "records",
+          "affected": 737,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-K13-MISSING-ROW",
+          "rule": "K13",
+          "title": "Missing row (deleted record)",
+          "unit": "cells",
+          "affected": 982,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N1-UNITS-BLANK-RECOVERED",
+          "rule": "N1",
+          "title": "Units blank, revenue present",
+          "unit": "records",
+          "affected": 2545,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N2-UNITS-BLANK-ZERO-ROW",
+          "rule": "N2",
+          "title": "Units blank on a zero row",
+          "unit": "records",
+          "affected": 450,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N3-UNITS-DASH",
+          "rule": "N3",
+          "title": "Units '-' placeholder",
+          "unit": "records",
+          "affected": 217,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N4-SIGN-ERROR",
+          "rule": "N4",
+          "title": "Negative units and revenue",
+          "unit": "records",
+          "affected": 491,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N5-UNITS-X10",
+          "rule": "N5",
+          "title": "Units x10",
+          "unit": "records",
+          "affected": 293,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N6-UNITS-X100",
+          "rule": "N6",
+          "title": "Units x100",
+          "unit": "records",
+          "affected": 75,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N7-REVENUE-X10",
+          "rule": "N7",
+          "title": "Revenue x10",
+          "unit": "records",
+          "affected": 425,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N8-REVENUE-DIGIT-SWAP",
+          "rule": "N8",
+          "title": "Revenue digit transposition",
+          "unit": "records",
+          "affected": 312,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N9-PRICE-IN-CENTS",
+          "rule": "N9",
+          "title": "Price in cents",
+          "unit": "records",
+          "affected": 614,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N10-PRICE-IN-EUR",
+          "rule": "N10",
+          "title": "Price and revenue in EUR (Europe Direct OEM 2022-Q1)",
+          "unit": "records",
+          "affected": 498,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N11-PACK-OF-10",
+          "rule": "N11",
+          "title": "Units booked in packs of 10 (India Aftermarket 2021-H2)",
+          "unit": "records",
+          "affected": 385,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N12-ERP-UNITS-LOST",
+          "rule": "N12",
+          "title": "Units and revenue blank on an order (LatAm ERP migration)",
+          "unit": "records",
+          "affected": 332,
+          "severity": "warning"
+        },
+        {
+          "check_id": "TRN-N13-PRICE-ZEROED",
+          "rule": "N13",
+          "title": "Price and revenue zeroed on a real order",
+          "unit": "records",
+          "affected": 295,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-N6B-THOUSANDS-SEPARATOR",
+          "rule": "N6b",
+          "title": "Thousands separator in Units_Sold",
+          "unit": "records",
+          "affected": 44,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-NUM-REVENUE-IDENTITY",
+          "rule": "2.2",
+          "title": "Revenue = units x invoice price to the cent",
+          "unit": "records",
+          "affected": 244234,
+          "severity": "error"
+        },
+        {
+          "check_id": "TRN-NUM-UNITS-VALID",
+          "rule": "2.2",
+          "title": "Units are non-negative integers",
+          "unit": "records",
+          "affected": 244566,
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "file": "test.csv",
+      "rows_raw": 58219,
+      "rows_clean": null,
+      "checks": 5,
+      "checks_failing_before": 1,
+      "checks_failing_after": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "cells_changed": 0,
+      "cells_changed_by_method": {},
+      "rows_dropped": 0,
+      "issues": [
+        {
+          "check_id": "TST-BU-MASTER",
+          "rule": "S1",
+          "title": "Business unit agrees with the master",
+          "unit": "rows",
+          "affected": 58219,
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "file": "sku_master.csv",
+      "rows_raw": 601,
+      "rows_clean": 601,
+      "checks": 10,
+      "checks_failing_before": 2,
+      "checks_failing_after": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "cells_changed": 2,
+      "cells_changed_by_method": {
+        "exact": 2
+      },
+      "rows_dropped": 0,
+      "issues": [
+        {
+          "check_id": "MST-S1-BU",
+          "rule": "S1",
+          "title": "Business unit contradicts the family",
+          "unit": "rows",
+          "affected": 1,
+          "severity": "error"
+        },
+        {
+          "check_id": "MST-S2-LAUNCH",
+          "rule": "S2",
+          "title": "Launch date later than the first sales",
+          "unit": "rows",
+          "affected": 1,
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "file": "macro_indicators.csv",
+      "rows_raw": 114,
+      "rows_clean": 113,
+      "checks": 6,
+      "checks_failing_before": 6,
+      "checks_failing_after": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "cells_changed": 56,
+      "cells_changed_by_method": {
+        "derived": 5,
+        "exact": 51
+      },
+      "rows_dropped": 1,
+      "issues": [
+        {
+          "check_id": "MAC-M1-DUPLICATE-MONTH",
+          "rule": "M1",
+          "title": "Duplicated month 2022-06",
+          "unit": "cells",
+          "affected": 2,
+          "severity": "error"
+        },
+        {
+          "check_id": "MAC-M2-FRACTION",
+          "rule": "M2",
+          "title": "Auto production YoY stored as a fraction",
+          "unit": "cells",
+          "affected": 12,
+          "severity": "error"
+        },
+        {
+          "check_id": "MAC-M3-DECIMAL-SHIFT",
+          "rule": "M3",
+          "title": "PMI decimal shift",
+          "unit": "cells",
+          "affected": 1,
+          "severity": "error"
+        },
+        {
+          "check_id": "MAC-M4-REBASE",
+          "rule": "M4",
+          "title": "Raw-material index on an old base",
+          "unit": "cells",
+          "affected": 36,
+          "severity": "error"
+        },
+        {
+          "check_id": "MAC-M5-BLANK",
+          "rule": "M5",
+          "title": "Single-month blank",
+          "unit": "cells",
+          "affected": 5,
+          "severity": "error"
+        },
+        {
+          "check_id": "MAC-COMPLETE",
+          "rule": "2.4",
+          "title": "One complete row per month 2019-01..2028-05",
+          "unit": "rows",
+          "affected": 113,
+          "severity": "error"
+        }
+      ]
+    },
+    {
+      "file": "events_calendar.csv",
+      "rows_raw": 68,
+      "rows_clean": 68,
+      "checks": 4,
+      "checks_failing_before": 0,
+      "checks_failing_after": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "cells_changed": 0,
+      "cells_changed_by_method": {},
+      "rows_dropped": 0,
+      "issues": []
+    },
+    {
+      "file": "inventory_stockouts.csv",
+      "rows_raw": 5830,
+      "rows_clean": 5830,
+      "checks": 10,
+      "checks_failing_before": 2,
+      "checks_failing_after": {
+        "error": 0,
+        "warning": 1,
+        "info": 1
+      },
+      "cells_changed": 0,
+      "cells_changed_by_method": {},
+      "rows_dropped": 0,
+      "issues": [
+        {
+          "check_id": "STK-I2-FILL-DOCUMENTATION",
+          "rule": "I2",
+          "title": "Fill_Rate_Pct is not Shipped / (Requested + Carried_In)",
+          "unit": "rows",
+          "affected": 115,
+          "severity": "info"
+        },
+        {
+          "check_id": "ORC-MISSING-ROWS-LISTED",
+          "rule": "K13",
+          "title": "Listed stock-out months without a train record",
+          "unit": "rows",
+          "affected": 26,
+          "severity": "warning"
+        }
+      ]
+    },
+    {
+      "file": "sample_submission.csv",
+      "rows_raw": 5,
+      "rows_clean": null,
+      "checks": 1,
+      "checks_failing_before": 0,
+      "checks_failing_after": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "cells_changed": 0,
+      "cells_changed_by_method": {},
+      "rows_dropped": 0,
+      "issues": []
+    }
+  ],
+  "checks": [
+    {
+      "check_id": "TRN-K3-DATE-FORMAT",
+      "file": "train.csv",
+      "rule": "K3",
+      "title": "Date written in a non-standard format",
+      "description": "Six alternative formats; the four-digit group is always the year, so none is ambiguous.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 9967,
+      "expected": 9967,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 9967,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "MM-YYYY": 1621,
+        "MM/YYYY": 1623,
+        "Mon YYYY": 1689,
+        "Mon-YYYY": 1659,
+        "YYYY-MM-DD": 1672,
+        "YYYY/MM": 1703
+      },
+      "action": "normalise to YYYY-MM; any other format raises",
+      "examples": [
+        {
+          "record_id": "CEL-0224986",
+          "date_raw": "2019-01-01",
+          "date": "2019-01"
+        },
+        {
+          "record_id": "CEL-0168363",
+          "date_raw": "01/2019",
+          "date": "2019-01"
+        },
+        {
+          "record_id": "CEL-0003451",
+          "date_raw": "2019/01",
+          "date": "2019-01"
+        },
+        {
+          "record_id": "CEL-0034551",
+          "date_raw": "Jan 2019",
+          "date": "2019-01"
+        },
+        {
+          "record_id": "CEL-0223214",
+          "date_raw": "Jan-2019",
+          "date": "2019-01"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K3-DATE-FORMAT-IDS",
+      "file": "train.csv",
+      "rule": "K3",
+      "title": "Records with a non-standard date format",
+      "description": "Counted on unique Record_IDs after de-duplication (latest load kept).",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "records",
+      "affected": 9821,
+      "expected": 9821,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 9821,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "see the raw-row check of the same rule",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K4-YEAR-TYPO",
+      "file": "train.csv",
+      "rule": "K4",
+      "title": "Year typo 2062",
+      "description": "Year outside 2019..2026; the Year column, Load_Timestamp and Record_ID all give 2026.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 30,
+      "expected": 30,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 30,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "swap the last two digits (2062 -> 2026), confirmed by month(Load_Timestamp) - 1",
+      "examples": [
+        {
+          "record_id": "CEL-0207046",
+          "date_raw": "2062-01",
+          "date": "2026-01"
+        },
+        {
+          "record_id": "CEL-0243867",
+          "date_raw": "2062-01",
+          "date": "2026-01"
+        },
+        {
+          "record_id": "CEL-0104515",
+          "date_raw": "2062-02",
+          "date": "2026-02"
+        },
+        {
+          "record_id": "CEL-0036690",
+          "date_raw": "2062-02",
+          "date": "2026-02"
+        },
+        {
+          "record_id": "CEL-0110229",
+          "date_raw": "2062-02",
+          "date": "2026-02"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K5-MONTH-COLUMN",
+      "file": "train.csv",
+      "rule": "K5",
+      "title": "Month column holds the load month",
+      "description": "Month = true month + 1 (December written as 1 with Year unchanged); Date is right on every such row.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 246,
+      "expected": 246,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 246,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "plus_one": 230,
+        "december": 16
+      },
+      "action": "drop the raw Year / Month columns and recompute them from Date (business rule 1)",
+      "examples": [
+        {
+          "record_id": "CEL-0045443",
+          "date": "2019-01",
+          "month_col_raw": "2"
+        },
+        {
+          "record_id": "CEL-0099411",
+          "date": "2019-01",
+          "month_col_raw": "2"
+        },
+        {
+          "record_id": "CEL-0112351",
+          "date": "2019-02",
+          "month_col_raw": "3"
+        },
+        {
+          "record_id": "CEL-0233623",
+          "date": "2019-02",
+          "month_col_raw": "3"
+        },
+        {
+          "record_id": "CEL-0032570",
+          "date": "2019-02",
+          "month_col_raw": "3"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K6-REGION",
+      "file": "train.csv",
+      "rule": "K6",
+      "title": "Region label variant",
+      "description": "Formatting variants of a canonical label; no row carries another entity's label.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 6199,
+      "expected": 6199,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 6199,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "abbreviation": 1948,
+        "case": 2244,
+        "punctuation": 504,
+        "whitespace": 1315,
+        "wording": 188
+      },
+      "action": "map to the canonical label; unknown variants raise",
+      "examples": [
+        {
+          "record_id": "CEL-0004601",
+          "region_raw": "Latin-America",
+          "region_label": "Latin America",
+          "region_kind": "punctuation"
+        },
+        {
+          "record_id": "CEL-0076621",
+          "region_raw": "Asia Pacific ",
+          "region_label": "Asia Pacific",
+          "region_kind": "whitespace"
+        },
+        {
+          "record_id": "CEL-0172931",
+          "region_raw": "LatAm",
+          "region_label": "Latin America",
+          "region_kind": "abbreviation"
+        },
+        {
+          "record_id": "CEL-0031911",
+          "region_raw": "india",
+          "region_label": "India",
+          "region_kind": "case"
+        },
+        {
+          "record_id": "CEL-0240957",
+          "region_raw": "Middle East and Africa",
+          "region_label": "Middle East & Africa",
+          "region_kind": "wording"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K6-REGION-IDS",
+      "file": "train.csv",
+      "rule": "K6",
+      "title": "Region label variant (records)",
+      "description": "Counted on unique Record_IDs after de-duplication (latest load kept).",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "records",
+      "affected": 6117,
+      "expected": 6117,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 6117,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "see the raw-row check of the same rule",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K8-CHANNEL",
+      "file": "train.csv",
+      "rule": "K8",
+      "title": "Sales_Channel label variant",
+      "description": "Formatting variants of a canonical label; no row carries another entity's label.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 3745,
+      "expected": 3745,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 3745,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "abbreviation": 403,
+        "case": 1800,
+        "punctuation": 1011,
+        "whitespace": 161,
+        "word_order": 370
+      },
+      "action": "map to the canonical label; unknown variants raise",
+      "examples": [
+        {
+          "record_id": "CEL-0179655",
+          "channel_raw": "direct oem",
+          "sales_channel": "Direct OEM",
+          "channel_kind": "case"
+        },
+        {
+          "record_id": "CEL-0176921",
+          "channel_raw": "T1 Distributor",
+          "sales_channel": "Tier-1 Distributor",
+          "channel_kind": "abbreviation"
+        },
+        {
+          "record_id": "CEL-0123962",
+          "channel_raw": "OEM Direct",
+          "sales_channel": "Direct OEM",
+          "channel_kind": "word_order"
+        },
+        {
+          "record_id": "CEL-0026610",
+          "channel_raw": "Tier 1 Distributor",
+          "sales_channel": "Tier-1 Distributor",
+          "channel_kind": "punctuation"
+        },
+        {
+          "record_id": "CEL-0122719",
+          "channel_raw": "Export ",
+          "sales_channel": "Export",
+          "channel_kind": "whitespace"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K8-CHANNEL-IDS",
+      "file": "train.csv",
+      "rule": "K8",
+      "title": "Sales_Channel label variant (records)",
+      "description": "Counted on unique Record_IDs after de-duplication (latest load kept).",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "records",
+      "affected": 3683,
+      "expected": 3683,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 3683,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "see the raw-row check of the same rule",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K9-SKU",
+      "file": "train.csv",
+      "rule": "K9",
+      "title": "SKU_ID format variant",
+      "description": "Formatting variants of a canonical label; no row carries another entity's label.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 3741,
+      "expected": 3741,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 3741,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "dropped_zero": 738,
+        "leading_space": 749,
+        "lowercase": 768,
+        "missing_dash": 767,
+        "underscore": 719
+      },
+      "action": "map to the canonical label; unknown variants raise",
+      "examples": [
+        {
+          "record_id": "CEL-0216906",
+          "sku_raw": "THM008",
+          "sku_id": "THM-008",
+          "sku_kind": "missing_dash"
+        },
+        {
+          "record_id": "CEL-0163761",
+          "sku_raw": "PMP-55",
+          "sku_id": "PMP-055",
+          "sku_kind": "dropped_zero"
+        },
+        {
+          "record_id": "CEL-0106014",
+          "sku_raw": "HYD_006",
+          "sku_id": "HYD-006",
+          "sku_kind": "underscore"
+        },
+        {
+          "record_id": "CEL-0121568",
+          "sku_raw": " HYD-041",
+          "sku_id": "HYD-041",
+          "sku_kind": "leading_space"
+        },
+        {
+          "record_id": "CEL-0048939",
+          "sku_raw": "css-035",
+          "sku_id": "CSS-035",
+          "sku_kind": "lowercase"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K9-SKU-IDS",
+      "file": "train.csv",
+      "rule": "K9",
+      "title": "SKU_ID format variant (records)",
+      "description": "Counted on unique Record_IDs after de-duplication (latest load kept).",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "records",
+      "affected": 3683,
+      "expected": 3683,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 3683,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "see the raw-row check of the same rule",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K10-CUSTOMER",
+      "file": "train.csv",
+      "rule": "K10",
+      "title": "Customer_Name variant",
+      "description": "Formatting variants of a canonical label; no row carries another entity's label.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 2490,
+      "expected": 2490,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 2490,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "double_space": 629,
+        "letter_deleted": 566,
+        "space_deleted": 55,
+        "suffix_inc": 631,
+        "uppercase": 609
+      },
+      "action": "map to the canonical label; unknown variants raise",
+      "examples": [
+        {
+          "record_id": "CEL-0158081",
+          "customer_raw": "Orion Drivline",
+          "customer": "Orion Driveline",
+          "customer_kind": "letter_deleted"
+        },
+        {
+          "record_id": "CEL-0099223",
+          "customer_raw": "NEXON MOTOR GROUP",
+          "customer": "Nexon Motor Group",
+          "customer_kind": "uppercase"
+        },
+        {
+          "record_id": "CEL-0200952",
+          "customer_raw": "Vantara Auto Inc.",
+          "customer": "Vantara Auto",
+          "customer_kind": "suffix_inc"
+        },
+        {
+          "record_id": "CEL-0032005",
+          "customer_raw": "Solaris  Automotive",
+          "customer": "Solaris Automotive",
+          "customer_kind": "double_space"
+        },
+        {
+          "record_id": "CEL-0079254",
+          "customer_raw": "Apex TierOne",
+          "customer": "Apex Tier One",
+          "customer_kind": "space_deleted"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K10-CUSTOMER-IDS",
+      "file": "train.csv",
+      "rule": "K10",
+      "title": "Customer_Name variant (records)",
+      "description": "Counted on unique Record_IDs after de-duplication (latest load kept).",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "records",
+      "affected": 2455,
+      "expected": 2455,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 2455,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "see the raw-row check of the same rule",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K11-FAMILY-BLANK",
+      "file": "train.csv",
+      "rule": "K11",
+      "title": "Product_Family blank",
+      "description": "Blank in the extract; every non-blank value equals the (corrected) master.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 1252,
+      "expected": 1252,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 1252,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "fill from the corrected master by SKU",
+      "examples": [
+        {
+          "record_id": "CEL-0020555",
+          "sku_id": "BSS-050",
+          "product_family": "Brake & Safety Systems"
+        },
+        {
+          "record_id": "CEL-0178353",
+          "sku_id": "PTC-003",
+          "product_family": "Powertrain Components"
+        },
+        {
+          "record_id": "CEL-0202348",
+          "sku_id": "PTC-059",
+          "product_family": "Powertrain Components"
+        },
+        {
+          "record_id": "CEL-0160137",
+          "sku_id": "PMP-047",
+          "product_family": "Precision Machined Parts"
+        },
+        {
+          "record_id": "CEL-0121322",
+          "sku_id": "HYD-040",
+          "product_family": "Hydraulic Systems"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K11-FAMILY-BLANK-IDS",
+      "file": "train.csv",
+      "rule": "K11",
+      "title": "Product_Family blank (records)",
+      "description": "Counted on unique Record_IDs after de-duplication (latest load kept).",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "records",
+      "affected": 1228,
+      "expected": 1228,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 1228,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "see the raw-row check of the same rule",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K12-DESCRIPTION-BLANK",
+      "file": "train.csv",
+      "rule": "K12",
+      "title": "SKU_Description blank",
+      "description": "Blank in the extract; every non-blank value equals the (corrected) master.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 996,
+      "expected": 996,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 996,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "fill from the corrected master by SKU",
+      "examples": [
+        {
+          "record_id": "CEL-0087515",
+          "sku_id": "ELA-044",
+          "sku_description": "Standard 25 mm Alternator Regulator"
+        },
+        {
+          "record_id": "CEL-0076041",
+          "sku_id": "ELA-012",
+          "sku_description": "Industrial 100 mm Power Distribution Module"
+        },
+        {
+          "record_id": "CEL-0188479",
+          "sku_id": "PTC-022",
+          "sku_description": "Standard 25 mm Axle Gear Module"
+        },
+        {
+          "record_id": "CEL-0189747",
+          "sku_id": "PTC-025",
+          "sku_description": "Heavy-Duty 70 mm Manual Gearbox Synchro Set"
+        },
+        {
+          "record_id": "CEL-0191359",
+          "sku_id": "PTC-032",
+          "sku_description": "Heavy-Duty 70 mm Clutch Carrier Assembly"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K12-DESCRIPTION-BLANK-IDS",
+      "file": "train.csv",
+      "rule": "K12",
+      "title": "SKU_Description blank (records)",
+      "description": "Counted on unique Record_IDs after de-duplication (latest load kept).",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "records",
+      "affected": 982,
+      "expected": 982,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 982,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "see the raw-row check of the same rule",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-UNQ-RECORD-ID",
+      "file": "train.csv",
+      "rule": "K1/K2",
+      "title": "One row per Record_ID",
+      "description": "3,682 Record_IDs appear twice, none three times or more.",
+      "dimension": "uniqueness",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 248248,
+      "expected": 248248,
+      "before": {
+        "metric": "violations",
+        "value": 3682,
+        "passed": false
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "keep the latest Load_Timestamp (tie-break: last raw row)",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K1-EXACT-DUPLICATE",
+      "file": "train.csv",
+      "rule": "K1",
+      "title": "Exact duplicate load",
+      "description": "Same Record_ID and Load_Timestamp, all 15 columns identical, adjacent rows.",
+      "dimension": "uniqueness",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 2946,
+      "expected": 2946,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 2946,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "keep one copy",
+      "examples": [
+        {
+          "record_id": "CEL-0000029",
+          "kept_load_timestamp": "2021-06-01 04:17:11",
+          "units_kept": "233"
+        },
+        {
+          "record_id": "CEL-0000038",
+          "kept_load_timestamp": "2022-03-02 03:19:56",
+          "units_kept": "120"
+        },
+        {
+          "record_id": "CEL-0000044",
+          "kept_load_timestamp": "2022-09-01 01:03:19",
+          "units_kept": "123"
+        },
+        {
+          "record_id": "CEL-0000209",
+          "kept_load_timestamp": "2020-10-02 01:20:07",
+          "units_kept": "62"
+        },
+        {
+          "record_id": "CEL-0000362",
+          "kept_load_timestamp": "2025-09-01 05:34:59",
+          "units_kept": "32"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K2-SUPERSEDED-LOAD",
+      "file": "train.csv",
+      "rule": "K2",
+      "title": "Superseded load (restatement)",
+      "description": "Re-loaded 5..24 days later; only Units_Sold and Revenue_USD change. The latest load equals Shipped_Units on every restated stock-out month.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "raw_rows",
+      "affected": 736,
+      "expected": 736,
+      "before": {
+        "metric": "raw_rows_with_issue",
+        "value": 736,
+        "passed": false
+      },
+      "after": {
+        "metric": "raw_rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "value_changed": 732
+      },
+      "action": "keep the latest load; never sum versions",
+      "examples": [
+        {
+          "record_id": "CEL-0000068",
+          "units_dropped": "131",
+          "units_kept": "105",
+          "delay_days": 21.0
+        },
+        {
+          "record_id": "CEL-0000260",
+          "units_dropped": "58",
+          "units_kept": "81",
+          "delay_days": 9.0
+        },
+        {
+          "record_id": "CEL-0000331",
+          "units_dropped": "27",
+          "units_kept": "44",
+          "delay_days": 23.0
+        },
+        {
+          "record_id": "CEL-0000634",
+          "units_dropped": "44",
+          "units_kept": "63",
+          "delay_days": 12.0
+        },
+        {
+          "record_id": "CEL-0000759",
+          "units_dropped": "43",
+          "units_kept": "59",
+          "delay_days": 7.0
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-GRID-BLOCKS",
+      "file": "train.csv",
+      "rule": "2.0",
+      "title": "Record_ID blocks tile the grid",
+      "description": "3,083 SKU-region series own contiguous ID blocks CEL-0000001..CEL-0245548 with the month advancing by one per ID; 244,566 IDs are used.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "series",
+      "affected": 3083,
+      "expected": 3083,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "len_94": 1976,
+        "len_58": 466
+      },
+      "action": "decode SKU, region and month of every record from its block",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-GRID-REGION-ORDER",
+      "file": "train.csv",
+      "rule": "2.0",
+      "title": "Per-SKU region orders",
+      "description": "433 distinct region orders; the core SKUs list all six regions in the canonical order.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "skus",
+      "affected": 433,
+      "expected": 433,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "core_skus": 100
+      },
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K7-REGION-BLANK",
+      "file": "train.csv",
+      "rule": "K7",
+      "title": "Region blank",
+      "description": "745 raw rows / 737 records. The Record_ID block gives the region; methods B and C (customer-channel combination and the only region without a row that month) independently give the same region for 737 / 737 records.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "records",
+      "affected": 737,
+      "expected": 737,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 737,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "Asia Pacific": 131,
+        "Europe": 137,
+        "India": 133,
+        "Latin America": 133,
+        "Middle East & Africa": 90,
+        "North America": 113
+      },
+      "action": "Region := region of the Record_ID block (asserted equal to the B-and-C witness)",
+      "examples": [
+        {
+          "record_id": "CEL-0186613",
+          "sku_id": "PTC-019",
+          "date": "2019-01",
+          "region": "Europe"
+        },
+        {
+          "record_id": "CEL-0058508",
+          "sku_id": "CSS-059",
+          "date": "2019-01",
+          "region": "India"
+        },
+        {
+          "record_id": "CEL-0144364",
+          "sku_id": "PMP-007",
+          "date": "2019-01",
+          "region": "Asia Pacific"
+        },
+        {
+          "record_id": "CEL-0164419",
+          "sku_id": "PMP-057",
+          "date": "2019-01",
+          "region": "North America"
+        },
+        {
+          "record_id": "CEL-0172063",
+          "sku_id": "PMP-076",
+          "date": "2019-01",
+          "region": "Latin America"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-K7-WITNESS",
+      "file": "train.csv",
+      "rule": "K7",
+      "title": "Blank regions: Record_ID decode vs Record_ID-free witness",
+      "description": "Methods B and C of the labels-keys lens, which do not use Record_ID, must give the decoded region.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 737,
+      "expected": 737,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "fail the build on any disagreement",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-UNQ-KEY",
+      "file": "train.csv",
+      "rule": "2.0",
+      "title": "One record per (Date, SKU, Region)",
+      "description": "After de-duplication and decoding no two records share a key (0 collisions).",
+      "dimension": "uniqueness",
+      "severity": "error",
+      "unit": "records",
+      "affected": 244566,
+      "expected": 244566,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none needed: de-duplication on Record_ID is sufficient",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-GRID-CELLS",
+      "file": "train.csv",
+      "rule": "2.0",
+      "title": "Grid size",
+      "description": "Every cell of every Record_ID block: records + missing rows.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 245548,
+      "expected": 245548,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "build the panel on the full grid",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-K13-MISSING-ROW",
+      "file": "train.csv",
+      "rule": "K13",
+      "title": "Missing row (deleted record)",
+      "description": "Gaps in the Record_ID sequence: cells whose record was deleted (0.400 % of the grid, missing completely at random). They stay null (business rule 3: a missing row is not a zero) and are flagged; customer inferred from agreeing neighbours for 982 of 982.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 982,
+      "expected": 982,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 982,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "first": 10,
+        "last": 16,
+        "inner": 956
+      },
+      "action": "row_status = missing_row, units null; treatment (stock-out file, cycle phase, imputation) in the demand stage",
+      "examples": [
+        {
+          "sku_id": "BSS-001",
+          "region": "Europe",
+          "date": "2024-01"
+        },
+        {
+          "sku_id": "BSS-001",
+          "region": "Asia Pacific",
+          "date": "2024-09"
+        },
+        {
+          "sku_id": "BSS-001",
+          "region": "Asia Pacific",
+          "date": "2024-11"
+        },
+        {
+          "sku_id": "BSS-001",
+          "region": "Latin America",
+          "date": "2024-11"
+        },
+        {
+          "sku_id": "BSS-001",
+          "region": "Middle East & Africa",
+          "date": "2026-08"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-PRICE-TABLE",
+      "file": "train.csv",
+      "rule": "2.2",
+      "title": "Canonical price table",
+      "description": "Mode of the non-zero raw price per SKU x period (598 SKUs, minimum mode share 0.571). Mean January list change by year: 2020 +2.001 %, 2021 +2.510 %, 2022 +5.019 %, 2023 +9.021 %, 2024 +4.472 %, 2025 +3.710 %, 2026 +3.752 %.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 4894,
+      "expected": 4894,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "skus": 598
+      },
+      "action": "one price per SKU and period in every region (business rule 4)",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-PRICE-SURCHARGE",
+      "file": "train.csv",
+      "rule": "2.2",
+      "title": "Surcharge 2022-H2 = list x 1.06",
+      "description": "Invoice price = round(list x 1.06, 2) on 529 / 530 SKUs with both halves; the exception is 1 cent off (the generator multiplies an unrounded base). A real price event (EV-027), not an error.",
+      "dimension": "consistency",
+      "severity": "info",
+      "unit": "skus",
+      "affected": 1,
+      "expected": 1,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "keep the observed invoice price; list price = H1 price",
+      "examples": [
+        {
+          "sku_id": "THM-051",
+          "list_price_usd": 1068.25,
+          "invoice_price_usd": 1132.35
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-NUM-STATES",
+      "file": "train.csv",
+      "rule": "2.2",
+      "title": "Every record in exactly one of 15 numeric states",
+      "description": "6,932 records carry an error; no record carries two.",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "records",
+      "affected": 244566,
+      "expected": 244566,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "N0": 202244,
+        "N0z": 35390,
+        "N1": 2545,
+        "N2": 450,
+        "N3": 217,
+        "N4": 491,
+        "N5": 293,
+        "N6": 75,
+        "N7": 425,
+        "N8": 312,
+        "N9": 614,
+        "N10": 498,
+        "N11": 385,
+        "N12": 332,
+        "N13": 295,
+        "error_ids": 6932
+      },
+      "action": "classify with q = price / canonical, then k = units x price / revenue",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-NUM-STATES-RAW",
+      "file": "train.csv",
+      "rule": "2.2",
+      "title": "Numeric states on raw rows (before de-duplication)",
+      "description": "Both versions of a repeated Record_ID always carry the same state.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "raw_rows",
+      "affected": 248248,
+      "expected": 248248,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "N0": 205431,
+        "N0z": 35805,
+        "N1": 2572,
+        "N2": 455,
+        "N3": 218,
+        "N4": 497,
+        "N5": 295,
+        "N6": 76,
+        "N7": 437,
+        "N8": 316,
+        "N9": 620,
+        "N10": 502,
+        "N11": 390,
+        "N12": 335,
+        "N13": 299
+      },
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-N1-UNITS-BLANK-RECOVERED",
+      "file": "train.csv",
+      "rule": "N1",
+      "title": "Units blank, revenue present",
+      "description": "Wrong field(s): units. Fix: units = revenue / price (exact integer).",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "records",
+      "affected": 2545,
+      "expected": 2545,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 2545,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "units = revenue / price (exact integer)",
+      "examples": [
+        {
+          "record_id": "CEL-0234056",
+          "date": "2019-01",
+          "sku_id": "THM-049",
+          "region": "Latin America",
+          "units_txt": "",
+          "price_txt": "479.97",
+          "revenue_txt": "55676.52",
+          "units_sold": 116,
+          "unit_price_usd": 479.97,
+          "revenue_usd": 55676.52
+        },
+        {
+          "record_id": "CEL-0004847",
+          "date": "2019-01",
+          "sku_id": "BSS-010",
+          "region": "Europe",
+          "units_txt": "",
+          "price_txt": "379.44",
+          "revenue_txt": "30734.64",
+          "units_sold": 81,
+          "unit_price_usd": 379.44,
+          "revenue_usd": 30734.64
+        },
+        {
+          "record_id": "CEL-0050823",
+          "date": "2019-01",
+          "sku_id": "CSS-041",
+          "region": "India",
+          "units_txt": "",
+          "price_txt": "385.63",
+          "revenue_txt": "9640.75",
+          "units_sold": 25,
+          "unit_price_usd": 385.63,
+          "revenue_usd": 9640.75
+        },
+        {
+          "record_id": "CEL-0086701",
+          "date": "2019-01",
+          "sku_id": "ELA-042",
+          "region": "Europe",
+          "units_txt": "",
+          "price_txt": "1571.72",
+          "revenue_txt": "70727.4",
+          "units_sold": 45,
+          "unit_price_usd": 1571.72,
+          "revenue_usd": 70727.4
+        },
+        {
+          "record_id": "CEL-0020743",
+          "date": "2019-01",
+          "sku_id": "BSS-051",
+          "region": "Asia Pacific",
+          "units_txt": "",
+          "price_txt": "323.06",
+          "revenue_txt": "11630.16",
+          "units_sold": 36,
+          "unit_price_usd": 323.06,
+          "revenue_usd": 11630.16
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N2-UNITS-BLANK-ZERO-ROW",
+      "file": "train.csv",
+      "rule": "N2",
+      "title": "Units blank on a zero row",
+      "description": "Wrong field(s): units. Fix: units = 0 (price 0 means no order).",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "records",
+      "affected": 450,
+      "expected": 450,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 450,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "erp_blank_revenue": 48
+      },
+      "action": "units = 0 (price 0 means no order)",
+      "examples": [
+        {
+          "record_id": "CEL-0092085",
+          "date": "2019-01",
+          "sku_id": "ELA-056",
+          "region": "India",
+          "units_txt": "",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 685.32,
+          "revenue_usd": 0.0
+        },
+        {
+          "record_id": "CEL-0152980",
+          "date": "2019-01",
+          "sku_id": "PMP-028",
+          "region": "Asia Pacific",
+          "units_txt": "",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 1119.08,
+          "revenue_usd": 0.0
+        },
+        {
+          "record_id": "CEL-0041064",
+          "date": "2019-02",
+          "sku_id": "CSS-015",
+          "region": "Asia Pacific",
+          "units_txt": "",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 439.69,
+          "revenue_usd": 0.0
+        },
+        {
+          "record_id": "CEL-0184596",
+          "date": "2019-02",
+          "sku_id": "PTC-015",
+          "region": "Asia Pacific",
+          "units_txt": "",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 1374.17,
+          "revenue_usd": 0.0
+        },
+        {
+          "record_id": "CEL-0094084",
+          "date": "2019-02",
+          "sku_id": "ELA-062",
+          "region": "North America",
+          "units_txt": "",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 846.81,
+          "revenue_usd": 0.0
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N3-UNITS-DASH",
+      "file": "train.csv",
+      "rule": "N3",
+      "title": "Units '-' placeholder",
+      "description": "Wrong field(s): units. Fix: units = 0.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "records",
+      "affected": 217,
+      "expected": 217,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 217,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "units = 0",
+      "examples": [
+        {
+          "record_id": "CEL-0131353",
+          "date": "2019-01",
+          "sku_id": "HYD-065",
+          "region": "Asia Pacific",
+          "units_txt": "-",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 1146.67,
+          "revenue_usd": 0.0
+        },
+        {
+          "record_id": "CEL-0135204",
+          "date": "2019-01",
+          "sku_id": "HYD-075",
+          "region": "Asia Pacific",
+          "units_txt": "-",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 1101.22,
+          "revenue_usd": 0.0
+        },
+        {
+          "record_id": "CEL-0087668",
+          "date": "2019-02",
+          "sku_id": "ELA-044",
+          "region": "Latin America",
+          "units_txt": "-",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 778.95,
+          "revenue_usd": 0.0
+        },
+        {
+          "record_id": "CEL-0054346",
+          "date": "2019-03",
+          "sku_id": "CSS-048",
+          "region": "North America",
+          "units_txt": "-",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 836.04,
+          "revenue_usd": 0.0
+        },
+        {
+          "record_id": "CEL-0079649",
+          "date": "2019-03",
+          "sku_id": "ELA-024",
+          "region": "India",
+          "units_txt": "-",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 0,
+          "unit_price_usd": 1341.27,
+          "revenue_usd": 0.0
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N4-SIGN-ERROR",
+      "file": "train.csv",
+      "rule": "N4",
+      "title": "Negative units and revenue",
+      "description": "Wrong field(s): units, revenue. Fix: abs() of both; never netted.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 491,
+      "expected": 491,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 491,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "abs() of both; never netted",
+      "examples": [
+        {
+          "record_id": "CEL-0068562",
+          "date": "2019-01",
+          "sku_id": "CSS-084",
+          "region": "North America",
+          "units_txt": "-35",
+          "price_txt": "211.0",
+          "revenue_txt": "-7385.0",
+          "units_sold": 35,
+          "unit_price_usd": 211.0,
+          "revenue_usd": 7385.0
+        },
+        {
+          "record_id": "CEL-0047001",
+          "date": "2019-01",
+          "sku_id": "CSS-030",
+          "region": "India",
+          "units_txt": "-59",
+          "price_txt": "363.16",
+          "revenue_txt": "-21426.44",
+          "units_sold": 59,
+          "unit_price_usd": 363.16,
+          "revenue_usd": 21426.44
+        },
+        {
+          "record_id": "CEL-0161439",
+          "date": "2019-01",
+          "sku_id": "PMP-050",
+          "region": "North America",
+          "units_txt": "-79",
+          "price_txt": "483.69",
+          "revenue_txt": "-38211.51",
+          "units_sold": 79,
+          "unit_price_usd": 483.69,
+          "revenue_usd": 38211.51
+        },
+        {
+          "record_id": "CEL-0235054",
+          "date": "2019-01",
+          "sku_id": "THM-051",
+          "region": "Europe",
+          "units_txt": "-84",
+          "price_txt": "990.3",
+          "revenue_txt": "-83185.2",
+          "units_sold": 84,
+          "unit_price_usd": 990.3,
+          "revenue_usd": 83185.2
+        },
+        {
+          "record_id": "CEL-0086795",
+          "date": "2019-01",
+          "sku_id": "ELA-042",
+          "region": "Latin America",
+          "units_txt": "-44",
+          "price_txt": "1571.72",
+          "revenue_txt": "-69155.68",
+          "units_sold": 44,
+          "unit_price_usd": 1571.72,
+          "revenue_usd": 69155.68
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N5-UNITS-X10",
+      "file": "train.csv",
+      "rule": "N5",
+      "title": "Units x10",
+      "description": "Wrong field(s): units. Fix: units = revenue / price.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 293,
+      "expected": 293,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 293,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "units = revenue / price",
+      "examples": [
+        {
+          "record_id": "CEL-0094177",
+          "date": "2019-01",
+          "sku_id": "ELA-062",
+          "region": "Asia Pacific",
+          "units_txt": "790",
+          "price_txt": "846.81",
+          "revenue_txt": "66897.99",
+          "units_sold": 79,
+          "unit_price_usd": 846.81,
+          "revenue_usd": 66897.99
+        },
+        {
+          "record_id": "CEL-0075665",
+          "date": "2019-01",
+          "sku_id": "ELA-012",
+          "region": "North America",
+          "units_txt": "190",
+          "price_txt": "1935.22",
+          "revenue_txt": "36769.18",
+          "units_sold": 19,
+          "unit_price_usd": 1935.22,
+          "revenue_usd": 36769.18
+        },
+        {
+          "record_id": "CEL-0243010",
+          "date": "2019-02",
+          "sku_id": "THM-074",
+          "region": "Latin America",
+          "units_txt": "400",
+          "price_txt": "529.34",
+          "revenue_txt": "21173.6",
+          "units_sold": 40,
+          "unit_price_usd": 529.34,
+          "revenue_usd": 21173.6
+        },
+        {
+          "record_id": "CEL-0026611",
+          "date": "2019-02",
+          "sku_id": "BSS-066",
+          "region": "Europe",
+          "units_txt": "750",
+          "price_txt": "634.13",
+          "revenue_txt": "47559.75",
+          "units_sold": 75,
+          "unit_price_usd": 634.13,
+          "revenue_usd": 47559.75
+        },
+        {
+          "record_id": "CEL-0016093",
+          "date": "2019-05",
+          "sku_id": "BSS-039",
+          "region": "North America",
+          "units_txt": "740",
+          "price_txt": "749.02",
+          "revenue_txt": "55427.48",
+          "units_sold": 74,
+          "unit_price_usd": 749.02,
+          "revenue_usd": 55427.48
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N6-UNITS-X100",
+      "file": "train.csv",
+      "rule": "N6",
+      "title": "Units x100",
+      "description": "Wrong field(s): units. Fix: units = revenue / price.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 75,
+      "expected": 75,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 75,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "units = revenue / price",
+      "examples": [
+        {
+          "record_id": "CEL-0030551",
+          "date": "2019-01",
+          "sku_id": "BSS-076",
+          "region": "Asia Pacific",
+          "units_txt": "9,600",
+          "price_txt": "226.24",
+          "revenue_txt": "21719.04",
+          "units_sold": 96,
+          "unit_price_usd": 226.24,
+          "revenue_usd": 21719.04
+        },
+        {
+          "record_id": "CEL-0236424",
+          "date": "2019-07",
+          "sku_id": "THM-056",
+          "region": "Europe",
+          "units_txt": "8200",
+          "price_txt": "874.34",
+          "revenue_txt": "71695.88",
+          "units_sold": 82,
+          "unit_price_usd": 874.34,
+          "revenue_usd": 71695.88
+        },
+        {
+          "record_id": "CEL-0211798",
+          "date": "2019-08",
+          "sku_id": "PTC-084",
+          "region": "Latin America",
+          "units_txt": "4500",
+          "price_txt": "781.58",
+          "revenue_txt": "35171.1",
+          "units_sold": 45,
+          "unit_price_usd": 781.58,
+          "revenue_usd": 35171.1
+        },
+        {
+          "record_id": "CEL-0077207",
+          "date": "2020-01",
+          "sku_id": "ELA-018",
+          "region": "India",
+          "units_txt": "3,100",
+          "price_txt": "941.42",
+          "revenue_txt": "29184.02",
+          "units_sold": 31,
+          "unit_price_usd": 941.42,
+          "revenue_usd": 29184.02
+        },
+        {
+          "record_id": "CEL-0001692",
+          "date": "2020-02",
+          "sku_id": "BSS-004",
+          "region": "Europe",
+          "units_txt": "15,100",
+          "price_txt": "372.58",
+          "revenue_txt": "56259.58",
+          "units_sold": 151,
+          "unit_price_usd": 372.58,
+          "revenue_usd": 56259.58
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N7-REVENUE-X10",
+      "file": "train.csv",
+      "rule": "N7",
+      "title": "Revenue x10",
+      "description": "Wrong field(s): revenue. Fix: revenue = units x price; units untouched.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 425,
+      "expected": 425,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 425,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "revenue = units x price; units untouched",
+      "examples": [
+        {
+          "record_id": "CEL-0033589",
+          "date": "2019-01",
+          "sku_id": "BSS-082",
+          "region": "Europe",
+          "units_txt": "83",
+          "price_txt": "309.58",
+          "revenue_txt": "256951.4",
+          "units_sold": 83,
+          "unit_price_usd": 309.58,
+          "revenue_usd": 25695.14
+        },
+        {
+          "record_id": "CEL-0066791",
+          "date": "2019-02",
+          "sku_id": "CSS-080",
+          "region": "North America",
+          "units_txt": "79",
+          "price_txt": "463.57",
+          "revenue_txt": "366220.3",
+          "units_sold": 79,
+          "unit_price_usd": 463.57,
+          "revenue_usd": 36622.03
+        },
+        {
+          "record_id": "CEL-0231266",
+          "date": "2019-03",
+          "sku_id": "THM-043",
+          "region": "Latin America",
+          "units_txt": "115",
+          "price_txt": "1019.16",
+          "revenue_txt": "1172034.0",
+          "units_sold": 115,
+          "unit_price_usd": 1019.16,
+          "revenue_usd": 117203.4
+        },
+        {
+          "record_id": "CEL-0243597",
+          "date": "2019-03",
+          "sku_id": "THM-075",
+          "region": "North America",
+          "units_txt": "84",
+          "price_txt": "549.3",
+          "revenue_txt": "461412.0",
+          "units_sold": 84,
+          "unit_price_usd": 549.3,
+          "revenue_usd": 46141.2
+        },
+        {
+          "record_id": "CEL-0119270",
+          "date": "2019-03",
+          "sku_id": "HYD-036",
+          "region": "North America",
+          "units_txt": "59",
+          "price_txt": "388.73",
+          "revenue_txt": "229350.7",
+          "units_sold": 59,
+          "unit_price_usd": 388.73,
+          "revenue_usd": 22935.07
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N8-REVENUE-DIGIT-SWAP",
+      "file": "train.csv",
+      "rule": "N8",
+      "title": "Revenue digit transposition",
+      "description": "Wrong field(s): revenue. Fix: revenue = units x price; units untouched.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 312,
+      "expected": 312,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 312,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "revenue = units x price; units untouched",
+      "examples": [
+        {
+          "record_id": "CEL-0058508",
+          "date": "2019-01",
+          "sku_id": "CSS-059",
+          "region": "India",
+          "units_txt": "30",
+          "price_txt": "256.4",
+          "revenue_txt": "6792.0",
+          "units_sold": 30,
+          "unit_price_usd": 256.4,
+          "revenue_usd": 7692.0
+        },
+        {
+          "record_id": "CEL-0227757",
+          "date": "2019-02",
+          "sku_id": "THM-036",
+          "region": "Europe",
+          "units_txt": "68",
+          "price_txt": "530.45",
+          "revenue_txt": "36007.6",
+          "units_sold": 68,
+          "unit_price_usd": 530.45,
+          "revenue_usd": 36070.6
+        },
+        {
+          "record_id": "CEL-0119117",
+          "date": "2019-02",
+          "sku_id": "HYD-035",
+          "region": "Asia Pacific",
+          "units_txt": "20",
+          "price_txt": "1047.44",
+          "revenue_txt": "2948.8",
+          "units_sold": 20,
+          "unit_price_usd": 1047.44,
+          "revenue_usd": 20948.8
+        },
+        {
+          "record_id": "CEL-0178977",
+          "date": "2019-03",
+          "sku_id": "PTC-004",
+          "region": "Latin America",
+          "units_txt": "16",
+          "price_txt": "1136.02",
+          "revenue_txt": "81176.32",
+          "units_sold": 16,
+          "unit_price_usd": 1136.02,
+          "revenue_usd": 18176.32
+        },
+        {
+          "record_id": "CEL-0017112",
+          "date": "2019-04",
+          "sku_id": "BSS-041",
+          "region": "India",
+          "units_txt": "87",
+          "price_txt": "388.03",
+          "revenue_txt": "33578.61",
+          "units_sold": 87,
+          "unit_price_usd": 388.03,
+          "revenue_usd": 33758.61
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N9-PRICE-IN-CENTS",
+      "file": "train.csv",
+      "rule": "N9",
+      "title": "Price in cents",
+      "description": "Wrong field(s): price. Fix: price = price / 100.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 614,
+      "expected": 614,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 614,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "price = price / 100",
+      "examples": [
+        {
+          "record_id": "CEL-0136542",
+          "date": "2019-01",
+          "sku_id": "HYD-078",
+          "region": "Europe",
+          "units_txt": "153",
+          "price_txt": "67308.0",
+          "revenue_txt": "102981.24",
+          "units_sold": 153,
+          "unit_price_usd": 673.08,
+          "revenue_usd": 102981.24
+        },
+        {
+          "record_id": "CEL-0025988",
+          "date": "2019-01",
+          "sku_id": "BSS-064",
+          "region": "India",
+          "units_txt": "48",
+          "price_txt": "26173.0",
+          "revenue_txt": "12563.04",
+          "units_sold": 48,
+          "unit_price_usd": 261.73,
+          "revenue_usd": 12563.04
+        },
+        {
+          "record_id": "CEL-0037849",
+          "date": "2019-01",
+          "sku_id": "CSS-006",
+          "region": "Latin America",
+          "units_txt": "180",
+          "price_txt": "20146.0",
+          "revenue_txt": "36262.8",
+          "units_sold": 180,
+          "unit_price_usd": 201.46,
+          "revenue_usd": 36262.8
+        },
+        {
+          "record_id": "CEL-0113646",
+          "date": "2019-01",
+          "sku_id": "HYD-020",
+          "region": "India",
+          "units_txt": "118",
+          "price_txt": "68443.0",
+          "revenue_txt": "80762.74",
+          "units_sold": 118,
+          "unit_price_usd": 684.43,
+          "revenue_usd": 80762.74
+        },
+        {
+          "record_id": "CEL-0013893",
+          "date": "2019-01",
+          "sku_id": "BSS-033",
+          "region": "Europe",
+          "units_txt": "85",
+          "price_txt": "35946.0",
+          "revenue_txt": "30554.1",
+          "units_sold": 85,
+          "unit_price_usd": 359.46,
+          "revenue_usd": 30554.1
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N10-PRICE-IN-EUR",
+      "file": "train.csv",
+      "rule": "N10",
+      "title": "Price and revenue in EUR (Europe Direct OEM 2022-Q1)",
+      "description": "Wrong field(s): price, revenue. Fix: price = canonical; revenue = units x canonical.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 498,
+      "expected": 498,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 498,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "price = canonical; revenue = units x canonical",
+      "examples": [
+        {
+          "record_id": "CEL-0040794",
+          "date": "2022-01",
+          "sku_id": "CSS-014",
+          "region": "Europe",
+          "units_txt": "9",
+          "price_txt": "850.69",
+          "revenue_txt": "7656.21",
+          "units_sold": 9,
+          "unit_price_usd": 955.83,
+          "revenue_usd": 8602.47
+        },
+        {
+          "record_id": "CEL-0089099",
+          "date": "2022-01",
+          "sku_id": "ELA-047",
+          "region": "Europe",
+          "units_txt": "12",
+          "price_txt": "473.04",
+          "revenue_txt": "5676.48",
+          "units_sold": 12,
+          "unit_price_usd": 531.51,
+          "revenue_usd": 6378.12
+        },
+        {
+          "record_id": "CEL-0052174",
+          "date": "2022-01",
+          "sku_id": "CSS-044",
+          "region": "Europe",
+          "units_txt": "103",
+          "price_txt": "217.15",
+          "revenue_txt": "22366.45",
+          "units_sold": 103,
+          "unit_price_usd": 243.99,
+          "revenue_usd": 25130.97
+        },
+        {
+          "record_id": "CEL-0221254",
+          "date": "2022-01",
+          "sku_id": "THM-022",
+          "region": "Europe",
+          "units_txt": "54",
+          "price_txt": "610.98",
+          "revenue_txt": "32992.92",
+          "units_sold": 54,
+          "unit_price_usd": 686.49,
+          "revenue_usd": 37070.46
+        },
+        {
+          "record_id": "CEL-0241565",
+          "date": "2022-01",
+          "sku_id": "THM-071",
+          "region": "Europe",
+          "units_txt": "72",
+          "price_txt": "506.7",
+          "revenue_txt": "36482.4",
+          "units_sold": 72,
+          "unit_price_usd": 569.33,
+          "revenue_usd": 40991.76
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N11-PACK-OF-10",
+      "file": "train.csv",
+      "rule": "N11",
+      "title": "Units booked in packs of 10 (India Aftermarket 2021-H2)",
+      "description": "Wrong field(s): units, price. Fix: units = 10 x units (+-5); price = canonical; revenue unchanged.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 385,
+      "expected": 385,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 385,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "units = 10 x units (+-5); price = canonical; revenue unchanged",
+      "examples": [
+        {
+          "record_id": "CEL-0003481",
+          "date": "2021-07",
+          "sku_id": "BSS-007",
+          "region": "India",
+          "units_txt": "9",
+          "price_txt": "1334.8",
+          "revenue_txt": "12013.2",
+          "units_sold": 90,
+          "unit_price_usd": 133.48,
+          "revenue_usd": 12013.2
+        },
+        {
+          "record_id": "CEL-0083375",
+          "date": "2021-07",
+          "sku_id": "ELA-034",
+          "region": "India",
+          "units_txt": "2",
+          "price_txt": "22327.0",
+          "revenue_txt": "44654.0",
+          "units_sold": 20,
+          "unit_price_usd": 2232.7,
+          "revenue_usd": 44654.0
+        },
+        {
+          "record_id": "CEL-0165411",
+          "date": "2021-07",
+          "sku_id": "PMP-059",
+          "region": "India",
+          "units_txt": "6",
+          "price_txt": "3783.2",
+          "revenue_txt": "22699.2",
+          "units_sold": 60,
+          "unit_price_usd": 378.32,
+          "revenue_usd": 22699.2
+        },
+        {
+          "record_id": "CEL-0127411",
+          "date": "2021-07",
+          "sku_id": "HYD-055",
+          "region": "India",
+          "units_txt": "6",
+          "price_txt": "10839.9",
+          "revenue_txt": "65039.4",
+          "units_sold": 60,
+          "unit_price_usd": 1083.99,
+          "revenue_usd": 65039.4
+        },
+        {
+          "record_id": "CEL-0219256",
+          "date": "2021-07",
+          "sku_id": "THM-017",
+          "region": "India",
+          "units_txt": "8",
+          "price_txt": "4767.7",
+          "revenue_txt": "38141.6",
+          "units_sold": 80,
+          "unit_price_usd": 476.77,
+          "revenue_usd": 38141.6
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N12-ERP-UNITS-LOST",
+      "file": "train.csv",
+      "rule": "N12",
+      "title": "Units and revenue blank on an order (LatAm ERP migration)",
+      "description": "Wrong field(s): units, revenue. Fix: units unknown (null), known positive.",
+      "dimension": "completeness",
+      "severity": "warning",
+      "unit": "records",
+      "affected": 332,
+      "expected": 332,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 332,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 332,
+        "passed": false
+      },
+      "breakdown": {},
+      "action": "units unknown (null), known positive",
+      "examples": [
+        {
+          "record_id": "CEL-0117269",
+          "date": "2023-03",
+          "sku_id": "HYD-030",
+          "region": "Latin America",
+          "units_txt": "",
+          "price_txt": "1117.37",
+          "revenue_txt": "",
+          "units_sold": null,
+          "unit_price_usd": 1117.37,
+          "revenue_usd": null
+        },
+        {
+          "record_id": "CEL-0108024",
+          "date": "2023-03",
+          "sku_id": "HYD-009",
+          "region": "Latin America",
+          "units_txt": "",
+          "price_txt": "1514.32",
+          "revenue_txt": "",
+          "units_sold": null,
+          "unit_price_usd": 1514.32,
+          "revenue_usd": null
+        },
+        {
+          "record_id": "CEL-0223792",
+          "date": "2023-03",
+          "sku_id": "THM-027",
+          "region": "Latin America",
+          "units_txt": "",
+          "price_txt": "529.84",
+          "revenue_txt": "",
+          "units_sold": null,
+          "unit_price_usd": 529.84,
+          "revenue_usd": null
+        },
+        {
+          "record_id": "CEL-0174319",
+          "date": "2023-03",
+          "sku_id": "PMP-081",
+          "region": "Latin America",
+          "units_txt": "",
+          "price_txt": "849.66",
+          "revenue_txt": "",
+          "units_sold": null,
+          "unit_price_usd": 849.66,
+          "revenue_usd": null
+        },
+        {
+          "record_id": "CEL-0218232",
+          "date": "2023-03",
+          "sku_id": "THM-014",
+          "region": "Latin America",
+          "units_txt": "",
+          "price_txt": "615.09",
+          "revenue_txt": "",
+          "units_sold": null,
+          "unit_price_usd": 615.09,
+          "revenue_usd": null
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N13-PRICE-ZEROED",
+      "file": "train.csv",
+      "rule": "N13",
+      "title": "Price and revenue zeroed on a real order",
+      "description": "Wrong field(s): price, revenue. Fix: price = canonical; revenue = units x canonical.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 295,
+      "expected": 295,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 295,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "price = canonical; revenue = units x canonical",
+      "examples": [
+        {
+          "record_id": "CEL-0134488",
+          "date": "2019-01",
+          "sku_id": "HYD-073",
+          "region": "Europe",
+          "units_txt": "55",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 55,
+          "unit_price_usd": 559.04,
+          "revenue_usd": 30747.2
+        },
+        {
+          "record_id": "CEL-0166495",
+          "date": "2019-01",
+          "sku_id": "PMP-061",
+          "region": "India",
+          "units_txt": "66",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 66,
+          "unit_price_usd": 493.36,
+          "revenue_usd": 32561.76
+        },
+        {
+          "record_id": "CEL-0113066",
+          "date": "2019-01",
+          "sku_id": "HYD-019",
+          "region": "Asia Pacific",
+          "units_txt": "19",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 19,
+          "unit_price_usd": 1436.43,
+          "revenue_usd": 27292.17
+        },
+        {
+          "record_id": "CEL-0165664",
+          "date": "2019-02",
+          "sku_id": "PMP-059",
+          "region": "Asia Pacific",
+          "units_txt": "41",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 41,
+          "unit_price_usd": 363.29,
+          "revenue_usd": 14894.89
+        },
+        {
+          "record_id": "CEL-0083968",
+          "date": "2019-02",
+          "sku_id": "ELA-035",
+          "region": "North America",
+          "units_txt": "35",
+          "price_txt": "0.0",
+          "revenue_txt": "0.0",
+          "units_sold": 35,
+          "unit_price_usd": 607.1,
+          "revenue_usd": 21248.5
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-N6B-THOUSANDS-SEPARATOR",
+      "file": "train.csv",
+      "rule": "N6b",
+      "title": "Thousands separator in Units_Sold",
+      "description": "44 records written d,ddd; 3 are genuine large orders whose only issue is the comma, the rest are x10 / x100 errors. Never divide on magnitude alone.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "records",
+      "affected": 44,
+      "expected": 44,
+      "before": {
+        "metric": "records_with_issue",
+        "value": 44,
+        "passed": false
+      },
+      "after": {
+        "metric": "records_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "N0": 3,
+        "N5": 16,
+        "N6": 25
+      },
+      "action": "strip the comma before classifying",
+      "examples": [
+        {
+          "record_id": "CEL-0030551",
+          "units_txt": "9,600",
+          "units_sold": 96,
+          "numeric_state": "N6_units_x100"
+        },
+        {
+          "record_id": "CEL-0162840",
+          "units_txt": "1,060",
+          "units_sold": 1060,
+          "numeric_state": "N0_ok"
+        },
+        {
+          "record_id": "CEL-0229596",
+          "units_txt": "1,080",
+          "units_sold": 108,
+          "numeric_state": "N5_units_x10"
+        },
+        {
+          "record_id": "CEL-0077207",
+          "units_txt": "3,100",
+          "units_sold": 31,
+          "numeric_state": "N6_units_x100"
+        },
+        {
+          "record_id": "CEL-0001692",
+          "units_txt": "15,100",
+          "units_sold": 151,
+          "numeric_state": "N6_units_x100"
+        }
+      ]
+    },
+    {
+      "check_id": "TRN-NUM-REVENUE-IDENTITY",
+      "file": "train.csv",
+      "rule": "2.2",
+      "title": "Revenue = units x invoice price to the cent",
+      "description": "Evaluated on every record whose units, price and revenue are known (no tolerance: the identity is exact).",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "records",
+      "affected": 244234,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 1719,
+        "passed": false
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "fix the wrong field identified by the state",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-NUM-UNITS-VALID",
+      "file": "train.csv",
+      "rule": "2.2",
+      "title": "Units are non-negative integers",
+      "description": "Before: blank, '-', negative or comma-formatted units. After: none negative; null only where the order size is unknown (332 ERP records).",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "records",
+      "affected": 244566,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 4079,
+        "passed": false
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "see the state rules",
+      "examples": []
+    },
+    {
+      "check_id": "TRN-NUM-TOTALS",
+      "file": "train.csv",
+      "rule": "2.2",
+      "title": "Units and revenue: naive coercion vs cleaned",
+      "description": "Naive numeric coercion (commas stripped, blanks and '-' ignored, signs kept): 12,030,253 units, USD 8,684.43 M. Cleaned: 11,723,379 units (pack-of-10 rows at 10 x booked, ERP blanks excluded), USD 8,575.85 M. 4,071 records have units restored exactly.",
+      "dimension": "accuracy",
+      "severity": "info",
+      "unit": "units",
+      "affected": 11723379,
+      "expected": 11723379,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "units_naive_total": 12030253,
+        "units_exact_recovered": 4071
+      },
+      "action": "report",
+      "examples": []
+    },
+    {
+      "check_id": "MST-UNQ-001",
+      "file": "sku_master.csv",
+      "rule": "2.5",
+      "title": "One row per SKU",
+      "description": "SKU_ID is unique and follows AAA-NNN.",
+      "dimension": "uniqueness",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 601,
+      "expected": 601,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "MST-S1-BU",
+      "file": "sku_master.csv",
+      "rule": "S1",
+      "title": "Business unit contradicts the family",
+      "description": "PMP-004 says Power & Drive Systems; its family, all train rows and all test rows say Advanced Manufacturing.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 1,
+      "expected": 1,
+      "before": {
+        "metric": "rows_with_issue",
+        "value": 1,
+        "passed": false
+      },
+      "after": {
+        "metric": "rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "Business_Unit := the family's business unit",
+      "examples": [
+        {
+          "sku_id": "PMP-004",
+          "business_unit": "Advanced Manufacturing"
+        }
+      ]
+    },
+    {
+      "check_id": "MST-S2-LAUNCH",
+      "file": "sku_master.csv",
+      "rule": "S2",
+      "title": "Launch date later than the first sales",
+      "description": "BSS-018's master launch is 2025-06 but its four series start in 2025-02 (16 records before the master launch); the Record_ID blocks only tile with 2025-02.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 1,
+      "expected": 1,
+      "before": {
+        "metric": "rows_with_issue",
+        "value": 1,
+        "passed": false
+      },
+      "after": {
+        "metric": "rows_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "launch_date_effective := first Record_ID block month; the 16 early records are kept",
+      "examples": [
+        {
+          "sku_id": "BSS-018",
+          "launch_date": "2025-06",
+          "launch_date_effective": "2025-02"
+        }
+      ]
+    },
+    {
+      "check_id": "MST-STATUS-001",
+      "file": "sku_master.csv",
+      "rule": "2.5",
+      "title": "Lifecycle status agrees with the dates",
+      "description": "Planned Launch = launch after 2026-10; Active = no EOL; Discontinued = EOL by 2026-10; EOL Announced = later EOL.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 601,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "MST-DESC-001",
+      "file": "sku_master.csv",
+      "rule": "2.5",
+      "title": "Description starts with the size class",
+      "description": "SKU_Description = Size_Class + ' mm ' + product name.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 601,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "MST-VAL-001",
+      "file": "sku_master.csv",
+      "rule": "2.5",
+      "title": "Valid powertrain, status and successor references",
+      "description": "Powertrain in {EV, ICE, Universal}, status in the four documented values, Replaces_SKU refers to a master SKU.",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 601,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "MST-STATUS-ACTIVE",
+      "file": "sku_master.csv",
+      "rule": "2.5",
+      "title": "SKUs with status Active",
+      "description": "Profile: number of master rows with Lifecycle_Status = Active.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 589,
+      "expected": 589,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "MST-STATUS-DISCONTINUED",
+      "file": "sku_master.csv",
+      "rule": "2.5",
+      "title": "SKUs with status Discontinued",
+      "description": "Profile: number of master rows with Lifecycle_Status = Discontinued.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 6,
+      "expected": 6,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "MST-STATUS-EOL-ANNOUNCED",
+      "file": "sku_master.csv",
+      "rule": "2.5",
+      "title": "SKUs with status EOL Announced",
+      "description": "Profile: number of master rows with Lifecycle_Status = EOL Announced.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 3,
+      "expected": 3,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "MST-STATUS-PLANNED-LAUNCH",
+      "file": "sku_master.csv",
+      "rule": "2.5",
+      "title": "SKUs with status Planned Launch",
+      "description": "Profile: number of master rows with Lifecycle_Status = Planned Launch.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 3,
+      "expected": 3,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "MAC-M1-DUPLICATE-MONTH",
+      "file": "macro_indicators.csv",
+      "rule": "M1",
+      "title": "Duplicated month 2022-06",
+      "description": "File lines 43/44 hold two versions of 2022-06; only PMI and New_Vehicle_Orders_Index differ. Line 43 is dropped.",
+      "dimension": "uniqueness",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 2,
+      "expected": 2,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 2,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "keep the row that joins its neighbours smoothly (the later line)",
+      "examples": [
+        {
+          "date": "2022-06",
+          "column": "ISM_Manufacturing_PMI",
+          "raw_value": "53.9",
+          "after": "52.7"
+        },
+        {
+          "date": "2022-06",
+          "column": "New_Vehicle_Orders_Index",
+          "raw_value": "102.9",
+          "after": "104.3"
+        }
+      ]
+    },
+    {
+      "check_id": "MAC-M2-FRACTION",
+      "file": "macro_indicators.csv",
+      "rule": "M2",
+      "title": "Auto production YoY stored as a fraction",
+      "description": "2019 values written as -0.ddd (three decimals) in a one-decimal percent column.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 12,
+      "expected": 12,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 12,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "x100",
+      "examples": [
+        {
+          "date": "2019-01",
+          "column": "Auto_Production_YoY_Pct",
+          "raw_value": "-0.015",
+          "after": "-1.5"
+        },
+        {
+          "date": "2019-02",
+          "column": "Auto_Production_YoY_Pct",
+          "raw_value": "-0.023",
+          "after": "-2.3"
+        },
+        {
+          "date": "2019-03",
+          "column": "Auto_Production_YoY_Pct",
+          "raw_value": "-0.032",
+          "after": "-3.2"
+        },
+        {
+          "date": "2019-04",
+          "column": "Auto_Production_YoY_Pct",
+          "raw_value": "-0.019",
+          "after": "-1.9"
+        },
+        {
+          "date": "2019-05",
+          "column": "Auto_Production_YoY_Pct",
+          "raw_value": "-0.014",
+          "after": "-1.4"
+        }
+      ]
+    },
+    {
+      "check_id": "MAC-M3-DECIMAL-SHIFT",
+      "file": "macro_indicators.csv",
+      "rule": "M3",
+      "title": "PMI decimal shift",
+      "description": "2023-05 written 4.79 (two decimals); robust z of the first difference about -57.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 1,
+      "expected": 1,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 1,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "x10 (47.9)",
+      "examples": [
+        {
+          "date": "2023-05",
+          "column": "ISM_Manufacturing_PMI",
+          "raw_value": "4.79",
+          "after": "47.9"
+        }
+      ]
+    },
+    {
+      "check_id": "MAC-M4-REBASE",
+      "file": "macro_indicators.csv",
+      "rule": "M4",
+      "title": "Raw-material index on an old base",
+      "description": "Level break at 2022-01 (149.3 -> 123.6) while 2024-01 = 100.0 (the documented base); 2019-01..2021-12 sit on an old base.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 36,
+      "expected": 36,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 36,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "divide by K = 1.25 (plausible 1.21..1.26; sensitivity at 1.22 / 1.26)",
+      "examples": [
+        {
+          "date": "2019-01",
+          "column": "Raw_Material_Cost_Index",
+          "raw_value": "91.7",
+          "after": "73.36"
+        },
+        {
+          "date": "2019-02",
+          "column": "Raw_Material_Cost_Index",
+          "raw_value": "93.1",
+          "after": "74.48"
+        },
+        {
+          "date": "2019-03",
+          "column": "Raw_Material_Cost_Index",
+          "raw_value": "95.0",
+          "after": "76.0"
+        },
+        {
+          "date": "2019-04",
+          "column": "Raw_Material_Cost_Index",
+          "raw_value": "91.9",
+          "after": "73.52"
+        },
+        {
+          "date": "2019-05",
+          "column": "Raw_Material_Cost_Index",
+          "raw_value": "90.1",
+          "after": "72.08"
+        }
+      ]
+    },
+    {
+      "check_id": "MAC-M5-BLANK",
+      "file": "macro_indicators.csv",
+      "rule": "M5",
+      "title": "Single-month blank",
+      "description": "Five isolated blanks (INV 2019-07, FUEL 2020-09, UTIL 2021-02, ORD 2023-08, EV 2024-11).",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "cells",
+      "affected": 5,
+      "expected": 5,
+      "before": {
+        "metric": "cells_with_issue",
+        "value": 5,
+        "passed": false
+      },
+      "after": {
+        "metric": "cells_with_issue",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "mean of the previous and next month",
+      "examples": [
+        {
+          "date": "2024-11",
+          "column": "EV_Adoption_Index",
+          "raw_value": "",
+          "after": "92.0"
+        },
+        {
+          "date": "2020-09",
+          "column": "Fuel_Price_Index",
+          "raw_value": "",
+          "after": "70.9"
+        },
+        {
+          "date": "2021-02",
+          "column": "Industrial_Util_Rate_Pct",
+          "raw_value": "",
+          "after": "74.9"
+        },
+        {
+          "date": "2023-08",
+          "column": "New_Vehicle_Orders_Index",
+          "raw_value": "",
+          "after": "100.0"
+        },
+        {
+          "date": "2019-07",
+          "column": "Vehicle_Inventory_Days",
+          "raw_value": "",
+          "after": "69.7"
+        }
+      ]
+    },
+    {
+      "check_id": "MAC-COMPLETE",
+      "file": "macro_indicators.csv",
+      "rule": "2.4",
+      "title": "One complete row per month 2019-01..2028-05",
+      "description": "114 raw rows -> 113 months, no blank cell; 56 cells changed.",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 113,
+      "expected": 113,
+      "before": {
+        "metric": "violations",
+        "value": 6,
+        "passed": false
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "raw_rows": 114,
+        "cells_changed": 56
+      },
+      "action": "M1-M5",
+      "examples": []
+    },
+    {
+      "check_id": "EVT-FORMAT",
+      "file": "events_calendar.csv",
+      "rule": "2.6",
+      "title": "Event dates parse",
+      "description": "YYYY-MM = whole month, YYYY-MM-DD = exact day, blank End_Date = open-ended (active through the forecast window). Scope types: Region 48, Global 15, Customer 3, Product_Family 1, Channel 1.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 68,
+      "expected": 68,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "start_month_precision": 48,
+        "start_day_precision": 20,
+        "open_ended": 1
+      },
+      "action": "tidy start/end day and month",
+      "examples": []
+    },
+    {
+      "check_id": "EVT-SCOPE",
+      "file": "events_calendar.csv",
+      "rule": "2.6",
+      "title": "Scope values are canonical",
+      "description": "Regions, channels, families and the three 'Customer | Region' pairs all exist in the vocabularies.",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 68,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "split 'Customer | Region'; unknown values raise",
+      "examples": [
+        {
+          "event_id": "EV-038",
+          "scope_customer": "Nexon Motor Group",
+          "scope_region": "Europe"
+        },
+        {
+          "event_id": "EV-052",
+          "scope_customer": "Helios Auto Parts",
+          "scope_region": "India"
+        },
+        {
+          "event_id": "EV-062",
+          "scope_customer": "Orion Driveline",
+          "scope_region": "North America"
+        }
+      ]
+    },
+    {
+      "check_id": "EVT-HOLIDAY-LENGTH",
+      "file": "events_calendar.csv",
+      "rule": "2.6",
+      "title": "Holiday windows have their documented length",
+      "description": "Lunar New Year windows last 10 days and Ramadan windows 30 days, at the real dates.",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 20,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "day counts per month are derived from these windows by the features stage",
+      "examples": []
+    },
+    {
+      "check_id": "EVT-FORECAST-WINDOW",
+      "file": "events_calendar.csv",
+      "rule": "2.6",
+      "title": "Events touching the forecast window",
+      "description": "Events overlapping 2026-11..2028-05 (EV-052 open-ended included).",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 10,
+      "expected": 10,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "in_forecast_window flag",
+      "examples": [
+        {
+          "event_id": "EV-052",
+          "start_month": "2025-09",
+          "end_month": "2028-05",
+          "description": "Helios Auto Parts commissions second Indian assembly line (permanent capacity increase)"
+        },
+        {
+          "event_id": "EV-059",
+          "start_month": "2027-01",
+          "end_month": "2027-01",
+          "description": "Annual list-price increase of about 4.5% effective 1 January"
+        },
+        {
+          "event_id": "EV-060",
+          "start_month": "2027-02",
+          "end_month": "2027-02",
+          "description": "Lunar New Year holiday period"
+        },
+        {
+          "event_id": "EV-061",
+          "start_month": "2027-02",
+          "end_month": "2027-03",
+          "description": "Ramadan"
+        },
+        {
+          "event_id": "EV-062",
+          "start_month": "2027-07",
+          "end_month": "2027-08",
+          "description": "Planned retooling shutdown at Orion Driveline North American plants"
+        }
+      ]
+    },
+    {
+      "check_id": "STK-FORMAT",
+      "file": "inventory_stockouts.csv",
+      "rule": "I1",
+      "title": "Formally clean file",
+      "description": "No blank, duplicate key, label or date variant; every key is inside the train grid (checked against the decoded grid).",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 5830,
+      "expected": 5830,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "requested": 235319,
+        "carried_in": 3948,
+        "shipped": 140554,
+        "backordered": 16886,
+        "lost": 81827
+      },
+      "action": "load as is",
+      "examples": []
+    },
+    {
+      "check_id": "STK-IDENTITY-LOST",
+      "file": "inventory_stockouts.csv",
+      "rule": "2.7",
+      "title": "Lost = Requested + Carried_In - Shipped - Backordered",
+      "description": "Exact on every row.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 5830,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "unit test of the supply block",
+      "examples": []
+    },
+    {
+      "check_id": "STK-IDENTITY-CARRY",
+      "file": "inventory_stockouts.csv",
+      "rule": "2.7",
+      "title": "Carried_In(t) = Backordered(t-1)",
+      "description": "On every pair of consecutive listed months of a series.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "pairs",
+      "affected": 3108,
+      "expected": 3108,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "unit test of the back-order carry",
+      "examples": []
+    },
+    {
+      "check_id": "STK-IDENTITY-BACKORDER",
+      "file": "inventory_stockouts.csv",
+      "rule": "2.7",
+      "title": "Backordered = floor(0.4 x shortfall), 0 for semiconductor rows",
+      "description": "Operational rows 1,516, semiconductor rows 4,314.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 5830,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "semiconductor": 4314,
+        "operational": 1516
+      },
+      "action": "unit test of the back-order rule",
+      "examples": []
+    },
+    {
+      "check_id": "STK-IDENTITY-FILL",
+      "file": "inventory_stockouts.csv",
+      "rule": "2.7",
+      "title": "Shipped = floor(f x (R + C)) and Stockout_Days = round(30 x (1 - f))",
+      "description": "One latent fill f inside the rounding interval of Fill_Rate_Pct explains both values on every row.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 5830,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "unit test of the allocation rule",
+      "examples": []
+    },
+    {
+      "check_id": "STK-I2-FILL-DOCUMENTATION",
+      "file": "inventory_stockouts.csv",
+      "rule": "I2",
+      "title": "Fill_Rate_Pct is not Shipped / (Requested + Carried_In)",
+      "description": "The documented definition holds at one decimal on 115 / 5,005 rows with demand; Fill_Rate_Pct is the latent allocation fraction. realised_fill_pct is added.",
+      "dimension": "consistency",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 115,
+      "expected": 115,
+      "before": {
+        "metric": "violations",
+        "value": 4890,
+        "passed": false
+      },
+      "after": {
+        "metric": "violations",
+        "value": 4890,
+        "passed": false
+      },
+      "breakdown": {},
+      "action": "keep fill_rate_pct as given; show realised_fill_pct",
+      "examples": [
+        {
+          "date": "2019-01",
+          "sku_id": "BSS-053",
+          "region": "Latin America",
+          "fill_rate_pct": 33.5,
+          "realised_fill_pct": 32.6
+        },
+        {
+          "date": "2019-01",
+          "sku_id": "BSS-083",
+          "region": "India",
+          "fill_rate_pct": 51.8,
+          "realised_fill_pct": 51.4
+        },
+        {
+          "date": "2019-01",
+          "sku_id": "CSS-036",
+          "region": "Europe",
+          "fill_rate_pct": 50.7,
+          "realised_fill_pct": 50.5
+        },
+        {
+          "date": "2019-01",
+          "sku_id": "HYD-039",
+          "region": "Latin America",
+          "fill_rate_pct": 42.5,
+          "realised_fill_pct": 38.9
+        },
+        {
+          "date": "2019-01",
+          "sku_id": "PMP-042",
+          "region": "Europe",
+          "fill_rate_pct": 53.4,
+          "realised_fill_pct": 51.2
+        }
+      ]
+    },
+    {
+      "check_id": "STK-I3-NO-IMPACT",
+      "file": "inventory_stockouts.csv",
+      "rule": "I3",
+      "title": "Stock-out rows without a shortfall",
+      "description": "All-zero rows that still carry a fill, days and reason, and rows holding only carried-in units.",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 825,
+      "expected": 825,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "carried_in_only": 45
+      },
+      "action": "keep as flags only (impact = none / carried_in_only)",
+      "examples": []
+    },
+    {
+      "check_id": "STK-I5-SEMICONDUCTOR-CARRY",
+      "file": "inventory_stockouts.csv",
+      "rule": "I5",
+      "title": "Semiconductor rows with carried-in units",
+      "description": "Back-orders from an operational stock-out the month before (2021-02 -> 2021-03).",
+      "dimension": "validity",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 3,
+      "expected": 3,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "allow Carried_In > 0 on these rows",
+      "examples": []
+    },
+    {
+      "check_id": "ORC-UNITS-SHIPPED",
+      "file": "inventory_stockouts.csv",
+      "rule": "2.2/N0-N13",
+      "title": "Cleaned train units = Shipped_Units",
+      "description": "5,761 comparable stock-out rows; the fixes that changed units or price on them, by state: N1 70, N10 48, N13 10, N2 13, N3 6, N4 14, N5 2, N6 4, N7 9, N8 6, N9 11. Pack rows: x10 within +-5 and units_raw = max(1, round(Shipped / 10)) on 42 / 42.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 5804,
+      "expected": 5804,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "units_exact": 5761,
+        "pack_rows": 42,
+        "erp_unknown": 1
+      },
+      "action": "fail the build on any mismatch",
+      "examples": []
+    },
+    {
+      "check_id": "ORC-MISSING-ROWS-LISTED",
+      "file": "inventory_stockouts.csv",
+      "rule": "K13",
+      "title": "Listed stock-out months without a train record",
+      "description": "Deleted train rows whose shipped quantity the stock-out file gives exactly (restored by the demand stage).",
+      "dimension": "completeness",
+      "severity": "warning",
+      "unit": "rows",
+      "affected": 26,
+      "expected": 26,
+      "before": {
+        "metric": "rows_with_issue",
+        "value": 26,
+        "passed": false
+      },
+      "after": {
+        "metric": "rows_with_issue",
+        "value": 26,
+        "passed": false
+      },
+      "breakdown": {},
+      "action": "Units := Shipped_Units, demand := Requested_Units (demand stage)",
+      "examples": [
+        {
+          "date": "2021-04",
+          "sku_id": "ELA-031",
+          "region": "Asia Pacific",
+          "shipped_units": 46
+        },
+        {
+          "date": "2021-05",
+          "sku_id": "ELA-001",
+          "region": "India",
+          "shipped_units": 24
+        },
+        {
+          "date": "2021-06",
+          "sku_id": "ELA-064",
+          "region": "Latin America",
+          "shipped_units": 24
+        },
+        {
+          "date": "2021-08",
+          "sku_id": "ELA-053",
+          "region": "Asia Pacific",
+          "shipped_units": 34
+        },
+        {
+          "date": "2021-08",
+          "sku_id": "ELA-086",
+          "region": "North America",
+          "shipped_units": 0
+        }
+      ]
+    },
+    {
+      "check_id": "ORC-RESTATEMENT-LATEST",
+      "file": "train.csv",
+      "rule": "K2",
+      "title": "Latest load = Shipped_Units on restated stock-out months",
+      "description": "17 restated records are listed: the latest version equals Shipped on 17, the superseded version on 0.",
+      "dimension": "accuracy",
+      "severity": "error",
+      "unit": "records",
+      "affected": 17,
+      "expected": 17,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "business rule 2 confirmed by an independent source",
+      "examples": [
+        {
+          "record_id": "CEL-0077602",
+          "units_dropped": "33",
+          "units_kept": "24",
+          "shipped_units": 24
+        },
+        {
+          "record_id": "CEL-0080840",
+          "units_dropped": "18",
+          "units_kept": "22",
+          "shipped_units": 22
+        },
+        {
+          "record_id": "CEL-0085458",
+          "units_dropped": "16",
+          "units_kept": "25",
+          "shipped_units": 25
+        },
+        {
+          "record_id": "CEL-0085463",
+          "units_dropped": "25",
+          "units_kept": "30",
+          "shipped_units": 30
+        },
+        {
+          "record_id": "CEL-0087013",
+          "units_dropped": "58",
+          "units_kept": "39",
+          "shipped_units": 39
+        }
+      ]
+    },
+    {
+      "check_id": "TST-SHAPE",
+      "file": "test.csv",
+      "rule": "2.3",
+      "title": "Clean keys and valid labels",
+      "description": "No blank cell, YYYY-MM dates inside 2026-11..2028-05, Year/Month consistent, canonical regions / channels, master SKUs, no duplicate key.",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 58219,
+      "expected": 58219,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "use as the forecast contract (keep rows and order)",
+      "examples": []
+    },
+    {
+      "check_id": "TST-SERIES",
+      "file": "test.csv",
+      "rule": "2.3",
+      "title": "Series: continuing and cold starts",
+      "description": "3,068 series: 3,058 continue a training series with the customer and channel of its last training month (0 differ), 10 are cold starts of the planned launches; one customer and one channel per series.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "series",
+      "affected": 3068,
+      "expected": 3068,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {
+        "cold_start_series": 10
+      },
+      "action": "static customer / channel features; cold starts need a prior",
+      "examples": []
+    },
+    {
+      "check_id": "TST-POST-EOL",
+      "file": "test.csv",
+      "rule": "2.3",
+      "title": "Rows after an announced EOL",
+      "description": "PTC-005, PMP-003 and THM-001 keep rows after their EOL month; business rule 5 says no sales there. The EOL month itself is positive.",
+      "dimension": "consistency",
+      "severity": "info",
+      "unit": "rows",
+      "affected": 156,
+      "expected": 156,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "forecast 0 with P10 = P50 = P90 = 0 (forecast stage)",
+      "examples": [
+        {
+          "Date": "2027-09",
+          "SKU_ID": "PMP-003",
+          "Region": "North America"
+        },
+        {
+          "Date": "2027-06",
+          "SKU_ID": "PTC-005",
+          "Region": "North America"
+        },
+        {
+          "Date": "2028-01",
+          "SKU_ID": "THM-001",
+          "Region": "North America"
+        }
+      ]
+    },
+    {
+      "check_id": "TST-BEFORE-LAUNCH",
+      "file": "test.csv",
+      "rule": "2.3",
+      "title": "No row before a launch",
+      "description": "Cold-start rows start exactly at the launch month.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 58219,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "none",
+      "examples": []
+    },
+    {
+      "check_id": "TST-BU-MASTER",
+      "file": "test.csv",
+      "rule": "S1",
+      "title": "Business unit agrees with the master",
+      "description": "Before: against the raw master (PMP-004 conflicts). After: against the corrected master.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 58219,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 114,
+        "passed": false
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "correct the master (S1)",
+      "examples": []
+    },
+    {
+      "check_id": "SMP-FORMAT",
+      "file": "sample_submission.csv",
+      "rule": "2.8",
+      "title": "Submission format",
+      "description": "Header Date,SKU_ID,Region,Units_Sold_Forecast; non-negative integers; keys are the first test rows in test order.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 5,
+      "expected": 5,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "submission = 58,219 rows in test order, rounded to the nearest integer",
+      "examples": []
+    }
+  ]
+}
