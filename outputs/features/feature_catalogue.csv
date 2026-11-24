@@ -1,0 +1,40 @@
+name,group,definition,source,used_by,in_gbm
+month,calendar,Calendar month 1..12 of the requested delivery month,test.csv / train Date,"structural (season), gbm (calendar_month)",False
+quarter,calendar,Calendar quarter 1..4,Date,dashboard,False
+days_in_month,calendar,Days in the month,Date,dashboard,False
+is_december / is_january,calendar,Year-end flags (ordinary channel year-end pattern),Date,dashboard,False
+f_season,calendar,"Region x calendar-month x channel x calendar-month seasonality (+ Thermal x month), each profile averaging 1, estimated per origin by ratio of sums",train_clean demand_uc (fit cells),"structural, gbm",True
+lny_days_apac,moving holiday,"Days of the Lunar New Year window in the month (Asia Pacific); 2027-02: 10, 2028-01: 6, 2028-02: 4",events_calendar.csv (day-precision Holiday rows),structural,False
+ramadan_days_mea,moving holiday,"Days of Ramadan in the month (Middle East & Africa); 2027-02: 21, 2027-03: 9, 2028-01: 4, 2028-02: 26",events_calendar.csv,structural,False
+f_holiday,moving holiday,"1 - depth x days / window length (LNY 10 days, Ramadan 30 days); depths estimated per origin by Poisson MLE",events_calendar.csv + demand_uc,"structural, gbm",True
+lag_1,lags / rolling,"Filled unconstrained demand 1 month(s) before, on the full grid with explicit gaps",train_clean demand_filled,dashboard,False
+lag_2,lags / rolling,"Filled unconstrained demand 2 month(s) before, on the full grid with explicit gaps",train_clean demand_filled,dashboard,False
+lag_3,lags / rolling,"Filled unconstrained demand 3 month(s) before, on the full grid with explicit gaps",train_clean demand_filled,dashboard,False
+lag_12,lags / rolling,"Filled unconstrained demand 12 month(s) before, on the full grid with explicit gaps",train_clean demand_filled,dashboard,False
+roll_mean_3,lags / rolling,Trailing 3-month mean of filled unconstrained demand (months before t),demand_filled,dashboard,False
+roll_mean_6,lags / rolling,Trailing 6-month mean of filled unconstrained demand (months before t),demand_filled,dashboard,False
+roll_mean_12,lags / rolling,Trailing 12-month mean of filled unconstrained demand (months before t),demand_filled,dashboard,False
+roll_std_3,lags / rolling,Trailing 3-month standard deviation of filled unconstrained demand,demand_filled,dashboard,False
+roll_std_6,lags / rolling,Trailing 6-month standard deviation of filled unconstrained demand,demand_filled,dashboard,False
+roll_std_12,lags / rolling,Trailing 12-month standard deviation of filled unconstrained demand,demand_filled,dashboard,False
+level_me_12,lags / rolling,Trailing 12-month monthly-equivalent level: sum of demand / latent months the orders carried (cycle-aware),"demand_filled, accum_span, carry_weight",baselines (cycle_aware uses 24 months),False
+zero_share_12,lags / rolling,Share of zero months in the trailing 12 (scheduled off-months included),demand_filled,dashboard,False
+ratio_level12 / ratio_level36 / ratio_level_all,level,De-factored level over the last 12 / 36 months / all history relative to the 24-month level,demand_uc / structural factors,gbm,True
+resid3 / resid6 / resid12,level,Recent in-sample residual ratio: demand / fitted expectation over the last 3 / 6 / 12 months,demand_uc / structural fit,gbm,True
+level,level,"Forecast level: ratio of sums of de-factored unconstrained demand over the last 24 months of level cells (arithmetic, mean-unbiased); credibility blend with the cross-sectional prior for series younger than 24 months; prior for cold starts","train_clean (level_mask, train_weight)",structural,False
+prior_level / ratio_prior,level,"Cross-sectional level prior: log-linear model on family, tier x region, channel and powertrain of mature series, smeared to the mean",series levels as of the origin,"structural, gbm",True
+sbc_adi_36 / sbc_cv2_36 / sbc_class_36,intermittency,"Syntetos-Boylan ADI, CV^2 and class (smooth / intermittent / erratic / lumpy; cut-offs 1.32 / 0.49) on the trailing 36 months; reporting only, the zeros are scheduled by the cycle",demand_uc,"gbm (adi, cv2), backtest slices",False
+cycle_kind / accum_span / carry_weight,ordering cycle,"Ordering-cycle regime (M / A / B / Q / T), latent months an order carries and the weight of carried months (0.5 after an annual shutdown)","outputs/clean/test_grid.parquet, demand state","structural (accumulation), gbm, baselines",True
+macro_leadlag (family x indicator x lag 0..12 x era),macro lead-lag,"Weighted correlation of the family macro index (de-seasonalised, de-levelled, EV removed) with each standardised indicator at lags 0..12, by era; is_driver = selected by forward selection in that era",macro_clean.csv + demand_uc,outputs/features/macro_leadlag.csv,False
+family drivers,macro lead-lag,"Up to 3 indicators per family by forward selection (economic sign, chi-square gain >= 9) at their best lag 0..6, with a lag posterior from the deviance profile; refit at every origin",macro_clean.csv + demand_uc,structural,False
+f_macro,macro,SKU macro multiplier exp(lm(t)) relative to its level-window mean; lm = soft-capped (slope 0.5 above 0.25) sum of SKU coefficients x indicators averaged over the SKU lag posterior; coefficients shrunk to the family (prior sd 0.06 per sd); 2021-01..2022-11 amplitude x0.9; Aftermarket = damping x path + Fuel at lag 1,macro_clean.csv (known values for target months),"structural, gbm",True
+macro_sensitivity,macro,"Change in log latent demand per +1 unit of each indicator at each lag, per SKU and channel group",fitted SKU paths,outputs/forecast/macro_sensitivity.csv (what-if),False
+f_ev,EV shift,"exp(beta_class x (EV index(t) - level-window mean)), zero lag, class level (EV / ICE; Universal 0), betas by Poisson MLE per origin",macro_clean.csv EV_Adoption_Index,"structural, gbm",True
+months_since_launch,lifecycle,Months since the product launch (effective launch date; BSS-018 2025-02),sku_master_clean.csv,"structural, dashboard",False
+series_age,lifecycle,Months since the series' first month (region age for the MEA opening cohort),series_blocks.csv,gbm,True
+months_to_eol,lifecycle,Months to the EOL date (negative after EOL),sku_master_clean.csv,"structural, gbm",True
+f_lifecycle,lifecycle,"Launch ramp 1 - exp(-(k+1)/4.6) on product age (launches), 1 - exp(-(k+1)/6) on series age (MEA opening cohort), times the EOL phase-out 0.90 / 0.81 / 0.71 / 0.61 / 0.52 / 0.42 at 5..0 months to EOL; 0 after EOL","sku_master_clean.csv, series_blocks.csv","structural, gbm",True
+lifecycle_phase,lifecycle,post_eol / lost_account / eol_phaseout / cold_start / just_launched / young / mature,outputs/clean/test_grid.parquet,dashboard,False
+f_event,events,"Helios Auto Parts India programme step (measured multiplier, half exposure in 2025-09) x Orion Driveline North America 2027-07/08 shutdown (measured Nexon 2023 strike multiplier, no catch-up), customer at time",events_clean.csv + customer_history.csv + demand_uc,"structural, gbm",True
+event masks (history),events,"COVID 2020-02..09, pre-buy T1 + AM 2022-12..2023-02, Nexon strike, Red Sea Export EU / MEA, one-offs, unknown targets: excluded from fitting (train_mask); semiconductor window, EOL phase-out and pre-switch months excluded from levels (level_mask)",train_clean train_mask / level_mask,structural,False
+one_offs12 / imputed12,data quality,One-off orders and imputed cells in the last 12 months,train_clean is_one_off / is_imputed,gbm,True

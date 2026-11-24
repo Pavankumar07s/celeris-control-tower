@@ -168,6 +168,9 @@ Columns added to `train_clean.parquet` by later stages (`celeris.tables`). The d
 ### `dashboard/public/data/`
 
 Compact JSON written by `celeris export`; the dashboard reads nothing else and no number in it is typed by hand.
+The file list, what each is built from and which view loads it are in `docs/dashboard.md`. The stage writes nothing
+under `outputs/`; `meta.json` records, per modelling input, whether the real file or the dev-only stand-in in
+`outputs/_provisional/` was used.
 
 ## Metrics
 
@@ -204,6 +207,7 @@ before editing and make small additive edits in your own part only.
 | `var_noise` | variance of the order noise, independent across rows |
 | `cv_level` | relative standard deviation of the series-level error, common to every month of the series |
 | `cv_group` | relative standard deviation of the error shared by all series of the same family × region |
+| `cv_common` | relative standard deviation of the error shared by every row (period-level bias; added by the modelling build, same value on every row) |
 | `price_usd`, `revenue_mean` | assumed invoice price for the month and `mean × price_usd` |
 
 `order(t) = Σ weight × latent_mean(month)` over the months the order carries (`celeris.demand.cycles.accumulation_weights`),
@@ -216,11 +220,12 @@ M = Σ mean
 V = Σ var_noise
   + Σ over series  (cv_level × Σ of that series' selected means)²
   + Σ over groups  (cv_group × Σ of that family×region's selected means)²
+  + (cv_common × M)²                                   (modelling build addition; 0 reproduces the original formula)
 sigma² = ln(1 + V / M²),  mu = ln M − sigma² / 2,  Pq = exp(mu + z_q × sigma)      (0 when M = 0)
 ```
 
 with `z = −1.2816, 0, +1.2816` for P10, P50, P90. `celeris.models.quantiles.aggregate_quantiles` is the reference
-implementation; the dashboard ports it exactly. The modelling stage calibrates `cv_level` and `cv_group` on the backtests
+implementation; the dashboard ports it exactly. The modelling stage calibrates `cv_level`, `cv_group` and `cv_common` on the backtests
 so that P10–P90 covers about 80 % at series, SKU, family × region and total level, and writes the parameters and the
 measured coverage to `outputs/forecast/uncertainty.json`. For a single row the dashboard shows the row-level `p10/p50/p90`.
 
@@ -234,3 +239,37 @@ measured coverage to `outputs/forecast/uncertainty.json`. For a single row the d
 | `outputs/backtest/predictions.parquet` | `origin, model, date, sku_id, region, horizon` (1–19), `actual` (unconstrained demand, null if masked), `pred`, `is_scored`; `p10, p50, p90` for the final model |
 | `outputs/backtest/metrics.csv` | `origin` (or `mean`), `model`, `level` (`series`, `sku`, `family_region`, `family`, `region`, `total`), `slice_type` (`all`, `family`, `region`, `channel`, `horizon`, `horizon_bucket`, `calendar_month`, `cycle_kind`, `intermittency`), `slice_value`, `n_cells`, `actual_sum`, `pred_sum`, `abs_err_sum`, `wape`, `bias` |
 | `outputs/backtest/summary.json` | model ladder (naive → seasonal naive → cycle-aware → structural → final) with mean WAPE and bias across origins, noise-floor estimate, quantile coverage by level, the chosen model and why |
+
+**Modelling build notes (additive refinements of the contract above, made by the modelling build):**
+
+- Model names in `predictions.parquet` / `metrics.csv` / `summary.json`: `naive` (last-12-month mean), `seasonal_naive`,
+  `moving_average` (6 months), `croston`, `sba`, `tsb`, `adida`, `imapa`, `cycle_aware` (cycle mask × accumulation ×
+  24-month level), `structural`, `gbm`, `ensemble`, `oracle` (in-hindsight level: the noise floor, not a forecast) and
+  `final` (the submitted model; the only one with `p10/p50/p90`). Origins are `YYYY-MM` labels: decision folds
+  2022-10, 2023-10, 2024-10, 2025-03 and the stress fold 2021-10 (excluded from `mean` and from every decision).
+- **Why `cv_common` was added**: with independent series and family × region errors only, the calibrated P10–P90
+  covered 47 % of total × month actuals in the backtest, because each fold carries a period-level bias common to all
+  series (-1.2 % .. +1.1 % in the final configuration). A common component fixes the total level without widening rows.
+- `metrics.csv` has one more `slice_type`, `subset`, with values `all_scored`, `excl_lost_accounts`, `excl_one_offs`,
+  `excl_lost_and_one_offs`, `excl_event_masked` (the with / without comparisons of dossier 6.7). `origin = mean` is
+  the average WAPE / bias of the four decision folds (sums are totals over them).
+- `summary.json` ladder entries carry `model`, `label`, `wape`, `bias`, `score` (= WAPE + |bias|, means over the
+  decision folds) plus `mean_over_decision_folds` and `by_origin` details; top-level `noise_floor_wape`,
+  `chosen_model`, `why`, `coverage`, `experiments` (per experiment: `default` = `shipped_variant`,
+  `best_by_mean_score`, `gain_vs_default`, `rule_indication`, `variants`), `leakage_check`.
+- `forecast.parquet`: `level` is the series level (including the expected one-off volume of Direct OEM / Tier-1
+  series, +1.2 % as of 2026-10) expressed at the level-window (last 24 months) average of the macro and EV factors, so `f_macro` and `f_ev` are multipliers relative to that window; `f_event` is the Helios India
+  programme step (the level is on the pre-step scale) times the Orion 2027-07/08 shutdown multiplier; `f_lifecycle` is
+  the launch ramp × EOL phase-out (0 after EOL). `pred_<member>` lists the ensemble members only (`pred_structural`
+  when the structural model ships alone).
+- `uncertainty.json`: `noise_a`, `noise_b` (per region), `noise_scale` define `var_noise = noise_scale × (a·m + b·m²)`
+  (plus an Orion multiplier term on rows that carry a shutdown month); `cv_level` is a map by lifecycle segment
+  (`mature`, `young`, `cold_start`), `cv_group` and `cv_common` numbers. Consumers should use the row columns of
+  `forecast.parquet`, which already hold the values per row; `coverage` holds the measured P10–P90 coverage by level.
+- `macro_sensitivity.csv` and `macro_leadlag.csv` name indicators by their cleaned column names in `macro_clean.csv`
+  (`ism_manufacturing_pmi`, …, `ev_adoption_index`).
+- Extra files: `outputs/features/{feature_catalogue.csv, calendar_features.csv, sku_macro_drivers.csv,
+  train_features.parquet, test_features.parquet}`, `outputs/backtest/{experiments.csv, macro_drivers_by_origin.csv,
+  gbm_importance.csv, uncertainty_calibration.json}`, `outputs/forecast/{aggregates.csv (bottom-up sums and aggregate
+  P10/P50/P90 per month for total, family, region, channel, family × region), structural_factors.json (fitted seasonal
+  profiles, holiday depths, EV betas, event multipliers, family macro drivers)}`. Methodology: `docs/modelling.md`.

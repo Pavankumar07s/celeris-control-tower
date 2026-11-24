@@ -1,0 +1,115 @@
+{
+  "record_version": "1.0",
+  "stage": "backtest",
+  "outputs": [
+    "backtest/experiments.csv",
+    "backtest/gbm_importance.csv",
+    "backtest/macro_drivers_by_origin.csv",
+    "backtest/metrics.csv",
+    "backtest/predictions.parquet",
+    "backtest/summary.json",
+    "backtest/uncertainty_calibration.json"
+  ],
+  "rows_raw": {},
+  "rows_clean": {},
+  "headline": {
+    "final_model": "structural",
+    "ladder_mean": {
+      "naive": 0.5688,
+      "seasonal_naive": 0.44538,
+      "moving_average": 0.58266,
+      "croston": 0.56481,
+      "sba": 0.60992,
+      "tsb": 0.57113,
+      "adida": 0.56224,
+      "imapa": 0.56211,
+      "cycle_aware": 0.35151,
+      "structural": 0.27286,
+      "gbm": 0.29438,
+      "ensemble": 0.27557,
+      "oracle": 0.23802,
+      "final": 0.27286
+    },
+    "leakage_check_passed": true
+  },
+  "checks": [
+    {
+      "stage": "backtest",
+      "check_id": "BT-LEAKAGE-ORACLE",
+      "file": "train.csv",
+      "rule": "dossier 6.7",
+      "title": "Every fold's final forecast scores above the in-hindsight oracle (noise floor of the scoring set)",
+      "description": "2021-10: final 0.3618 vs oracle 0.2764; 2022-10: final 0.2882 vs oracle 0.2519; 2023-10: final 0.2614 vs oracle 0.2346; 2024-10: final 0.2516 vs oracle 0.2296; 2025-03: final 0.2517 vs oracle 0.2305",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "folds",
+      "affected": 5,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "summary.json leakage_check",
+      "examples": []
+    },
+    {
+      "stage": "backtest",
+      "check_id": "BT-QUANTILE-ORDER",
+      "file": "train.csv",
+      "rule": "dossier 6.5",
+      "title": "Backtest row quantiles are ordered",
+      "description": "0 rows with p10 > p50 or p50 > p90.",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 278976,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "predictions.parquet p10 / p50 / p90",
+      "examples": []
+    },
+    {
+      "stage": "backtest",
+      "check_id": "BT-FOLDS",
+      "file": "train.csv",
+      "rule": "dossier 6.7",
+      "title": "Rolling-origin folds with a 19-month horizon",
+      "description": "folds: ['2021-10', '2022-10', '2023-10', '2024-10', '2025-03']",
+      "dimension": "completeness",
+      "severity": "error",
+      "unit": "folds",
+      "affected": 5,
+      "expected": 5,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "predictions.parquet",
+      "examples": []
+    }
+  ]
+}

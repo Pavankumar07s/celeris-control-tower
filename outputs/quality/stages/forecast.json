@@ -1,0 +1,158 @@
+{
+  "record_version": "1.0",
+  "stage": "forecast",
+  "outputs": [
+    "forecast/aggregates.csv",
+    "forecast/forecast.parquet",
+    "forecast/macro_sensitivity.csv",
+    "forecast/structural_factors.json",
+    "forecast/submission.csv",
+    "forecast/uncertainty.json"
+  ],
+  "rows_raw": {},
+  "rows_clean": {
+    "sample_submission.csv": 58219
+  },
+  "headline": {
+    "final_model": "structural",
+    "members": [
+      "structural"
+    ],
+    "units_total": 2793254,
+    "mean_total": 2793338.8,
+    "revenue_total_usd": 2504199812.39,
+    "structural_zero_rows": 8842
+  },
+  "checks": [
+    {
+      "stage": "forecast",
+      "check_id": "FC-SUBMISSION-CONTRACT",
+      "file": "test.csv",
+      "rule": "sample_submission contract (dossier 2.8)",
+      "title": "Submission: 58,219 rows in test order, non-negative integers",
+      "description": "58,219 rows; keys equal to test.csv: True; invalid values: 0.",
+      "dimension": "conformity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 58219,
+      "expected": 58219,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "submission.csv",
+      "examples": []
+    },
+    {
+      "stage": "forecast",
+      "check_id": "FC-STRUCTURAL-ZEROS",
+      "file": "test.csv",
+      "rule": "dossier 5.1-5.3",
+      "title": "Structural zeros are exactly 0 (forecast, mean and P10 / P50 / P90)",
+      "description": "8,842 structural-zero rows (dossier 8,842).",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 8842,
+      "expected": 8842,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "forecast 0",
+      "examples": []
+    },
+    {
+      "stage": "forecast",
+      "check_id": "FC-COMPONENTS",
+      "file": "test.csv",
+      "rule": "forecast contract",
+      "title": "Multiplicative components multiply to latent_mean",
+      "description": "level x f_season x f_holiday x f_macro x f_ev x f_lifecycle x f_event == latent_mean on every row.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 58219,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "forecast.parquet components",
+      "examples": []
+    },
+    {
+      "stage": "forecast",
+      "check_id": "FC-QUANTILE-ORDER",
+      "file": "test.csv",
+      "rule": "dossier 6.5",
+      "title": "Row quantiles are ordered integers (p10 <= p50 <= p90)",
+      "description": "0 rows out of order.",
+      "dimension": "validity",
+      "severity": "error",
+      "unit": "rows",
+      "affected": 58219,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "row quantiles from a negative binomial",
+      "examples": []
+    },
+    {
+      "stage": "forecast",
+      "check_id": "FC-HIERARCHY",
+      "file": "test.csv",
+      "rule": "dossier 6.6",
+      "title": "Bottom-up forecasts add up at every level",
+      "description": "Sums of the submitted integers per month for total, family, region, channel and family x region equal the aggregates table and the submission total.",
+      "dimension": "consistency",
+      "severity": "error",
+      "unit": "levels",
+      "affected": 5,
+      "expected": null,
+      "before": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "after": {
+        "metric": "violations",
+        "value": 0,
+        "passed": true
+      },
+      "breakdown": {},
+      "action": "aggregates.csv",
+      "examples": []
+    }
+  ]
+}

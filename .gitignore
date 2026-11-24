@@ -6,7 +6,10 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 node_modules/
+dashboard/node_modules/
 dist/
+# the dashboard's static build is committed so the demo can be hosted as-is
+!dashboard/dist/
 .DS_Store
 
 # original downloads (kept out of the repo; data/raw holds the working copy)
@@ -29,3 +32,6 @@ data/raw/
 # tooling caches
 graphify-out/
 *.egg-info/
+
+# dev-only stand-in forecasts for dashboard development
+outputs/_provisional/

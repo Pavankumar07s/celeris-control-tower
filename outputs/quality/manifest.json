@@ -65,6 +65,46 @@
       "rows": 3083
     },
     {
+      "path": "backtest/experiments.csv",
+      "sha256": "f49d9a484135e436d8349623a0e621e1a8913fc8f2ab559dc69534eb2392d952",
+      "bytes": 24076,
+      "rows": 275
+    },
+    {
+      "path": "backtest/gbm_importance.csv",
+      "sha256": "6e639052b7196fc8db4fa10d0112e22652ff6b7ce98ba1d4be1f6d124836ea43",
+      "bytes": 3575,
+      "rows": 128
+    },
+    {
+      "path": "backtest/macro_drivers_by_origin.csv",
+      "sha256": "13c4ae2a90496c718bac9b7d5ecc7b0ebd2fdc7d662ba93bc637c1931d60b610",
+      "bytes": 15585,
+      "rows": 271
+    },
+    {
+      "path": "backtest/metrics.csv",
+      "sha256": "525baa1a3f58e1acf52967b58a5436eb869a9aa20ffee2fff8e813b682143263",
+      "bytes": 3234567,
+      "rows": 34362
+    },
+    {
+      "path": "backtest/predictions.parquet",
+      "sha256": "8d1f9fa17ce4786f1b2cfbc6939011648e49aa0595647cd7c56e70015115d308",
+      "bytes": 11406860,
+      "rows": 3905664
+    },
+    {
+      "path": "backtest/summary.json",
+      "sha256": "3fbbddbc84a5ef4a350b2097718709ad853d6335c9c7eb1bc14822d76f4eb0cb",
+      "bytes": 53662
+    },
+    {
+      "path": "backtest/uncertainty_calibration.json",
+      "sha256": "47eca43e1b0cfef0afc1026a3db9b531a73607af20507eceaa9c60dea3942a0f",
+      "bytes": 2039
+    },
+    {
       "path": "clean/account_events.csv",
       "sha256": "fd16f9178525335c85ad5bd729eaa84d35c89bfbf1f30162b4c8c24ba5b0fec5",
       "bytes": 5424,
@@ -143,6 +183,76 @@
       "rows": 245548
     },
     {
+      "path": "features/calendar_features.csv",
+      "sha256": "1ce8cdbff063b7daf43708f49dd346e49a6878a3de0481ad968f9960661130d7",
+      "bytes": 13463,
+      "rows": 113
+    },
+    {
+      "path": "features/feature_catalogue.csv",
+      "sha256": "ac17de7386178b5a8072aab310bf40bc5cc26770a2fc03687f247f03f30c5e49",
+      "bytes": 7377,
+      "rows": 39
+    },
+    {
+      "path": "features/macro_leadlag.csv",
+      "sha256": "3541e962aa1a64fca11b2d8c7800fd36495f9a879620247d1bffb8b4ec5cea7e",
+      "bytes": 146997,
+      "rows": 2184
+    },
+    {
+      "path": "features/sku_macro_drivers.csv",
+      "sha256": "09ea21b8c4ebb4c1eb468c6aed78471d484f7497b074343667f224946053ca62",
+      "bytes": 97059,
+      "rows": 601
+    },
+    {
+      "path": "features/test_features.parquet",
+      "sha256": "ee312105d9bf0e68b6e71d9b58acf1589512dccb167132ad4432084c486f5d7e",
+      "bytes": 601987,
+      "rows": 58219
+    },
+    {
+      "path": "features/train_features.parquet",
+      "sha256": "0325201fc7d7f1abacbd2adcc6e2af1937d5ed90a3dcae4282bdc1ed0f262ccb",
+      "bytes": 5345622,
+      "rows": 245548
+    },
+    {
+      "path": "forecast/aggregates.csv",
+      "sha256": "75324005ae20a1199001dcdd8f0c036ce87baa093d29398732d379ea504abd2d",
+      "bytes": 113093,
+      "rows": 1140
+    },
+    {
+      "path": "forecast/forecast.parquet",
+      "sha256": "e57f9bda193c19176475e268abd83270b6566e3792a8979061cfd8c31b0d103e",
+      "bytes": 2970993,
+      "rows": 58219
+    },
+    {
+      "path": "forecast/macro_sensitivity.csv",
+      "sha256": "fc0a81d23ee3b22389e4c2440550a90162f1c05c1242e0ce1b158cd0b991979a",
+      "bytes": 1035352,
+      "rows": 19949
+    },
+    {
+      "path": "forecast/structural_factors.json",
+      "sha256": "ac0305136fbcf58e5ba19aa5ee9f7cc16170cf7b6c3e18afbec767517695e05d",
+      "bytes": 6882
+    },
+    {
+      "path": "forecast/submission.csv",
+      "sha256": "5ba32af78efed035121edeedfa7fabbd51d78d16f3f1c060da4be9ed6708ab47",
+      "bytes": 1829495,
+      "rows": 58219
+    },
+    {
+      "path": "forecast/uncertainty.json",
+      "sha256": "7ffe201609a419270f37f8b7d9ebd3bfedda974d01ac4a8e612b1aebfd08d141",
+      "bytes": 2150
+    },
+    {
       "path": "quality/dedup_decisions.csv",
       "sha256": "6597636ba9dfb251e266fc1894d8d43f58c3f2dcc15b9a8a2d0dbf053190fe31",
       "bytes": 519820,
@@ -150,8 +260,8 @@
     },
     {
       "path": "quality/dq_report.json",
-      "sha256": "81b3c6074cbbf7387e0030370f234429b1aa7b20c2e0206fff895c527bbe0c5c",
-      "bytes": 150421
+      "sha256": "71a407d865d7840c2b8f5f3c9f6ab4e038b68d309778bf494cf75f83b0401296",
+      "bytes": 163347
     },
     {
       "path": "quality/fix_log.parquet",
@@ -177,6 +287,17 @@
       "rows": 0
     },
     {
+      "path": "quality/stages/backtest.json",
+      "sha256": "cb9df0f42707f7b55aee732a4741adc93ca434d6b26a1876b8214c951a44e131",
+      "bytes": 3117
+    },
+    {
+      "path": "quality/stages/backtest_fix_log.parquet",
+      "sha256": "489acd87108d0cd3c261810485cd82c02b0ab1b8b5fe83317fb028d56f9bddd0",
+      "bytes": 5859,
+      "rows": 0
+    },
+    {
       "path": "quality/stages/clean.json",
       "sha256": "613829c3d37a246fdfe0483b02ac6ebf39de287a6f4b2ead1237472d30c93840",
       "bytes": 107090
@@ -197,6 +318,28 @@
       "sha256": "06a4b99879f949d010d44be36322cad5336ecbe07db742c7c94a43cfca3b02d7",
       "bytes": 9393,
       "rows": 126
+    },
+    {
+      "path": "quality/stages/features.json",
+      "sha256": "61ff969c459bf53a51aa6f30d832bc3a0ee64947f9a2f6141357eb5476ecfad2",
+      "bytes": 6279
+    },
+    {
+      "path": "quality/stages/features_fix_log.parquet",
+      "sha256": "489acd87108d0cd3c261810485cd82c02b0ab1b8b5fe83317fb028d56f9bddd0",
+      "bytes": 5859,
+      "rows": 0
+    },
+    {
+      "path": "quality/stages/forecast.json",
+      "sha256": "6ba18ad770ca8ef461190d47ab26d9e23c2178bffc66ca47c87283806e9a9b4b",
+      "bytes": 4256
+    },
+    {
+      "path": "quality/stages/forecast_fix_log.parquet",
+      "sha256": "489acd87108d0cd3c261810485cd82c02b0ab1b8b5fe83317fb028d56f9bddd0",
+      "bytes": 5859,
+      "rows": 0
     }
   ]
 }

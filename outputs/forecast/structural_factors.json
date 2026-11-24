@@ -1,0 +1,323 @@
+{
+  "as_of": "2026-10",
+  "region_season": {
+    "North America": {
+      "Jan": 0.9648,
+      "Feb": 0.9815,
+      "Mar": 1.0758,
+      "Apr": 1.043,
+      "May": 1.0565,
+      "Jun": 1.0117,
+      "Jul": 0.8274,
+      "Aug": 0.9845,
+      "Sep": 1.0577,
+      "Oct": 1.0564,
+      "Nov": 1.0185,
+      "Dec": 0.9221
+    },
+    "Europe": {
+      "Jan": 0.9448,
+      "Feb": 1.0171,
+      "Mar": 1.1066,
+      "Apr": 1.046,
+      "May": 1.0691,
+      "Jun": 1.0491,
+      "Jul": 0.9955,
+      "Aug": 0.6386,
+      "Sep": 1.0718,
+      "Oct": 1.0768,
+      "Nov": 1.042,
+      "Dec": 0.9425
+    },
+    "Asia Pacific": {
+      "Jan": 0.9531,
+      "Feb": 0.9033,
+      "Mar": 1.0448,
+      "Apr": 1.0322,
+      "May": 1.0288,
+      "Jun": 1.0199,
+      "Jul": 0.9975,
+      "Aug": 0.9987,
+      "Sep": 1.0407,
+      "Oct": 0.9068,
+      "Nov": 1.0455,
+      "Dec": 1.0287
+    },
+    "India": {
+      "Jan": 0.9494,
+      "Feb": 0.9962,
+      "Mar": 1.0747,
+      "Apr": 0.9724,
+      "May": 0.9981,
+      "Jun": 0.931,
+      "Jul": 0.9213,
+      "Aug": 0.9584,
+      "Sep": 1.0454,
+      "Oct": 1.1219,
+      "Nov": 1.0464,
+      "Dec": 0.9847
+    },
+    "Latin America": {
+      "Jan": 0.7836,
+      "Feb": 0.9213,
+      "Mar": 1.0269,
+      "Apr": 1.0192,
+      "May": 1.0597,
+      "Jun": 1.046,
+      "Jul": 1.0174,
+      "Aug": 1.0488,
+      "Sep": 1.0479,
+      "Oct": 1.0652,
+      "Nov": 1.0258,
+      "Dec": 0.9381
+    },
+    "Middle East & Africa": {
+      "Jan": 0.9934,
+      "Feb": 1.0112,
+      "Mar": 1.0326,
+      "Apr": 1.0201,
+      "May": 1.0152,
+      "Jun": 0.9649,
+      "Jul": 0.9047,
+      "Aug": 0.9181,
+      "Sep": 1.0212,
+      "Oct": 1.0352,
+      "Nov": 1.0579,
+      "Dec": 1.0254
+    }
+  },
+  "channel_season": {
+    "Direct OEM": {
+      "Jan": 1.0539,
+      "Feb": 1.0043,
+      "Mar": 1.0019,
+      "Apr": 0.9946,
+      "May": 0.9984,
+      "Jun": 1.0001,
+      "Jul": 0.9947,
+      "Aug": 0.996,
+      "Sep": 0.998,
+      "Oct": 1.0067,
+      "Nov": 1.0058,
+      "Dec": 0.9455
+    },
+    "Tier-1 Distributor": {
+      "Jan": 0.9398,
+      "Feb": 0.9998,
+      "Mar": 1.0008,
+      "Apr": 1.0049,
+      "May": 0.9976,
+      "Jun": 0.9978,
+      "Jul": 1.0035,
+      "Aug": 1.0044,
+      "Sep": 1.0034,
+      "Oct": 0.9925,
+      "Nov": 0.9965,
+      "Dec": 1.059
+    },
+    "Aftermarket": {
+      "Jan": 0.9526,
+      "Feb": 0.9966,
+      "Mar": 0.9978,
+      "Apr": 1.0032,
+      "May": 1.0058,
+      "Jun": 1.0045,
+      "Jul": 1.0008,
+      "Aug": 1.0,
+      "Sep": 0.9908,
+      "Oct": 0.9964,
+      "Nov": 0.9932,
+      "Dec": 1.0582
+    },
+    "Export": {
+      "Jan": 1.0368,
+      "Feb": 0.9876,
+      "Mar": 0.9926,
+      "Apr": 1.0025,
+      "May": 1.0055,
+      "Jun": 0.9995,
+      "Jul": 1.0099,
+      "Aug": 1.0031,
+      "Sep": 1.0117,
+      "Oct": 1.0011,
+      "Nov": 0.9969,
+      "Dec": 0.9527
+    }
+  },
+  "thermal_season": {
+    "Jan": 0.9308,
+    "Feb": 0.9949,
+    "Mar": 0.9937,
+    "Apr": 1.0081,
+    "May": 1.0943,
+    "Jun": 1.0794,
+    "Jul": 1.097,
+    "Aug": 0.9805,
+    "Sep": 0.9793,
+    "Oct": 0.9775,
+    "Nov": 0.9323,
+    "Dec": 0.9321
+  },
+  "lny_depth_per_full_window": 0.2218,
+  "ramadan_depth_per_full_window": 0.299,
+  "ev_beta_per_index_point": {
+    "EV": 0.02804,
+    "ICE": -0.01171
+  },
+  "programme_steps": {
+    "EV-052": 1.2366
+  },
+  "shutdown_analogue": {
+    "event": "EV-038",
+    "multiplier": 0.1437
+  },
+  "aftermarket": {
+    "damping": 0.3784,
+    "fuel_lag1_per_sd": -0.0691
+  },
+  "family_macro_drivers": {
+    "Brake & Safety Systems": [
+      {
+        "indicator": "auto_production_yoy_pct",
+        "lag": 1,
+        "coef_per_sd": 0.1061,
+        "deviance_gain": 320.81
+      },
+      {
+        "indicator": "fuel_price_index",
+        "lag": 2,
+        "coef_per_sd": -0.0948,
+        "deviance_gain": 149.52
+      },
+      {
+        "indicator": "vehicle_inventory_days",
+        "lag": 2,
+        "coef_per_sd": -0.0733,
+        "deviance_gain": 166.3
+      }
+    ],
+    "Chassis & Structural": [
+      {
+        "indicator": "raw_material_cost_index",
+        "lag": 4,
+        "coef_per_sd": -0.0948,
+        "deviance_gain": 246.13
+      },
+      {
+        "indicator": "auto_production_yoy_pct",
+        "lag": 2,
+        "coef_per_sd": 0.0726,
+        "deviance_gain": 179.53
+      },
+      {
+        "indicator": "new_vehicle_orders_index",
+        "lag": 2,
+        "coef_per_sd": 0.0689,
+        "deviance_gain": 34.68
+      }
+    ],
+    "Electrical Assemblies": [
+      {
+        "indicator": "new_vehicle_orders_index",
+        "lag": 2,
+        "coef_per_sd": 0.1301,
+        "deviance_gain": 734.05
+      },
+      {
+        "indicator": "ism_manufacturing_pmi",
+        "lag": 1,
+        "coef_per_sd": 0.0488,
+        "deviance_gain": 42.89
+      },
+      {
+        "indicator": "auto_production_yoy_pct",
+        "lag": 2,
+        "coef_per_sd": 0.0367,
+        "deviance_gain": 29.51
+      }
+    ],
+    "Hydraulic Systems": [
+      {
+        "indicator": "ism_manufacturing_pmi",
+        "lag": 3,
+        "coef_per_sd": 0.1066,
+        "deviance_gain": 790.37
+      },
+      {
+        "indicator": "industrial_util_rate_pct",
+        "lag": 0,
+        "coef_per_sd": 0.0615,
+        "deviance_gain": 112.57
+      },
+      {
+        "indicator": "new_vehicle_orders_index",
+        "lag": 0,
+        "coef_per_sd": 0.0495,
+        "deviance_gain": 16.25
+      }
+    ],
+    "Powertrain Components": [
+      {
+        "indicator": "auto_production_yoy_pct",
+        "lag": 3,
+        "coef_per_sd": 0.0917,
+        "deviance_gain": 268.86
+      },
+      {
+        "indicator": "new_vehicle_orders_index",
+        "lag": 4,
+        "coef_per_sd": 0.0658,
+        "deviance_gain": 193.95
+      },
+      {
+        "indicator": "industrial_util_rate_pct",
+        "lag": 0,
+        "coef_per_sd": 0.0507,
+        "deviance_gain": 29.98
+      }
+    ],
+    "Precision Machined Parts": [
+      {
+        "indicator": "ism_manufacturing_pmi",
+        "lag": 2,
+        "coef_per_sd": 0.0747,
+        "deviance_gain": 224.1
+      },
+      {
+        "indicator": "industrial_util_rate_pct",
+        "lag": 1,
+        "coef_per_sd": 0.0629,
+        "deviance_gain": 80.97
+      },
+      {
+        "indicator": "auto_production_yoy_pct",
+        "lag": 2,
+        "coef_per_sd": 0.0477,
+        "deviance_gain": 62.82
+      }
+    ],
+    "Thermal Management": [
+      {
+        "indicator": "ism_manufacturing_pmi",
+        "lag": 0,
+        "coef_per_sd": 0.0659,
+        "deviance_gain": 347.86
+      },
+      {
+        "indicator": "auto_production_yoy_pct",
+        "lag": 2,
+        "coef_per_sd": 0.0757,
+        "deviance_gain": 147.36
+      },
+      {
+        "indicator": "fuel_price_index",
+        "lag": 2,
+        "coef_per_sd": -0.0528,
+        "deviance_gain": 102.81
+      }
+    ]
+  },
+  "level_window_months": 24,
+  "launch_tau": 4.6,
+  "mea_opening_tau": 6.0
+}

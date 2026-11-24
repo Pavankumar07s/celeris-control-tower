@@ -305,5 +305,8 @@ EXPECTED: Final = MappingProxyType(
         "test_grid.accum.3_months": 1_505,
         "test_grid.cold_start_rows": 117,
         "test_grid.uncertain_zero_rows": 3,
+        # modelling stages (features, backtest, forecast)
+        "features.leadlag_rows": 2_184,  # 7 families x 8 indicators x 13 lags (0..12) x 3 eras
+        "backtest.folds": 5,  # decision folds 2022-10, 2023-10, 2024-10, 2025-03 + the 2021-10 stress fold (dossier 6.7)
     }
 )

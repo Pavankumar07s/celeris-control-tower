@@ -16,9 +16,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from celeris.anomalies.stage import run_anomalies
+from celeris.backtest.stage import run_backtest
 from celeris.cleaning.stage import run_clean
 from celeris.config import STAGE_ORDER, Paths
 from celeris.demand.stage import run_demand
+from celeris.export.stage import run_export
+from celeris.features.stage import run_features
+from celeris.models.forecast_stage import run_forecast
 
 __all__ = ["STAGES", "STAGE_ORDER", "Stage", "main"]
 
@@ -34,6 +38,10 @@ STAGES: dict[str, Stage] = {
     "clean": Stage("clean", run_clean, "part A: clean every raw file, write outputs/clean and outputs/quality"),
     "demand": Stage("demand", run_demand, "part B: unconstrained demand, ordering cycles, account events, test grid"),
     "anomalies": Stage("anomalies", run_anomalies, "part B: one-off orders, event masks, anomaly register, series profile"),
+    "features": Stage("features", run_features, "modelling: feature tables, macro lead/lag analysis, feature catalogue"),
+    "backtest": Stage("backtest", run_backtest, "modelling: rolling-origin backtest, model ladder, ensemble rule, uncertainty calibration"),
+    "forecast": Stage("forecast", run_forecast, "modelling: fit as of 2026-10, forecast.parquet, submission.csv, quantiles, hierarchy checks"),
+    "export": Stage("export", run_export, "dashboard: write the data bundle to dashboard/public/data (reads outputs/, writes nothing there)"),
 }
 
 

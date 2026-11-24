@@ -1,0 +1,81 @@
+{
+  "noise_a": 1.0,
+  "noise_b": {
+    "North America": 0.04546814285722914,
+    "Europe": 0.0457246324949187,
+    "Asia Pacific": 0.05558682924887526,
+    "India": 0.06907520727407787,
+    "Latin America": 0.0860285310940414,
+    "Middle East & Africa": 0.1000741612526501
+  },
+  "noise_scale": 0.877490234375,
+  "cv_level": {
+    "mature": 0.13642236847924338,
+    "young": 0.21371555844912407,
+    "cold_start": 0.5985708832797921
+  },
+  "cv_group": 0.0452423095703125,
+  "cv_common": 0.022381591796875003,
+  "coverage": {
+    "monthly": {
+      "series": {
+        "n": 193953,
+        "coverage_p10_p90": 0.8,
+        "below_p10": 0.0987,
+        "above_p90": 0.1013
+      },
+      "sku": {
+        "n": 43901,
+        "coverage_p10_p90": 0.7398,
+        "below_p10": 0.1353,
+        "above_p90": 0.1248
+      },
+      "family_region": {
+        "n": 3192,
+        "coverage_p10_p90": 0.8001,
+        "below_p10": 0.0959,
+        "above_p90": 0.104
+      },
+      "total": {
+        "n": 76,
+        "coverage_p10_p90": 0.8026,
+        "below_p10": 0.1316,
+        "above_p90": 0.0658
+      }
+    },
+    "horizon_total": {
+      "series": {
+        "n": 12131,
+        "coverage_p10_p90": 0.8598,
+        "below_p10": 0.0601,
+        "above_p90": 0.0801
+      },
+      "sku": {
+        "n": 2347,
+        "coverage_p10_p90": 0.7925,
+        "below_p10": 0.098,
+        "above_p90": 0.1095
+      },
+      "family_region": {
+        "n": 168,
+        "coverage_p10_p90": 0.9762,
+        "below_p10": 0.0119,
+        "above_p90": 0.0119
+      },
+      "total": {
+        "n": 4,
+        "coverage_p10_p90": 1.0,
+        "below_p10": 0.0,
+        "above_p90": 0.0
+      }
+    }
+  },
+  "method": "method of moments on backtest residuals, then split-conformal scaling: noise scale on rows, cv_level on the mean coverage of series 19-month totals and SKU x month, cv_group on family x region x month, cv_common on total x month",
+  "z": {
+    "p10": -1.2816,
+    "p50": 0.0,
+    "p90": 1.2816
+  },
+  "orion_multiplier_sd": 0.25,
+  "note": "coverage measured on the backtest folds (non-zero scored rows); the forecast window uses the same components"
+}
