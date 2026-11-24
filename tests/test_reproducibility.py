@@ -6,7 +6,7 @@ The default session covers the three core stages. ``second_run`` runs ``python -
 outputs byte for byte while invalidating ``anomalies``; re-running ``clean`` invalidates both.
 
 ``test_all_twice_gives_identical_outputs`` (marker ``slow``, deselected by default; ``make test-all``) runs every stage
-with ``python -m celeris all`` twice into temporary directories (about 10 minutes and 2.5 GB each) and compares every
+with ``python -m celeris all`` twice into temporary directories (about 11 minutes and 2.7 GB each) and compares every
 output, the dashboard bundle included.
 """
 

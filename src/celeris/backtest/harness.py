@@ -13,6 +13,9 @@ model and its experiment variants (dossier 9.1 questions), the global GBM (train
 inner origins every 3 months from 2021-10 whose targets lie before the fold's origin), the equal-weight ensemble and an
 in-hindsight oracle (the structural factors with each series' level fitted on the horizon itself: the noise floor of
 this scoring set, used as the leakage check: an honest forecast must score above it).
+
+The structural fits of the inner origins and the experiment variants that change the factor backfit run in worker
+processes when ``workers > 1`` (``celeris.backtest.parallel``); every output is the same for any number of workers.
 """
 
 from __future__ import annotations
@@ -25,17 +28,17 @@ import numpy as np
 import pandas as pd
 
 from celeris.backtest.metrics import aggregate_wape, bias, score, wape
-from celeris.backtest.targets import backtest_targets
+from celeris.backtest.parallel import drivers_rows, inner_task, make_pool, origin_base, variant_mean, variant_task
 from celeris.cleaning.dates import month_label
 from celeris.config import REGIONS
 from celeris.anomalies.expectation import ONE_OFF_CHANNELS
 from celeris.features.macro import driver_set_weights
 from celeris.models.baselines import BASELINES
-from celeris.models.context import ModelInputs, origin_context
-from celeris.models.gbm import GbmModel, feature_frame, importance, inner_origins, predict_gbm, train_gbm
+from celeris.models.context import ModelInputs
+from celeris.models.gbm import GbmModel, importance, inner_origins, predict_gbm, train_gbm
 from celeris.models.intermittent import intermittent_forecasts
 from celeris.models.quantiles import noise_moments
-from celeris.models.structural import StructuralConfig, fit_structural, predict, refit_levels, shares_factors
+from celeris.models.structural import StructuralConfig, predict, refit_levels, shares_factors
 
 OUTER_ORIGINS = (74, 69, 57, 45)  # 2025-03, 2024-10, 2023-10, 2022-10
 STRESS_ORIGIN = 33  # 2021-10
@@ -171,27 +174,6 @@ def _score_row(origin: int, experiment: str, variant: str, frame: pd.DataFrame, 
     return rows
 
 
-def _drivers_rows(origin: int, fit) -> list[dict]:
-    rows = []
-    if fit.macro_paths is None:
-        return rows
-    for family, d in fit.macro_paths.drivers.items():
-        for k, name in enumerate(d.indicators):
-            rows.append(
-                {
-                    "origin": month_label(origin),
-                    "product_family": family,
-                    "rank": k + 1,
-                    "indicator": name,
-                    "lag": d.lags[k],
-                    "lag_posterior_max": round(float(d.lag_posterior[k].max()), 3),
-                    "coef_per_sd": round(float(d.coef[k]), 4),
-                    "deviance_gain": d.gains[k],
-                }
-            )
-    return rows
-
-
 def oracle_floor(frame: pd.DataFrame, structural: np.ndarray) -> np.ndarray:
     """In-hindsight forecast: each series' structural forecast rescaled by sum actual / sum forecast on its own scored
     horizon rows (true level, estimated factors). Its WAPE is the noise floor of the scoring set."""
@@ -203,6 +185,16 @@ def oracle_floor(frame: pd.DataFrame, structural: np.ndarray) -> np.ndarray:
     return structural * ratio.reindex(s).to_numpy()
 
 
+def full_refits(experiments: dict[str, dict[str, StructuralConfig]], config: StructuralConfig) -> list[StructuralConfig]:
+    """Distinct experiment configurations that need a full refit (the others share the base fit's factors)."""
+    out: list[StructuralConfig] = []
+    for variants in experiments.values():
+        for cfg in variants.values():
+            if cfg != config and not shares_factors(cfg, config) and cfg not in out:
+                out.append(cfg)
+    return out
+
+
 def run_backtest_folds(
     inputs: ModelInputs,
     final: pd.DataFrame,
@@ -211,8 +203,10 @@ def run_backtest_folds(
     stress: int | None = STRESS_ORIGIN,
     with_experiments: bool = True,
     log: Callable[[str], None] = print,
+    workers: int = 1,
 ) -> BacktestResult:
-    """Run every fold (see module docstring)."""
+    """Run every fold (see module docstring). ``workers >= 2`` runs the inner-origin fits and the experiment refits in
+    that many worker processes (``celeris.backtest.parallel``); the result does not depend on ``workers``."""
     timings: dict[str, float] = {}
     scored_origins = sorted(set(outer) | ({stress} if stress is not None else set()))
     grid = sorted(set(inner_origins(max(outer))) | set(scored_origins))
@@ -221,21 +215,33 @@ def run_backtest_folds(
     drivers: list[dict] = []
     noise_parts: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
     experiments = experiment_grid(config) if with_experiments else {}
-    for origin in grid:
-        started = time.perf_counter()
-        ctx = origin_context(inputs, origin)
-        fit = fit_structural(inputs, ctx, config)
-        targets = backtest_targets(ctx, final)
-        targets["is_young"] = np.isin(fit.level_source[targets["u"].to_numpy()], ["young_blend", "cold_start"])
-        targets["months_to_eol"] = fit.universe["eol_idx"].to_numpy()[targets["u"].to_numpy()] - targets["month_idx"].to_numpy()
-        structural = predict(fit, targets)
-        features = feature_frame(ctx, fit, targets, structural)
-        keep = ["origin", "series_no", "month_idx", "actual", "is_scored", "zero"]
-        gbm_frames[origin] = pd.concat([targets[keep].reset_index(drop=True), features.reset_index(drop=True)], axis=1).assign(
-            structural=structural["mean"].to_numpy(dtype="float32")
-        )
-        drivers.extend(_drivers_rows(origin, fit))
-        if origin in scored_origins:
+    refits = full_refits(experiments, config)
+    pool = make_pool(workers, inputs, final)
+    pending: dict = {}
+    try:
+        if pool is not None:  # queued in the order the loop below consumes them
+            for origin in grid:
+                if origin in scored_origins:
+                    pending.update({(origin, cfg): pool.submit(variant_task, origin, cfg) for cfg in refits})
+                else:
+                    pending[origin] = pool.submit(inner_task, origin, config)
+        for origin in grid:
+            started = time.perf_counter()
+            if origin not in scored_origins:
+                if pool is not None:
+                    gbm_frames[origin], rows = pending.pop(origin).result()
+                else:
+                    base = origin_base(inputs, final, origin, config)
+                    gbm_frames[origin], rows = base.gbm_frame, drivers_rows(origin, base.fit)
+                    del base
+                drivers.extend(rows)
+                timings[month_label(origin)] = round(time.perf_counter() - started, 1)
+                log(f"backtest origin {month_label(origin)}: {timings[month_label(origin)]} s")
+                continue
+            base = origin_base(inputs, final, origin, config)
+            ctx, fit, targets, structural = base.ctx, base.fit, base.targets, base.structural
+            gbm_frames[origin] = base.gbm_frame
+            drivers.extend(drivers_rows(origin, fit))
             frame = targets.copy()
             for name, function in BASELINES.items():
                 frame[name] = function(ctx, targets)
@@ -252,8 +258,12 @@ def run_backtest_folds(
                 subset = _subset(experiment, frame)
                 for variant, cfg in variants.items():
                     if cfg not in cache:
-                        variant_fit = refit_levels(fit, ctx, cfg) if shares_factors(cfg, config) else fit_structural(inputs, ctx, cfg)
-                        cache[cfg] = predict(variant_fit, targets)["mean"].to_numpy()
+                        if shares_factors(cfg, config):
+                            cache[cfg] = predict(refit_levels(fit, ctx, cfg), targets)["mean"].to_numpy()
+                        elif pool is not None:
+                            cache[cfg] = pending.pop((origin, cfg)).result()
+                        else:
+                            cache[cfg] = variant_mean(inputs, ctx, targets, cfg)
                     fold.experiments.extend(_score_row(origin, experiment, variant, frame, cache[cfg], subset))
             del cache
             for shade in (1.0, 0.985):
@@ -281,9 +291,12 @@ def run_backtest_folds(
                 "backfit_iterations": len(fit.trace),
             }
             folds[origin] = fold
-        timings[month_label(origin)] = round(time.perf_counter() - started, 1)
-        log(f"backtest origin {month_label(origin)}: {timings[month_label(origin)]} s")
-        del ctx, fit
+            timings[month_label(origin)] = round(time.perf_counter() - started, 1)
+            log(f"backtest origin {month_label(origin)}: {timings[month_label(origin)]} s")
+            del base, ctx, fit
+    finally:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
     importances = []
     for origin, fold in folds.items():
         started = time.perf_counter()
@@ -348,6 +361,7 @@ __all__ = [
     "FoldResult",
     "ensemble_decision",
     "experiment_grid",
+    "full_refits",
     "oracle_floor",
     "run_backtest_folds",
 ]

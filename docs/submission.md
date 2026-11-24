@@ -40,16 +40,17 @@ Three options. The first is recommended.
 >   an EV-adoption factor, lifecycle and events. It is validated on four rolling 19-month origins, with the whole
 >   demand state rebuilt as of each origin and a no-leakage test.
 >
-> **Results.** Backtest WAPE is 26.3 % with bias −0.2 %. Seasonal naive scores 38.7 %, the Croston-type methods
-> 51–52 %, and the noise floor is 23.7 %. Summed to total × month, the WAPE is 2.1 %. A LightGBM model scored 27.3 % and
-> failed our pre-set ensemble rule, so we report it as a negative result. The forecast totals 2.79 M units (P10–P90:
-> 2.71 M to 2.88 M), or USD 2.50 bn. Its bands are calibrated to 80 % coverage and add up across the hierarchy.
+> **Results.** Backtest WAPE is 26.1 % with bias +0.2 %. Seasonal naive scores 38.7 %, the Croston-type methods
+> 51–52 %, and the noise floor is 23.6 %. Summed to total × month, the WAPE is 1.8 %. A LightGBM model scored 26.7 % and
+> failed our pre-set ensemble rule, so we report it as a negative result. One declared optimisation round, checked on
+> held-back origins, kept one change: a converged factor fit. The forecast totals 2.81 M units (P10–P90: 2.73 M to
+> 2.88 M), or USD 2.52 bn. Its bands are calibrated to 80 % coverage and add up across the hierarchy.
 >
 > **The dashboard** has the 5 required and all 7 optional views, sharing one timeline and one set of filters. It
 > includes cell-level lineage from raw to cleaned value, a forecast X-ray, a backtest time machine, a macro what-if, and
-> an exception inbox of 286 items ranked by revenue at risk (USD 66.8 M).
+> an exception inbox of 305 cases ranked by revenue at risk (USD 70.4 M).
 
-*(About 390 words.)*
+*(About 400 words.)*
 
 ---
 
@@ -103,11 +104,11 @@ Rebuilding everything from the raw data:
       cp /path/to/student_data/*.csv data/raw/
    Expected files: events_calendar.csv, inventory_stockouts.csv, macro_indicators.csv, sample_submission.csv,
    sku_master.csv, test.csv, train.csv
-5. Run the whole pipeline (about 10 minutes):
+5. Run the whole pipeline (about 11 minutes):
       make all
    This writes outputs/ (clean data, data-quality report, anomaly register, features, backtest, forecast)
    and the dashboard data in dashboard/public/data/.
-6. Run the tests (under 3 minutes):
+6. Run the tests (about 3 minutes):
       make test
 7. Rebuild and open the dashboard (needs Node 20 or later):
       make dashboard
@@ -130,16 +131,16 @@ Key outputs:
 
 - Serve `dashboard/dist`, open the Executive overview in the light theme, and clear all filters.
 - Keep the series ELA-003 · Europe in mind: a quarterly customer, in the family hit by the chip shortage.
-- The dashboard's backtest figures (26.3 % on four decision folds) and aggregate ranges (2.71 M – 2.88 M for the
-  19-month total) now match the pipeline outputs, so the hero strip and the value-added steps can be quoted directly.
+- The dashboard's backtest figures (26.1 % on four decision folds) and aggregate ranges (2.73 M – 2.88 M for the
+  19-month total) match the pipeline outputs, so the hero strip and the value-added steps can be quoted directly.
 
 | Time | View and action | What to say |
 |---|---|---|
-| 0:00–0:15 | **Executive overview.** Point at the hero figure and the timeline. | "This is one timeline from January 2019 to May 2028. Ink is what happened and orange is our forecast: 2.79 million units over the next 19 months, between 2.71 and 2.88 million with 80 % confidence." |
+| 0:00–0:15 | **Executive overview.** Point at the hero figure and the timeline. | "This is one timeline from January 2019 to May 2028. Ink is what happened and orange is our forecast: 2.81 million units over the next 19 months, between 2.73 and 2.88 million with 80 % confidence." |
 | 0:15–0:30 | **Data health.** Point at the row waterfall and the before / after checks. | "248,248 raw rows became one clean row per SKU, region and month. Every error had an exact signature, so every fix is a named rule: 55 checks failed before cleaning, and no errors remain. Cleaned units match the stock-out file on all 5,761 rows." |
 | 0:30–0:45 | **Demand explorer.** Filter to ELA-003 · Europe; show the zero-month calendar, then switch the header to "Latent monthly demand". | "These zeros are not lost demand. 98.7 % of zero months are scheduled off-months of the customer's ordering cycle. This customer orders every quarter, and each order carries three months of demand. Our forecast places orders the same way." |
 | 0:45–1:00 | **Stock-outs & lost sales.** Point at the shipped vs unconstrained chart in 2021–22. | "Shipments hid demand. In 2021 Electrical Assemblies customers asked for 44.8 % more than was shipped. In total 106,925 units, worth 110 million dollars, were never shipped. We forecast what customers ask for, not what the plant managed to ship." |
-| 1:00–1:20 | **Forecast & accuracy.** Open the backtest time machine at origin 2025-03, then the forecast X-ray. | "Here is the forecast we would have made in March 2025, checked against the next 19 months: 25.2 % error against 37.0 % for seasonal naive. Across four origins the error is 26.3 % with almost no bias, close to the 23.7 % noise floor. The X-ray shows why each number is what it is: level, season, holidays, economy, EV adoption, lifecycle and events." |
+| 1:00–1:20 | **Forecast & accuracy.** Open the backtest time machine at origin 2025-03, then the forecast X-ray. | "Here is the forecast we would have made in March 2025, checked against the next 19 months: 25.1 % error against 37.0 % for seasonal naive. Across four origins the error is 26.1 % with almost no bias, close to the 23.6 % noise floor. The X-ray shows why each number is what it is: level, season, holidays, economy, EV adoption, lifecycle and events." |
 | 1:20–1:35 | **Lifecycle.** Point at the end-of-life run-offs and the cold starts. | "Three SKUs reach end of life inside the window and run off to zero. Three planned launches replace them, ramping up from their launch month." |
-| 1:35–1:50 | **Exception inbox.** Group by cause. | "A planner starts here: 286 items, ranked by revenue at risk, 66.8 million dollars in total. Lost accounts, the Orion Driveline shutdown in July and August 2027, and launches, each with a cause and an action." |
+| 1:35–1:50 | **Exception inbox.** Group by cause. | "A planner starts here: 305 cases, ranked by revenue at risk, 70.4 million dollars in total. Lost accounts, the Orion Driveline shutdown in July and August 2027, and launches, each with a cause and an action." |
 | 1:50–2:00 | **What-if.** Apply the preset "PMI −3 from Jan 2027". | "If the economy turns, the plan moves through each customer's ordering cycle. And all of this is rebuilt from the raw files with one command: make all." |

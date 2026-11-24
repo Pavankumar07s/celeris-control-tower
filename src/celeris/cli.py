@@ -10,12 +10,14 @@ files) and add one ``Stage`` entry to ``STAGES``.
 from __future__ import annotations
 
 import argparse
+import os
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from celeris.anomalies.stage import run_anomalies
+from celeris.backtest.parallel import WORKERS_ENV
 from celeris.backtest.stage import run_backtest
 from celeris.cleaning.stage import run_clean
 from celeris.config import STAGE_ORDER, Paths
@@ -54,11 +56,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--bundle-dir", type=Path, default=None,
                         help="where 'export' writes the dashboard data bundle (default: dashboard/public/data with the "
                              "default --out-dir, <out-dir>/dashboard_bundle with any other)")
+    parser.add_argument("--workers", type=int, default=None,
+                        help="worker processes for the backtest's structural fits (default: $CELERIS_WORKERS or 3; "
+                             "1 runs everything in this process); outputs are identical for any value")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.workers is not None:
+        os.environ[WORKERS_ENV] = str(max(args.workers, 1))
     paths = Paths(raw_dir=args.raw_dir, outputs_dir=args.out_dir, bundle_dir=args.bundle_dir)
     names = [name for name in STAGE_ORDER if name in STAGES] if args.stage == "all" else [args.stage]
     for name in names:

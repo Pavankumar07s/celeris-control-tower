@@ -922,7 +922,7 @@
     }
   },
   "leakage_check": {
-    "rule": "an honest forecast must score above the in-hindsight oracle of the same scoring set; tests/test_model_leakage.py checks that altering data after an origin leaves that origin's forecasts unchanged",
+    "rule": "an honest forecast must score above the in-hindsight oracle of the same scoring set; tests/test_model_structural.py::test_no_leakage_after_the_origin checks that altering data after an origin leaves that origin's forecasts unchanged",
     "passed": true
   },
   "noise_floor_wape": 0.23565,

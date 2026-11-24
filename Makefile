@@ -22,7 +22,8 @@ anomalies:
 features:
 	$(PY) -m celeris features
 
-## backtest: rolling-origin backtest (4 folds + stress fold), model ladder, uncertainty calibration -> outputs/backtest (~25 min, 1.3 GB)
+## backtest: rolling-origin backtest (4 folds + stress fold), model ladder, uncertainty calibration -> outputs/backtest
+##   (~10 min and 2.7 GB in total with 3 worker processes; CELERIS_WORKERS=1: ~23 min, 1.5 GB, identical outputs)
 backtest:
 	$(PY) -m celeris backtest
 
@@ -49,7 +50,8 @@ dashboard-dev:
 test:
 	$(PY) -m pytest
 
-## test-all: the whole suite including the slow end-to-end test (python -m celeris all twice into temp dirs, ~20 min, 2.5 GB)
+## test-all: the whole suite including the slow end-to-end test (python -m celeris all twice into temp dirs; ~24 min,
+##   peak ~4 GB of memory, ~0.2 GB of temporary disk)
 test-all:
 	$(PY) -m pytest -m "slow or not slow"
 

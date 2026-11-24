@@ -23,13 +23,13 @@ Every number below is read from a pipeline output. The file is named in the last
 | | Cleaned units equal the stock-out file's `Shipped_Units` on 5,761 of 5,761 comparable rows. Without the repairs, history would show 2.6 % more units (12,030,253 vs 11,723,379) and USD 108.6 M more revenue (USD 8,684.4 M vs 8,575.9 M). | checks `ORC-UNITS-SHIPPED`, `TRN-NUM-TOTALS` |
 | Unconstrained demand | 11,831,100 units requested vs 11,724,013 shipped (+0.91 %). For Electrical Assemblies the gap is +44.8 % in 2021 and +29.2 % in 2022 (chip shortage). | `dq_report.json` → check `DEM-UC-UPLIFT` |
 | Lost sales | 106,925 units never shipped, worth USD 109.9 M. Electrical Assemblies accounts for 80,664 of those units (75 %). | `outputs/clean/train_clean.parquet` (`lost_units`) |
-| Backtest accuracy | Four rolling forecast origins (2022-10, 2023-10, 2024-10, 2025-03), each forecasting 19 months ahead, scored against unconstrained demand on 225,942 cells. Final model: **WAPE 26.3 %, bias −0.2 %**. | `outputs/backtest/summary.json`, `metrics.csv` |
-| | Baselines on the same cells: last-12-month mean 51.6 %, seasonal naive 38.7 %, intermittent-demand methods (Croston, SBA, TSB, ADIDA, IMAPA) 51.3–51.6 %, cycle-aware naive 31.2 %, global LightGBM 27.3 % (bias +2.1 %; not shipped). | `summary.json` → `ladder` |
-| | Noise floor: a forecaster who knew each series' future level in hindsight scores 23.7 %. The final model is 2.7 WAPE points above it. Summed to family × month the WAPE is 3.5 %, and at total × month it is 2.1 %. | `summary.json` → `noise_floor_wape`; `metrics.csv` |
-| Forecast | **2,793,254 units** over 2026-11 to 2028-05, with a P10–P90 range of 2.71 M to 2.88 M units for the 19-month total. That is ×1.035 the last 19 months of unconstrained demand. Revenue is USD 2.50 bn at assumed prices (2026 price +4.5 % in 2027, +4.0 % more in 2028). | `outputs/forecast/submission.csv`, `forecast.parquet`, `aggregates.csv` |
+| Backtest accuracy | Four rolling forecast origins (2022-10, 2023-10, 2024-10, 2025-03), each forecasting 19 months ahead, scored against unconstrained demand on 225,942 cells. Final model: **WAPE 26.1 %, bias +0.2 %** (per origin 28.3 %, 26.0 %, 25.1 %, 25.1 %). It includes the one change that passed a declared optimisation round with held-back confirmation origins: a converged factor fit (`docs/methodology.md` 8.4). | `outputs/backtest/summary.json`, `metrics.csv` |
+| | Baselines on the same cells: last-12-month mean 51.6 %, seasonal naive 38.7 %, intermittent-demand methods (Croston, SBA, TSB, ADIDA, IMAPA) 51.3–51.6 %, cycle-aware naive 31.2 %, global LightGBM 26.7 % (bias +1.5 %; not shipped). | `summary.json` → `ladder` |
+| | Noise floor: a forecaster who knew each series' future level in hindsight scores 23.6 %. The final model is 2.5 WAPE points above it. Summed to family × month the WAPE is 3.1 %, and at total × month it is 1.8 %. | `summary.json` → `noise_floor_wape`; `metrics.csv` |
+| Forecast | **2,805,199 units** over 2026-11 to 2028-05, with a P10–P90 range of 2.73 M to 2.88 M units for the 19-month total. That is ×1.039 the last 19 months of unconstrained demand. Revenue is USD 2.52 bn at assumed prices (2026 price +4.5 % in 2027, +4.0 % more in 2028). | `outputs/forecast/submission.csv`, `forecast.parquet`, `aggregates.csv` |
 | | 8,842 rows are exactly 0: 8,382 scheduled off-months of a customer's ordering cycle, 304 rows of 16 lost accounts, and 156 rows after an announced end of life. | `outputs/clean/test_grid.parquet` |
 | | The P10–P90 bands are calibrated to cover 80 % of backtest actuals at row, family × region × month and total × month level. Forecasts are bottom-up sums, so they add up exactly at family, region, channel and total level. | `outputs/forecast/uncertainty.json`; check `FC-HIERARCHY` |
-| Dashboard | 12 views: the 5 required views and all 7 optional ones. They share filters (family, SKU, region, channel, customer). History is drawn in ink and the forecast in orange on one continuous timeline. An exception inbox lists 286 items for planners, ranked by revenue at risk (USD 66.8 M in total). No backend is needed. | `dashboard/`, `dashboard/public/data/exceptions.json` |
+| Dashboard | 12 views: the 5 required views and all 7 optional ones. They share filters (family, SKU, region, channel, customer). History is drawn in ink and the forecast in orange on one continuous timeline. An exception inbox lists 305 cases on 304 series for planners, ranked by revenue at risk (USD 70.4 M in total). No backend is needed. | `dashboard/`, `dashboard/public/data/exceptions.json` |
 
 ## What is original in the approach
 
@@ -97,7 +97,7 @@ sha256sum data/raw/*.csv   # compare with "inputs" in outputs/quality/manifest.j
 
 ```bash
 make all    # clean -> demand -> anomalies -> features -> backtest -> forecast -> export
-make test   # fast test suite (224 tests; the slow end-to-end test is deselected)
+make test   # fast test suite (232 tests; the slow end-to-end test is deselected)
 ```
 
 `make all` writes everything under `outputs/` and the dashboard data under `dashboard/public/data/`. Each stage can also
@@ -122,10 +122,10 @@ and `npm run build`.
 
 | Command | Time | Notes |
 |---|---|---|
-| `make all` | about 10 min | Most of it is the backtest. |
-| `make clean-data` | about 15 s | Cleaning stage only. |
-| `make test` | under 3 min | Runs pipeline stages into temporary folders. Never writes to `outputs/`. |
-| `make test-all` | about 20 min | Adds one slow test that runs `all` twice and compares hashes. Needs 2.5 GB of temporary disk. |
+| `make all` | about 11 min | Most of it is the backtest (about 10 min), which runs its structural fits in three worker processes (`CELERIS_WORKERS=N make all` or `python -m celeris all --workers N` to change; outputs are identical for any N). Peak about 2.7 GB of memory. |
+| `make clean-data` | about 10 s | Cleaning stage only. |
+| `make test` | about 3 min | Runs pipeline stages into temporary folders. Never writes to `outputs/`. Peak about 2.6 GB of memory. |
+| `make test-all` | about 24 min | Adds one slow test that runs `all` twice into temporary folders and compares every output, the dashboard bundle included. Needs about 0.2 GB of temporary disk; peak about 4 GB of memory. |
 | `make dashboard` | a few minutes | `npm ci` downloads about 120 MB of packages. |
 
 ## Repository map
@@ -158,7 +158,7 @@ the submission contract, is in [`docs/requirements_traceability.md`](docs/requir
 
 | Workstream | Core | Advanced | Expert |
 |---|---|---|---|
-| 1. Cleaning | `src/celeris/cleaning/`; one row per Date-SKU-Region in `outputs/clean/train_clean.parquet` | 15 numeric states reconciled to the cent; unit, currency and pack errors fixed; missing rows ≠ zeros; indicators cleaned (`macro_clean.csv`) | `make all` + 225 tests; `outputs/quality/dq_report.json`, `fix_log.parquet`, `manifest.json` |
+| 1. Cleaning | `src/celeris/cleaning/`; one row per Date-SKU-Region in `outputs/clean/train_clean.parquet` | 15 numeric states reconciled to the cent; unit, currency and pack errors fixed; missing rows ≠ zeros; indicators cleaned (`macro_clean.csv`) | `make all` + 233 tests; `outputs/quality/dq_report.json`, `fix_log.parquet`, `manifest.json` |
 | 2. Anomalies | `outputs/anomalies/anomaly_register.csv` (11,799 rows, data errors vs real events) | Breaks, pre-buy, holidays, stock-outs; unconstrained demand (`demand_uc`) | 27 cycle changes, 23 customer switches, 16 lost accounts; master-data conflicts |
 | 3. Features & drivers | `outputs/features/feature_catalogue.csv` (39 entries) | `macro_leadlag.csv`; family drivers and lags; event and lifecycle factors | Lag stability by origin and by era; EV shift by powertrain class |
 | 4. Forecasting | 3 baselines + structural model; time-based backtest | Croston, SBA, TSB, ADIDA, IMAPA; LightGBM; 4 + 1 rolling origins, 19-month horizon | Cold starts, end of life, window events; P10/P50/P90; bottom-up coherence |
@@ -195,6 +195,6 @@ These are listed in full, ordered by importance, under "Gaps" in
 [`docs/requirements_traceability.md`](docs/requirements_traceability.md#gaps).
 
 - Fixed on 24 Nov 2026: the dashboard's aggregate P10–P90 ranges now include the common-error term `cv_common`
-  (19-month total 2.71 M to 2.88 M, as in `outputs/forecast/aggregates.csv`), and its backtest figures pool the four
-  decision folds on the cells every model forecast (final model 26.3 %, LightGBM 27.3 %, as in `summary.json`).
+  (19-month total 2.73 M to 2.88 M with the current forecast), and its backtest figures pool the four decision folds on
+  the cells every model forecast (final model 26.1 %, LightGBM 26.7 %, as in `summary.json`).
 - The demo is not deployed yet.

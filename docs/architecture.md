@@ -15,7 +15,8 @@ lens reports beside it.
    Running a stage invalidates every later stage (their records and outputs are deleted, see `outputs/quality/`), so
    `all` and the stages run one at a time in order give byte-identical outputs.
 4. **Deterministic.** Fixed seeds, stable sort orders, no wall-clock values inside data files. Two runs give identical
-   output hashes (`outputs/quality/manifest.json`).
+   output hashes (`outputs/quality/manifest.json`), whatever the number of backtest worker processes (`--workers`,
+   `$CELERIS_WORKERS`, default 3; see "Run time and memory" below).
 5. **Assert the forensics.** Counts established in the dossier (245,548 grid cells, 244,566 records, 982 missing rows, …)
    are hard assertions or tests, so a regression in a rule is caught immediately.
 6. **Every change is explained.** Each modified cell has a row in the fix log (rule, raw value, before, after, evidence);
@@ -38,17 +39,20 @@ src/celeris/
   tables.py                column contract of train_clean.parquet across stages
   features/                calendar, holiday day counts, macro paths, lifecycle, levels
   models/                  baselines, intermittent methods, structural model, global GBM, ensemble, quantiles, reconciliation
-  backtest/                rolling-origin harness and metrics
+  backtest/                rolling-origin harness, worker pool for the structural fits (parallel.py), metrics
   export/                  dashboard data bundle, submission file
   cli.py                   `python -m celeris <stage>`; stages: clean, demand, anomalies, features, backtest, forecast, export, all
-                           (only registered stages are callable; a later stage plugs in with one `Stage` entry in `STAGES`)
+                           (only registered stages are callable; a later stage plugs in with one `Stage` entry in `STAGES`);
+                           options --raw-dir, --out-dir, --bundle-dir, --workers
 tests/                     pytest suite (schema, invariants, oracle, rule fixtures, corruption-recovery, idempotence, contract);
-                           `make test` deselects `@pytest.mark.slow`, `make test-all` adds the end-to-end `all` run (~20 min)
+                           `make test` deselects `@pytest.mark.slow` (about 3 min), `make test-all` adds the end-to-end
+                           test that runs `all` twice (about 24 min in total)
 outputs/                   everything the pipeline writes (see below)
 dashboard/                 static web app; reads only `dashboard/public/data/*` written by `celeris export`
 docs/                      problem statement, jury criteria, this file, methodology
 research/                  forensic reports and skeptic reviews (evidence of process; not used at runtime)
-Makefile                   all, clean-data, test, test-all, install (dashboard, submission added with their stages)
+Makefile                   all; one target per stage (clean-data, demand, anomalies, features, backtest, forecast or
+                           submission, export); dashboard, dashboard-dev; test, test-all; install
 ```
 
 Part A lives in `src/celeris/cleaning/`: one module per dossier step (`keys` 1, `dedup` 2, `record_id` 3, `grid` 4,
@@ -157,14 +161,21 @@ Columns added to `train_clean.parquet` by later stages (`celeris.tables`). The d
 | `anomaly_register.csv` | `anomaly_id` (deterministic: `type:key`), `level` (episode / cell), `episode_id` (cells point to their episode), `type` (`DE.*` / `RC.*` data errors and master or documentation conflicts; `RE.*` real events; `ST.*` structural and lifecycle events), `class` (`data_error` / `real_event`), `sku_id`, `region`, `product_family`, `sales_channel`, `customer` (at time), `scope`, `date_start`, `date_end`, `n_cells`, `event_id` (events calendar), `cause`, `evidence` (compact JSON: counts, witnesses, measured multipliers), `detection`, `action`, `confidence` (high / medium / low), `impact_units`, `impact_usd` (signed; see `celeris.anomalies.register`), `in_forecast_window`. Off-phase cycle zeros are structure and are not registered; formatting errors are one episode per rule (the fix log holds their cells) |
 | `series_profile.csv` | one row per series (3,083): keys, family, BU, channel, powertrain, tier, lifecycle status, effective launch, EOL, replaced SKU, history window, cycle (pattern, kind, phase, posterior, before, change month), customer first / at origin / count, switch month and ratio, lost-account flag / month / pre-loss level, Syntetos-Boylan ADI, CV² and class (full life and last 36 months, on `demand_uc`), `level_last12` (monthly-equivalent, one-offs at expectation), `mean_monthly_demand`, `n_orders`, `mean_order`, `zero_share`, stock-out exposure (listed, inferred, suspected months, lost units, unconstraining uplift), `n_missing_rows`, `n_imputed`, `n_one_offs`, `n_fixes`, `n_anomaly_cells` |
 
-### `outputs/backtest/`, `outputs/forecast/`
+### `outputs/features/`, `outputs/backtest/`, `outputs/forecast/`
+
+Summary; the column-level contracts are in "Contracts for the modelling and dashboard builds" below.
 
 | File | Contents |
 |---|---|
-| `backtest/predictions.parquet` | origin, model, keys, horizon, actual (unconstrained), prediction, quantiles |
-| `backtest/metrics.csv` | WAPE, bias and WAPE + \|bias\| by origin × model × slice (family, region, channel, horizon, calendar month, level) |
-| `forecast/forecast.parquet` | one row per test row: mean (submitted), P10, P50, P90, the multiplicative components behind the mean |
-| `forecast/submission.csv` | `Date, SKU_ID, Region, Units_Sold_Forecast` — 58,219 rows, non-negative integers |
+| `features/feature_catalogue.csv`, `calendar_features.csv`, `train_features.parquet`, `test_features.parquet` | the feature catalogue (39 entries), calendar features per month, the feature tables of every grid cell and every test row |
+| `features/macro_leadlag.csv`, `sku_macro_drivers.csv` | family × indicator × lag (0–12) correlations by era; each SKU's drivers, lags and coefficients |
+| `backtest/predictions.parquet` | origin, model, keys, horizon, actual (unconstrained), prediction; P10 / P50 / P90 for the final model |
+| `backtest/metrics.csv` | WAPE, bias and sums by origin (and the mean of the decision folds) × model × level × slice |
+| `backtest/summary.json` | model ladder, noise floor, leakage check, ensemble decision, final model, coverage by level, experiment decisions, per-origin diagnostics |
+| `backtest/experiments.csv`, `macro_drivers_by_origin.csv`, `gbm_importance.csv`, `uncertainty_calibration.json` | structural variants and ablations per origin; family drivers per origin; LightGBM feature importance; the calibrated variance components read by `forecast` |
+| `forecast/forecast.parquet` | one row per test row: `forecast` (submitted, the rounded mean), `mean`, P10 / P50 / P90, the multiplicative components, variance components, price and revenue |
+| `forecast/submission.csv` | `Date, SKU_ID, Region, Units_Sold_Forecast`: 58,219 rows in `test.csv` order, non-negative integers |
+| `forecast/aggregates.csv`, `uncertainty.json`, `macro_sensitivity.csv`, `structural_factors.json` | bottom-up sums with aggregate P10 / P50 / P90 per month and node; calibrated uncertainty and measured coverage; what-if sensitivities; the fitted factors as of 2026-10 |
 
 ### `dashboard/public/data/`
 
@@ -173,7 +184,34 @@ The file list, what each is built from and which view loads it are in `docs/dash
 under `outputs/`; `meta.json` records, per modelling input, whether the real file or the dev-only stand-in in
 `outputs/_provisional/` was used. The destination is `Paths.bundle_dir` (`--bundle-dir`): `dashboard/public/data` for
 the default outputs root, `<out-dir>/dashboard_bundle` when `--out-dir` points anywhere else, so runs into a temporary
-directory (tests, experiments) never rewrite the dashboard's bundle.
+directory (tests, experiments) never rewrite the dashboard's bundle. `make test-all` relies on this: its end-to-end test
+runs `python -m celeris all --out-dir <tmp>` twice and compares every file, the bundle in `<tmp>/dashboard_bundle`
+included, without touching `outputs/` or `dashboard/public/data`.
+
+## Run time and memory
+
+`make all` (`python -m celeris all`, one process) measured on the reference machine (8 cores, 11 GB RAM) on 25 Nov 2026:
+11.0 minutes, with a peak of 2.7 GB summed over all processes.
+
+| Stage | Wall clock | Peak memory |
+|---|---|---|
+| `clean` | 9 s | 1.2 GB |
+| `demand` | 3 s | 0.8 GB |
+| `anomalies` | 6 s | 1.0 GB |
+| `features` | 13 s | 1.1 GB |
+| `backtest` | 598 s | 2.7 GB summed over the main process (1.6 GB) and three workers |
+| `forecast` | 13 s | 1.5 GB (0.8 GB when run alone) |
+| `export` | 19 s | 2.7 GB |
+
+Peaks are those of the `all` process, which keeps memory from earlier stages. The backtest runs its independent work in
+`$CELERIS_WORKERS` worker processes (`--workers`, default 3, at most the number of CPUs − 1;
+`celeris.backtest.parallel`): the inner-origin fits that feed the GBM and the experiment refits while the main process
+fits each scored origin's base model, then the four leave-one-origin-out calibrations and the per-fold metrics. Every
+task is a pure function of its inputs and results are consumed in a fixed order, so the outputs are byte-identical for
+any number of workers (`tests/test_backtest_parallel.py`; the 19 files of `features`, `backtest` and `forecast` were
+compared by hash against single-process runs, before and after this change). With `--workers 1` the backtest takes
+about 23 minutes and 1.5 GB in one process (1,358 s measured; 1,436 s before the change), and `make all` about 24
+minutes.
 
 ## Metrics
 

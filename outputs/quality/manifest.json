@@ -96,8 +96,8 @@
     },
     {
       "path": "backtest/summary.json",
-      "sha256": "6e54c55d80dbec6095ce0a335f85f0e4a17808f2d491c3bbb14c4e142e5bc54e",
-      "bytes": 64298
+      "sha256": "20b7bffbd02c951a3cedd315dc8180b0a106a9e06b3bf25c7e53fea48017ad83",
+      "bytes": 64335
     },
     {
       "path": "backtest/uncertainty_calibration.json",

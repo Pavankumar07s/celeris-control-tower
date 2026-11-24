@@ -12,6 +12,10 @@ Writes, under ``outputs/backtest/``:
 - ``uncertainty_calibration.json``: the calibrated variance components (read by the ``forecast`` stage);
 - ``summary.json``: the model ladder, noise floor and leakage check, ensemble decision, final model, coverage by
   level (in-sample calibrated and leave-one-origin-out), experiment decisions and per-origin diagnostics.
+
+The structural fits, the leave-one-origin-out calibrations and the per-fold metrics run in ``$CELERIS_WORKERS`` worker
+processes (default 3, ``python -m celeris --workers``); the outputs are byte-identical for any number of workers
+(``celeris.backtest.parallel``).
 """
 
 from __future__ import annotations
@@ -28,7 +32,8 @@ from celeris.backtest.harness import (
     ensemble_decision,
     run_backtest_folds,
 )
-from celeris.backtest.metrics import aggregate_wape, bias, mean_over_origins, metric_table, score, wape
+from celeris.backtest.metrics import aggregate_wape, bias, fold_metrics, mean_over_origins, score, wape
+from celeris.backtest.parallel import default_workers, held_out_coverage, worker_pool
 from celeris.backtest.targets import FINAL_COLUMNS
 from celeris.cleaning.dates import month_label
 from celeris.config import Paths
@@ -101,10 +106,33 @@ def leave_one_origin_out(result: BacktestResult, noise: dict) -> dict:
     out = {}
     for held in OUTER_ORIGINS:
         others = tuple(o for o in OUTER_ORIGINS if o != held)
-        unc = calibrate(calibration_rows(result, others), noise["a"], noise["b"])
-        test = calibration_rows(result, (held,))
-        out[month_label(held)] = {"monthly": coverage(test, unc), "horizon_total": coverage(test, unc, TOTAL_LEVELS)}
+        out[month_label(held)] = held_out_coverage(calibration_rows(result, others), calibration_rows(result, (held,)), noise["a"], noise["b"])
     return out
+
+
+def calibrate_folds(result: BacktestResult, noise: dict, workers: int = 1) -> tuple[Uncertainty, dict, dict[int, pd.DataFrame]]:
+    """Components calibrated on the four decision folds, the leave-one-origin-out coverage of each fold, and each
+    fold's rows of ``metrics.csv``.
+
+    With ``workers >= 2`` the four leave-one-out calibrations (about 50 s each) and the per-fold metrics run in worker
+    processes while this process calibrates on all four folds. Each task is a pure function of its rows, so the result
+    does not depend on ``workers``.
+    """
+    jobs = {}
+    for held in OUTER_ORIGINS:
+        others = tuple(o for o in OUTER_ORIGINS if o != held)
+        jobs[month_label(held)] = (calibration_rows(result, others), calibration_rows(result, (held,)))
+    pool = worker_pool(workers)
+    try:
+        loo_tasks = {key: pool.submit(held_out_coverage, train, test, noise["a"], noise["b"]) for key, (train, test) in jobs.items()} if pool else {}
+        metric_tasks = {origin: pool.submit(fold_metrics, fold.frame, month_label(origin), REPORTED) for origin, fold in sorted(result.folds.items())} if pool else {}
+        unc = calibrate(calibration_rows(result, OUTER_ORIGINS), noise["a"], noise["b"])
+        loo = {key: loo_tasks[key].result() if pool else held_out_coverage(train, test, noise["a"], noise["b"]) for key, (train, test) in jobs.items()}
+        metrics = {origin: metric_tasks[origin].result() if pool else fold_metrics(fold.frame, month_label(origin), REPORTED) for origin, fold in sorted(result.folds.items())}
+    finally:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
+    return unc, loo, metrics
 
 
 def with_quantiles(frame: pd.DataFrame, unc: Uncertainty) -> pd.DataFrame:
@@ -141,15 +169,12 @@ def predictions_long(result: BacktestResult) -> pd.DataFrame:
     return out.loc[:, list(PREDICTION_COLUMNS)]
 
 
-def metrics_table(result: BacktestResult) -> pd.DataFrame:
-    """``metrics.csv``: per fold (stress fold included) and the mean over the four decision folds."""
+def metrics_table(result: BacktestResult, folds: dict[int, pd.DataFrame] | None = None) -> pd.DataFrame:
+    """``metrics.csv``: per fold (stress fold included) and the mean over the four decision folds (``folds``: each
+    fold's ``fold_metrics`` when already computed, by origin)."""
     parts = []
     for origin, fold in sorted(result.folds.items()):
-        for model in REPORTED:
-            frame = fold.frame.assign(pred=fold.frame[model].to_numpy())
-            if frame["pred"].isna().all():
-                continue
-            parts.append(metric_table(frame, month_label(origin), model))
+        parts.append(folds[origin] if folds is not None else fold_metrics(fold.frame, month_label(origin), REPORTED))
     table = pd.concat(parts, ignore_index=True)
     decision = table[table["origin"].isin([month_label(o) for o in OUTER_ORIGINS])]
     table = pd.concat([table, mean_over_origins(decision)], ignore_index=True)
@@ -263,12 +288,12 @@ def backtest_stage(paths: Paths) -> StageRecord:
     inputs = load_model_inputs(paths)
     final_cells = read_train_clean(paths, "anomalies").loc[:, list(FINAL_COLUMNS)]
     config = StructuralConfig()
-    result = run_backtest_folds(inputs, final_cells, config)
+    workers = default_workers()  # the outputs do not depend on the number of workers
+    result = run_backtest_folds(inputs, final_cells, config, workers=workers)
     decision = ensemble_decision(result.folds)
     for fold in result.folds.values():
         fold.frame["final"] = fold.frame[decision["final_model"]].to_numpy()
-    unc = calibrate(calibration_rows(result, OUTER_ORIGINS), result.noise["a"], result.noise["b"])
-    loo = leave_one_origin_out(result, result.noise)
+    unc, loo, fold_tables = calibrate_folds(result, result.noise, workers)
     for fold in result.folds.values():
         fold.frame = with_quantiles(fold.frame, unc)
     stress = calibration_rows(result, (STRESS_ORIGIN,)) if STRESS_ORIGIN in result.folds else None
@@ -280,7 +305,7 @@ def backtest_stage(paths: Paths) -> StageRecord:
         "ladder": ladder(result),
         "noise_floor": floor,
         "leakage_check": {
-            "rule": "an honest forecast must score above the in-hindsight oracle of the same scoring set; tests/test_model_leakage.py checks that altering data after an origin leaves that origin's forecasts unchanged",
+            "rule": "an honest forecast must score above the in-hindsight oracle of the same scoring set; tests/test_model_structural.py::test_no_leakage_after_the_origin checks that altering data after an origin leaves that origin's forecasts unchanged",
             "passed": bool(all(v["final_above_oracle"] for v in floor.values())),
         },
         "noise_floor_wape": round(float(np.mean([floor[month_label(o)]["oracle_wape"] for o in OUTER_ORIGINS])), 5),
@@ -302,7 +327,7 @@ def backtest_stage(paths: Paths) -> StageRecord:
     calibration = {**unc.to_dict(), "noise_moments_source": "in-sample residuals of the structural fit at the decision folds (last 36 months)"}
     written = [
         write_parquet(predictions_long(result), out / "predictions.parquet"),
-        write_csv(metrics_table(result), out / "metrics.csv"),
+        write_csv(metrics_table(result, fold_tables), out / "metrics.csv"),
         write_csv(experiments.round(6), out / "experiments.csv"),
         write_csv(result.drivers, out / "macro_drivers_by_origin.csv"),
         write_csv(result.gbm_importance.round(6), out / "gbm_importance.csv"),

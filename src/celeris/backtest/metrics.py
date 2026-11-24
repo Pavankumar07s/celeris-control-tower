@@ -134,6 +134,17 @@ def metric_table(frame: pd.DataFrame, origin_label: object, model: str) -> pd.Da
     return pd.DataFrame(out, columns=list(METRIC_COLUMNS))
 
 
+def fold_metrics(frame: pd.DataFrame, origin_label: object, models: tuple[str, ...]) -> pd.DataFrame:
+    """``metric_table`` of every model with forecasts in one fold, in ``models`` order (a worker task of the stage)."""
+    parts = []
+    for model in models:
+        scored = frame.assign(pred=frame[model].to_numpy())
+        if scored["pred"].isna().all():
+            continue
+        parts.append(metric_table(scored, origin_label, model))
+    return pd.concat(parts, ignore_index=True)
+
+
 def mean_over_origins(metrics: pd.DataFrame) -> pd.DataFrame:
     """``origin = 'mean'`` rows: average WAPE and bias of the folds, summed counts and totals."""
     keys = ["model", "level", "slice_type", "slice_value"]

@@ -36,6 +36,6 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers -m 'not slow'"
 markers = [
     "pipeline: runs the full part-A cleaning stage once per session (about 15 s)",
-    "slow: end-to-end run of every stage (python -m celeris all, ~20 min, 2.5 GB); deselected by default, run with make test-all",
+    "slow: end-to-end run of every stage (python -m celeris all twice, ~22 min, 2.7 GB each); deselected by default, run with make test-all",
 ]
 filterwarnings = ["error::FutureWarning"]

@@ -6,7 +6,9 @@ number below is read from a pipeline output (`outputs/backtest/summary.json`, `m
 `research/DATA_DOSSIER.md` (sections cited as "dossier x.y").
 
 Reproduce: `make all` (or `python -m celeris features`, `backtest`, `forecast` after `clean`, `demand`, `anomalies`;
-about 15 s, 25 min and 15 s with peaks of 0.9, 1.3 and 0.7 GB on the reference machine).
+about 15 s, 10 min and 15 s on the reference machine, with peaks of 1.0 GB, 2.7 GB summed over the backtest's process
+and its three workers, and 0.8 GB; `--workers 1` runs the backtest in one process in about 23 min and 1.5 GB, with
+identical outputs).
 
 **In short.** We submit the structural multiplicative model alone: the reverse-engineered generator (level x
 region / channel seasonality x moving holidays x SKU macro path x EV factor x lifecycle x events), estimated from data
@@ -14,7 +16,7 @@ at every origin and placed on each customer's ordering cycle. Over four rolling 
 2023-10, 2024-10, 2025-03) it scores **WAPE 0.2611 and bias +0.2 % (WAPE + |bias| 0.2676)** at series x month, against
 0.3124 / -3.2 % for the cycle-aware naive, 0.3870 / -3.8 % for seasonal naive, 0.5162 / -3.2 % for the last-12-month mean
 and 0.51-0.52 for every intermittent-demand method. The in-hindsight oracle of the same cells (the noise floor) is
-0.2356, so about 2.6 WAPE points separate us from a forecaster who knew each series' future level. Aggregates are
+0.2356, so about 2.5 WAPE points separate us from a forecaster who knew each series' future level. Aggregates are
 tight: 0.0308 at family x month and 0.0178 at total x month. The global LightGBM and the equal-weight ensemble did not
 pass the ensemble rule (better in 0 of 4 folds) and are reported as a negative result. P10-P90 bands were calibrated to
 80 % coverage at row, family x region x month and total x month level on the backtests. The submission totals
@@ -592,7 +594,8 @@ for cold starts; `cv_group` 0.042; `cv_common` 0.019 (first submission: 0.88; 0.
   EV trend; it was non-convergence). The converged beta, 0.0363 as of 2026-10, matches the forensic estimate
   (0.036-0.038), as does the LNY depth (0.281 vs 0.28-0.30). The converged fit alone did not pass the keep rule: its
   gain came with the noise of picking one of two near-tied macro driver sets, which averaging the sets removed
-  (section 11). Convergence takes 18-36 iterations (cap 40) and makes the backtest stage about 2.5x slower.
+  (section 11). Convergence takes 18-36 iterations (cap 40) and makes each fit several times slower; the backtest stage runs its
+  fits in worker processes to compensate (section 11, runtime).
 - **Cold starts** rest on a cross-sectional prior (log sd about 0.5 around it); `Replaces_SKU` only fixes their timing
   (the predecessor's phase-out meets the successor's ramp) and their price, because successors do not inherit regions,
   customers or channels (dossier 5.4).
@@ -600,10 +603,10 @@ for cold starts; `cv_group` 0.042; `cv_common` 0.019 (first submission: 0.88; 0.
 
 ### 10.1 Where accuracy could still be gained
 
-The final model is 2.6 WAPE points above the oracle of the same cells (0.2611 vs 0.2356) and the oracle is about 1.3
+The final model is 2.5 WAPE points above the oracle of the same cells (0.2611 vs 0.2356) and the oracle is about 1.3
 points above the pure negative-binomial noise floor (0.2223). Roughly in order of expected value:
 
-1. **Level estimation noise** (most of the 2.6 points). A 24-month ratio-of-sums level from orders with about 30 %
+1. **Level estimation noise** (most of the 2.5 points). A 24-month ratio-of-sums level from orders with about 30 %
    noise each still carries a few percent of error per series. A hierarchical level model (SKU effect x region effect
    x series factor, dossier 4.2) that shrinks each series toward its SKU and region could reduce it, especially for
    small, Q / B-cycle and MEA series. The window tests (18-48 months) show the trade-off is flat around 24, and the
@@ -691,4 +694,9 @@ GBM and five scored origins with about 17 experiment refits each) grew from abou
 1.3 GB); the forecast and features stages take about 15 s each. Freezing coefficient rows that stopped moving in the
 soft-cap Gauss-Newton fit (they would recompute the same step) cut the stage to 25.3 minutes with bit-identical
 results (predictions and SKU paths compared in memory at three origins; the 19 output files of `features`,
-`backtest` and `forecast` have identical hashes before and after the change).
+`backtest` and `forecast` have identical hashes before and after the change). The backtest stage then moved its
+independent work into three worker processes (`celeris.backtest.parallel`): the 10 inner-origin fits that are not
+also scored origins and the 17 full experiment refits at each scored origin while the main process fits each scored origin's base model, then the four
+leave-one-origin-out calibrations and the per-fold metrics. Measured on 25 Nov 2026 on the reference machine: 1,436 s
+and 1.5 GB in one process, 600 s and 2.7 GB summed over the four processes, with the 19 output files of `features`,
+`backtest` and `forecast` byte-identical; with `--workers 1` the new code takes 1,358 s and gives the same 19 files.
