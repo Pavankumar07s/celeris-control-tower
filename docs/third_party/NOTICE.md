@@ -46,6 +46,6 @@ Declared in `pyproject.toml`; exact versions in `requirements.lock.txt`. pandas 
   dashboard-designer (a community rule set published under MIT). They are cited in `docs/design_system.md` and in
   `research/dashboard-*.md`, together with the other public design guides listed there. None of their files is in
   this repository.
-- The hackathon brief (`docs/problem_statement.pdf`, transcribed in `docs/problem_statement.md`) and the jury criteria
+- The hackathon brief (transcribed in `docs/problem_statement.md`; the organisers' PDF is not redistributed) and the jury criteria
   (`docs/evaluation_criteria.md`, from the portal) are the organisers' material. The provided dataset is not in the
   repository.

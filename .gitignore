@@ -39,3 +39,6 @@ dist_zip/
 
 # dev-only stand-in forecasts for dashboard development
 outputs/_provisional/
+
+# organisers' problem-statement PDF: kept locally, not redistributed
+docs/problem_statement.pdf

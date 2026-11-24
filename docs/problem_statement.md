@@ -1,6 +1,6 @@
 # Celeris Automobili Industrial: Demand Forecasting & Planning Control Tower
 
-(Faithful transcription of `docs/problem_statement.pdf` — the PDF is authoritative.)
+(Faithful transcription of the organisers' problem-statement PDF, which is not redistributed in this repository; the PDF is authoritative.)
 
 **Format:** 1-week project, individual or teams of 2–3. **Level:** students to ~7 years' experience. Every workstream has
 Core, Advanced and Expert tiers. Everyone must finish Core; the higher tiers set apart the strongest submissions.

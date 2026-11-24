@@ -262,6 +262,12 @@ the submission contract, is in [`docs/requirements_traceability.md`](docs/requir
 | [`docs/problem_statement.md`](docs/problem_statement.md), [`docs/evaluation_criteria.md`](docs/evaluation_criteria.md) | The brief and the jury criteria |
 | [`docs/third_party/NOTICE.md`](docs/third_party/NOTICE.md) | Third-party fonts and libraries with their licences (the fonts are under the SIL Open Font License) |
 
+## Licence
+
+The code and documentation in this repository are released under the [MIT License](LICENSE). Bundled fonts keep their own
+licences (SIL Open Font License; see [`docs/third_party/NOTICE.md`](docs/third_party/NOTICE.md)). The hackathon dataset and
+the organisers' problem-statement PDF are not included.
+
 ## Dashboard screenshots
 
 | | |

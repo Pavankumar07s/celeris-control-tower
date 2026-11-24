@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Celeris Automobili Industrial: ERP extract cleaning, anomaly analysis, demand forecasting and planning control tower."
 readme = "docs/architecture.md"
 requires-python = ">=3.12,<3.13"
+license = { text = "MIT" }
 # Ranges compatible with the versions the outputs were built with; requirements.lock.txt pins those exact versions
 # (README, "Exact reproduction"). Only packages that src/ or tests/ import, plus statsmodels, which statsforecast needs.
 dependencies = [
