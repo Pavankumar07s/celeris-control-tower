@@ -575,7 +575,7 @@ export default function Forecast() {
           <div className="grid g3">
             <Card
               title="Bias by family × region"
-              sub={`${modelName(bt.data.final)} model; red = over-forecast, blue = under. Click a cell to filter.`}
+              sub={`${modelName(bt.data.final)} model; plum = over-forecast, jade = under. Click a cell to filter.`}
               info={<Info what="Signed bias Σ(forecast − actual) / Σ actual for each family × region (other filters apply)." how="Diverging scale centred at 0, saturating at ±15 %." source="backtest.json" />}
             >
               {bias && <EChart option={bias} height={300} ariaLabel="Bias heatmap" onClick={(e) => { const v = e.value as number[]; setParam({ fam: m.dims.families.code[v[1]], reg: m.dims.regions[v[0]], sku: null }); }} />}

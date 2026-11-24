@@ -1,9 +1,9 @@
 // Tables.  Two types: the BAR TABLE for rankings and change (text-first, an inline bar per row, the leader
-// in cobalt for forecast or ink for history, the rest tinted) and the LEDGER (DataTable) for registers and
+// in orange for forecast or ink for history, the rest tinted) and the LEDGER (DataTable) for registers and
 // inboxes (sortable, paged, CSV twin, mono identifiers, 2-line clamps, inline bars).  Numbers are always
 // right-aligned with tabular numerals; rows never grow beyond about 64px.
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Download } from "./icons";
+import { ChevronDown, Download } from "./icons";
 
 export type BarTone = "forecast" | "history" | "loss";
 
@@ -24,7 +24,7 @@ export interface BarCol<R> {
 export interface BarSpec<R> {
   value: (r: R) => number;
   tone?: BarTone;
-  /** The highlighted row(s): cobalt (forecast) or ink (history); the rest use the tint. */
+  /** The highlighted row(s): orange (forecast) or ink (history); the rest use the tint. */
   leader?: (r: R) => boolean;
   /** Fixed absolute maximum (default: the largest |value| in the rows). */
   max?: number;
@@ -153,7 +153,7 @@ export interface Column<R> {
   clamp?: boolean;
   /** Identifier in Plex Mono 500. */
   id?: boolean;
-  /** Forecast column: headed by a 2px cobalt rule (the colour grammar inside a table). */
+  /** Forecast column: headed by a 2px orange rule (the colour grammar inside a table). */
   fc?: boolean;
 }
 
@@ -230,7 +230,7 @@ export function DataTable<R>(props: DataTableProps<R>) {
                   onKeyDown={(e) => e.key === "Enter" && setSort((s) => (s?.key === c.key ? { key: c.key, desc: !s.desc } : { key: c.key, desc: !!c.num }))}
                 >
                   {c.label}
-                  {sort?.key === c.key ? (sort.desc ? " ▾" : " ▴") : ""}
+                  {sort?.key === c.key && <ChevronDown size={9} style={{ marginLeft: 4, transform: sort.desc ? undefined : "rotate(180deg)" }} />}
                 </th>
               ))}
             </tr>
@@ -273,10 +273,10 @@ export function DataTable<R>(props: DataTableProps<R>) {
           {pages > 1 && (
             <>
               <button className="btn sm" type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                ‹ Previous
+                Previous
               </button>
               <button className="btn sm" type="button" disabled={page >= pages - 1} onClick={() => setPage((p) => p + 1)}>
-                Next ›
+                Next
               </button>
             </>
           )}

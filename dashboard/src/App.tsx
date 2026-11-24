@@ -160,8 +160,8 @@ export default function App() {
             <Suspense fallback={<SkeletonChart height={360} />}>
               <View />
             </Suspense>
-            <ViewFooter />
           </main>
+          <ViewFooter />
         </div>
       </div>
       <ToastHost />

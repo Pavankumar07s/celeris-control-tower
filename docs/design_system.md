@@ -1,21 +1,38 @@
-# Design system: "Editorial Precision"
+# Design system: Editorial Precision in black, orange and cream
 
 This is the canonical, as-built design system of the Celeris control tower (`dashboard/`). Code against it. The
 Executive overview (`dashboard/src/views/Overview.tsx`) is the reference implementation: when in doubt, copy what it does.
 
-The dashboard reads like a well-edited planning report: typography leads, one confident accent, rules and whitespace
-instead of boxes, every chart title states its conclusion, annotations tell the story. It is light-first; the dark
-theme is a selected palette, not an inversion.
+The dashboard reads like a well-edited planning report set in the team owner's black / orange / cream palette (the
+"rover-hire" look): cream paper for content, black bands for navigation and the footer, one scarce orange. Typography
+leads; rules and whitespace replace boxes; every chart title states its conclusion; annotations tell the story.
 
-> **The one rule: ink is the past, cobalt is the future.** History, actuals and anything already known are drawn in
-> ink (near-black, near-white in dark). The forecast, its band and anything predicted are drawn in cobalt. No other
-> colour is loud. The rail's colour key teaches it in five seconds; every view must keep it.
+> **The one rule: ink is the past, orange is the future.** History, actuals and anything already known are drawn in
+> ink (near-black on cream, chalk on black). The forecast, its band and anything predicted are drawn in orange. Orange
+> is scarce: it means the forecast, the one active / selected marker, and the primary action. No other colour is loud,
+> and no blue is used anywhere as an identity or interactive colour.
 
-Contents: [1 Principles](#1-principles) · [2 Tokens](#2-tokens) · [3 Typography](#3-typography) ·
+> **Superseded.** The mocks and spec in `research/scratch/design-editorial/` (not kept in the repository) used cobalt for
+> the forecast on a near-white page. Their **colours are superseded** by this document (team owner's decision,
+> 24 Nov 2026); they remain the bar for layout, typography and composition only.
+
+## 0. Before you start (mandatory)
+
+1. Load the two skills the team owner supplied, with the Skill tool, before touching a view:
+   - **`ui-ux-pro-max`** (`.claude/skills/ui-ux-pro-max/`; first priority, "use this first"). How it applies here:
+     `research/dashboard-skill-ui-ux-pro-max.md`.
+   - **`dashboard-designer`** (`.claude/skills/dashboard-designer/SKILL.md`). How it applies here:
+     `research/dashboard-design-skills.md`, section 9.
+   - Also load **`dataviz`** before writing chart code (palette validation, mark specs).
+2. Every view must pass **both acceptance gates in [§13](#13-acceptance-gates-every-view-before-it-ships)**: the
+   18-point UI/UX Pro Max gate first, then the 16-point dashboard-designer gate.
+
+Contents: [1 Principles](#1-principles) · [2 Colour](#2-colour) · [3 Typography](#3-typography) ·
 [4 Layout and shell](#4-layout-and-the-shell) · [5 Components](#5-components) · [6 Charts](#6-charts) ·
 [7 Headline templates](#7-headline-templates) · [8 Numbers and copy](#8-numbers-and-copy) ·
 [9 Accessibility](#9-accessibility) · [10 Do and don't](#10-do-and-dont) ·
-[11 Restyling a view](#11-restyling-a-view-checklist-and-per-view-notes) · [12 Files](#12-file-map)
+[11 Restyling a view](#11-restyling-a-view-checklist-and-per-view-notes) · [12 Files](#12-file-map) ·
+[13 Acceptance gates](#13-acceptance-gates-every-view-before-it-ships)
 
 ---
 
@@ -23,134 +40,173 @@ Contents: [1 Principles](#1-principles) · [2 Tokens](#2-tokens) · [3 Typograph
 
 1. **Answer first, evidence second.** Every view runs: headline → standfirst → hero evidence → supporting modules →
    detail. A planner who reads only the headline leaves with the answer.
-2. **Ink is the past, cobalt is the future.** Colour carries time. Semantic colour (loss, status) appears only where it
-   means something.
+2. **Ink is the past, orange is the future.** Colour carries time. Semantic colour (loss, status) appears only where it
+   means something, always with a word or an icon.
 3. **Conclusion titles, computed.** Headlines and module titles are sentences built from the data by deterministic
    templates, never typed numbers. When a template's condition fails, a descriptive title is used ([§7](#7-headline-templates)).
 4. **Annotate instead of legend-hunting.** The key sits inline above the chart; the story lives in two to five
    annotations placed on the data with leader lines.
 5. **Rules, not boxes.** Structure comes from a 1px rule above each module and consistent spacing. Raised surfaces,
    radius and shadow are only for things that float: popovers, drawers, tooltips, menus, toasts.
-6. **One hero per view.** One number set large (sans, 54px). Everything else is a supporting figure.
-7. **Restraint.** One accent, three type families, a small spacing scale; no gradients, glow, decoration or icons as
-   ornament.
+6. **One hero per view.** One number set large (sans, 54px), top of the view. Everything else is a supporting figure.
+7. **Calm and precise, dense below the fold.** Generous space only around the headline and hero; modules and tables
+   below are compact (the "data-dense dashboard" of UI/UX Pro Max). Nothing ornate: no gradients, glow, glass or
+   decoration; the only texture is the faint dot grid on the black bands.
 
 ---
 
-## 2. Tokens
+## 2. Colour
 
 All tokens are CSS custom properties in `dashboard/src/styles/tokens.css`. Charts read the same variables at render time
 through `readTheme()` (`charts/theme.ts`), so one token set drives HTML and canvas. **Never hard-code a hex in a view.**
 
 Dark values apply under `:root[data-theme="dark"]`, and under `@media (prefers-color-scheme: dark)` unless the user
-picked light (`:root:not([data-theme="light"])`). The app always sets `data-theme` on `<html>` before the first render.
+picked light. The app sets `data-theme` on `<html>` before the first render. Light is the default the jury sees.
 
-### 2.1 Interface colours
+### 2.1 Surfaces, ink and rules
 
 | Token | Light | Dark | Role |
 |---|---|---|---|
-| `--paper` | `#FBFBF9` | `#0E1117` | page and chart surface |
-| `--rail` | `#F3F4F6` | `#12161E` | navigation rail |
-| `--raised` | `#FFFFFF` | `#161B24` | popover, drawer, tooltip, input, pressed segment |
-| `--hover` | `#ECEEF2` | `#1C222D` | hover wash, segmented track, neutral chip |
-| `--ink` | `#121826` | `#E9ECF2` | primary text, **history line**, hero numbers (17.1:1 / 16.0:1) |
-| `--ink-2` | `#3D4556` | `#B6BDCA` | secondary text, standfirst, table body (9.3 / 10.0) |
-| `--ink-3` | `#5E6678` | `#8E97A8` | muted text, axis labels, captions (5.6 / 6.4) |
-| `--ink-4` | `#8A91A0` | `#5F6878` | **non-text marks only**: shipped hairline, benchmark bars, "Other" |
-| `--rule` | `#E4E6EA` | `#232935` | hairlines between rows and figures |
-| `--rule-strong` | `#C9CED6` | `#343B49` | module rule, axis baseline, control borders |
-| `--grid` | `#E9EBEF` | `#1D232D` | chart gridlines (solid, 1px) |
-| `--accent` | `#2B4BD6` | `#8199FF` | **forecast line**, links, focus ring, selected-row inset |
-| `--accent-text` | `#2B4BD6` | `#8FA5FF` | accent as text (links, the FORECAST zone label) |
-| `--accent-strong` | `#1F38A8` | `#A9B9FF` | link hover, pressed, P10–P90 whiskers |
-| `--accent-wash` | `#F2F5FE` | `#121A2E` | forecast-window tint, selected table row |
-| `--accent-band` | `rgba(43,75,214,.20)` | `rgba(129,153,255,.24)` | P10–P90 band fill |
-| `--accent-edge` | `rgba(43,75,214,.50)` | `rgba(129,153,255,.55)` | P10 / P90 edge hairlines, dotted P50 |
-| `--accent-tint` | `#B9C6F2` | `#34407A` | de-emphasised forecast bars (non-leaders) |
-| `--loss` | `#B4501E` | `#F0905A` | lost-sales text and label (4.9 / 8.0) |
-| `--loss-fill` | `rgba(205,104,48,.30)` | `rgba(240,144,90,.30)` | the shipped-versus-demand gap |
-| `--good` / `--good-wash` | `#1A7F37` / `#E7F4EB` | `#4CC07A` / `#12261B` | resolved, checks pass |
-| `--warn` / `--warn-wash` / `--warn-mark` | `#8A5A00` / `#FBF1DA` / `#D99A06` | `#E7B149` / `#2A2210` / `#E7B149` | provisional, in review, risk |
-| `--crit` / `--crit-wash` | `#B42318` / `#FCEBE9` | `#FF7A6B` / `#2D1614` | act now, failed check |
-| `--scenario` | `#B26B00` | `#E0A040` | what-if scenario line (solid) |
+| `--paper` | `#EDE6D6` cream | `#0A0A0A` night | page and chart surface |
+| `--raised` | `#F7F3EA` | `#151515` | popover, drawer, tooltip, input, pressed segment |
+| `--hover` | `#E4DBC8` (paper-2) | `#1C1C1C` | hover wash, segmented track, neutral chip |
+| `--band` (= `--rail`) | `#0A0A0A` | `#111111` | the black bands: rail and footer |
+| `--band-2` / `--band-rule` | `#151515` / `#2B2B2B` | `#1C1C1C` / `#2B2B2B` | hover / active surface and hairlines on a band |
+| `--band-ink` / `--band-ink-2` | `#F2EDE3` chalk / `#A39D90` | same | text on a band (16.97:1 / 7.34:1) |
+| `--band-dots` | `rgba(242,237,227,.07)` | `.06` | the faint dot grid on bands (14px pitch) |
+| `--ink` | `#141414` | `#F2EDE3` | primary text, **history line**, hero numbers (14.82:1 / 16.97:1) |
+| `--ink-2` | `#3F3A31` | `#CFC8BA` | secondary text, standfirst, table body (9.08:1 / 11.9:1) |
+| `--ink-3` | `#5F5849` | `#A39D90` | muted text, axis labels, captions (5.67:1, 5.31 on the wash / 7.34:1) |
+| `--ink-4` | `#8A8475` | `#6E685E` | **non-text marks only**: shipped hairline, benchmark bars, "Other" (3.00:1 / 3.59:1) |
+| `--rule` | `#D3C9B4` | `#242424` | hairlines between rows and figures |
+| `--rule-strong` | `#B3A892` | `#3A3833` | module rule, axis baseline, control borders |
+| `--grid` | `#DDD4C1` | `#1A1A1A` | chart gridlines (solid, 1px) |
 
-Rules: text never wears a series colour (exceptions: `--accent-text` for links and the FORECAST label, `--loss` for the
-"lost" label). Status colours always come with an icon or a word. White on `--accent` is 6.8:1, but the default primary
-button is ink-filled.
+**Bands re-scope the tokens.** Inside `.rail` and `.view-foot` (`styles/shell.css`) `--paper`, `--ink*`, `--rule*`,
+`--hover`, `--raised`, `--accent`, `--focus`, `--link`, `--good`, `--crit`, `--warn` are redefined for chalk on black,
+so any component placed in a band reads correctly without special cases.
 
-### 2.2 Chart roles
+### 2.2 Orange: the forecast
+
+`#FF6A13` on cream is only 2.31:1, so on cream orange is a **fill** (with ink text on it) or a darker burnt orange.
+
+| Token | Light | Dark | Role | Contrast |
+|---|---|---|---|---|
+| `--orange` | `#FF6A13` | `#FF6A13` | fills only on cream (band, markers, primary button, active marker); any use on black | 6.90:1 on night |
+| `--on-orange` | `#141414` | `#141414` | text on an orange fill | 6.42:1 |
+| `--accent` | `#C24E08` burnt | `#FF6A13` | **forecast line** and forecast marks on paper | 3.85:1 (3.60 on the wash) |
+| `--accent-text` | `#A33F05` | `#FF7A2E` | orange as text (the FORECAST zone label, tooltip "Forecast" tag) | 5.16:1 (4.83 on the wash) |
+| `--accent-strong` | `#8A3404` | `#FFA066` | P10–P90 whiskers, pressed | – |
+| `--accent-wash` | `#EEE0CC` | `#1E120B` | forecast-window tint, selected table row | – |
+| `--accent-band` | `rgba(255,106,19,.24)` | `rgba(255,106,19,.28)` | P10–P90 band fill | – |
+| `--accent-edge` | `rgba(194,78,8,.55)` | `rgba(255,106,19,.6)` | P10 / P90 edge hairlines, dotted P50 | – |
+| `--accent-tint` | `#F0C4A2` | `#6B3A1C` | de-emphasised forecast bars (non-leaders in a ranking) | – |
+| `--focus` | `#C24E08` | `#FF6A13` | the focus ring (≥ 3:1 on its surface) | 3.85:1 / 6.90:1 |
+| `--link` | `#141414` | `#F2EDE3` | links are **ink, underlined**; orange is not an interactive colour | – |
+
+Rules:
+
+- **Never orange text on cream** at `#FF6A13`. Text in orange uses `--accent-text`; lines and marks use `--accent`.
+- **Orange stays scarce**: the forecast (line, band, wash, forecast bars, forecast column rule, range-strip tick,
+  "our model" bar), the single active / selected marker (active rail item, selected table row inset), the primary
+  action fill, the focus ring, and the brand's single 2px rule under the masthead. Nothing else: links, tabs, chips and
+  segmented controls are ink with underline, outline or weight.
+- **The primary button** (`.btn.primary`) is the one orange fill on a screen, with ink text.
+
+### 2.3 Semantic colours (always with a word or an icon)
+
+| Token | Light | Dark | Role | Contrast (light) |
+|---|---|---|---|---|
+| `--good` / `--good-wash` | `#067006` / `#DCE6CC` | `#2FBF4F` / `#10230F` | resolved, checks pass | 5.08:1 |
+| `--warn` / `--warn-wash` / `--warn-mark` | `#7A5C00` / `#EADFB5` / `#A07A00` | `#E8C547` / `#2A240E` / `#E8C547` | caution, in review; **amber, distinct from the brand orange** | 5.03:1 / mark 3.20:1 |
+| `--crit` / `--crit-wash` | `#B02E2E` / `#F0D6CF` | `#F06A5F` / `#2A1310` | act now, failed check, revenue at risk | 5.16:1 |
+| `--loss` / `--loss-fill` | `#A8322D` / `rgba(160,40,40,.24)` | `#EE7B70` / `rgba(238,123,112,.28)` | lost sales (evaluative, so the red family) | 5.35:1 |
+| `--scenario` | `#7862BF` violet | `#9482DB` | what-if scenario line (solid) | – |
+
+Alert never reads as forecast: status and loss are red / green / amber, never orange; the warn amber (`#A07A00`, hue
+95°) is far from the brand orange; every status colour ships with an icon (`WarnTriangle`, `CheckCircle`,
+`CrossCircle`) or a word in a `StatusPill`.
+
+### 2.4 Chart roles
 
 | Role | Token | Mark |
 |---|---|---|
 | Unconstrained demand (history) | `--ink` | 2px line, round join |
 | Shipped, where lower than demand | `--ink-4` | 1px line, only on months where the gap is above 0.4 % (plus neighbours) |
-| Lost to stock-outs | `--loss-fill` | area between shipped and demand |
+| Lost to stock-outs | `--loss-fill` | area between shipped and demand (history only) |
 | Months with rebuilt cells | `--ink` ring on `--paper` | 8px hollow marker where rebuilt cells cluster (>1.5 % of cells at aggregate; every one for a single series) |
-| Forecast (submitted) | `--accent` | 2px line joined to the last actual |
-| P10–P90 band | `--accent-band` + `--accent-edge` | stacked area + 1px edges, fanning out of the last actual |
+| Forecast (submitted) | `--accent` | 2px line joined to the last actual (orange columns for one series) |
+| P10–P90 band | `--accent-band` + `--accent-edge` | stacked area + 1px edges, fanning out of the last actual (whiskers for one series) |
 | P50 | `--accent-edge` | dotted 1px, only when it departs from the forecast by more than 1px; always in the tooltip |
-| Forecast window | `--accent-wash` | markArea from the last actual to the end |
+| Forecast window | `--accent-wash` | wash from the last actual to the end |
 | Last actual | `--ink` | solid 1px vertical rule, labelled "Oct 2026 · last actual" |
-| Benchmark / another forecast | `--ink-3`, `--ink-4` | 1.5px **dashed 4/3** (dashing means "another forecast"; never gridlines) |
-| What-if scenario | `--scenario` | 2px solid; base forecast stays cobalt; gap labelled at the end |
-| Data error fixed (anomaly) | `--cat-2` rust | 9px hollow diamond |
-| Real event (anomaly) | `--cat-1` teal | 9px filled triangle |
+| Benchmark / another forecast | `--ink-3`, `--ink-4` | 1.5px **dashed 4/3** (dashes mean "another forecast"; never gridlines, never history) |
+| What-if scenario | `--scenario` | 2px solid; base forecast stays orange; gap labelled at the end |
+| Data error fixed (anomaly) | `--cat-1` rose | 9px hollow diamond **plus** a text annotation (`anomalyAnnotations`) |
+| Real event (anomaly) | `--cat-7` jade | 9px filled triangle **plus** a text annotation |
 
-### 2.3 Categorical palette (no blue: blue means forecast)
+History and forecast stay distinguishable in greyscale: the divider rule, the wash, the FORECAST zone label and the
+band carry it as well as the hue.
+
+### 2.5 Categorical palette (no orange, no blue)
 
 | Slot | Token | Family (fixed by family index) | Light | Dark |
 |---|---|---|---|---|
-| 1 | `--cat-1` | Brake & Safety Systems | teal `#008A7C` | `#1A9E93` |
-| 2 | `--cat-2` | Chassis & Structural | rust `#C8502A` | `#D9643C` |
-| 3 | `--cat-3` | Electrical Assemblies | violet `#6D5BD0` | `#8A7BEA` |
-| 4 | `--cat-4` | Hydraulic Systems | green `#4E8A2E` | `#5E9C3A` |
-| 5 | `--cat-5` | Powertrain Components | plum `#9C4A9A` | `#B060AE` |
-| 6 | `--cat-6` | Precision Machined Parts | ochre `#C27C0E` | `#B97F17` |
-| 7 | `--cat-7` | Thermal Management | rose `#D0638B` | `#CB6690` |
+| 1 | `--cat-1` | Brake & Safety Systems | rose `#B74B61` | `#D46E80` |
+| 2 | `--cat-2` | Chassis & Structural | violet `#7862BF` | `#9482DB` |
+| 3 | `--cat-3` | Electrical Assemblies | mustard `#8A7300` | `#AB9017` |
+| 4 | `--cat-4` | Hydraulic Systems | plum `#A84F8E` | `#C670AB` |
+| 5 | `--cat-5` | Powertrain Components | olive `#6B7F09` | `#889D37` |
+| 6 | `--cat-6` | Precision Machined Parts | purple `#9358AC` | `#B078C9` |
+| 7 | `--cat-7` | Thermal Management | jade `#04896A` | `#05AB86` |
 | – | `--cat-other` | "Other" fold | `= --ink-4` | `= --ink-4` |
 
-In TS: `theme.cat[0..6]` are slots 1–7 and `theme.cat[7]` is "Other". Cobalt is deliberately **not** in the array.
+In TS: `theme.cat[0..6]` are slots 1–7 and `theme.cat[7]` is "Other". Orange is deliberately **not** in the array.
 
-Validated 2026-11-24 with the dataviz validator (Machado 2009 CVD simulation, OKLab ΔE×100), both modes ALL PASS:
+Chosen on 24 Nov 2026 by searching OKLCH hues that exclude orange / brown (30–80°), blue (225–275°) and the status
+green, then validating every order with the dataviz skill's `validate_palette.js` (Machado 2009 CVD, OKLab ΔE×100) in
+both themes. ALL PASS:
 
-| Check | Light (on `#FBFBF9`) | Dark (on `#0E1117`) |
+| Check | Light (on `#EDE6D6`) | Dark (on `#0A0A0A`) |
 |---|---|---|
 | Lightness band | L 0.43–0.77 | L 0.48–0.67 |
 | Chroma floor | all ≥ 0.10 | all ≥ 0.10 |
-| Worst adjacent CVD ΔE | 12.3 (rose ↔ ochre, deutan) | 12.7 |
-| Worst adjacent normal ΔE | 16.2 | 17.0 |
+| Worst adjacent CVD ΔE | 10.6 (jade ↔ purple, deutan) | 10.1 |
+| Worst adjacent normal ΔE | 17.7 | 16.4 |
 | Contrast vs surface | all ≥ 3:1 | all ≥ 3:1 |
 
 Rules: colour follows the entity (filtering never repaints survivors); regions use slots 1–6 in region order and
 channels 1–4, never in the same chart as families; more than 7 series fold into "Other" or become small multiples;
-stacks are ordered by slot with a 2px surface gap. **Use categorical colour last**: usually one entity in ink or cobalt
-and the rest in `--ink-4` says more.
+stacks are ordered by slot with a 2px surface gap. **Use categorical colour last**: usually one entity in ink (or
+orange if it is the forecast) and the rest in `--ink-4`. **At most 4–5 colours on one screen** (dashboard-designer).
 
-### 2.4 Sequential and diverging ramps
+### 2.6 Sequential and diverging ramps
 
 | Ramp | Tokens (1 = near zero) | Use | TS |
 |---|---|---|---|
-| Slate (history magnitudes) | `--slate-1 … --slate-7` | shortfall heatmap, zero-month calendar, issue × month strip, waterfall steps | `theme.slate[0..6]` |
-| Cobalt (forecast magnitudes) | `--cobalt-1 … --cobalt-7` | forecast by family × month, procurement buffer heat | `theme.cobalt[0..6]` |
-| Diverging steel ↔ rust | `--div-1 … --div-9` | bias, correlation, change vs last year | `theme.diverging[0..8]` |
+| Warm grey (history magnitudes) | `--hist-1 … --hist-7` | shortfall heatmap, zero-month calendar, issue × month strip, waterfall steps | `theme.hist[0..6]` |
+| Orange (forecast magnitudes) | `--fc-1 … --fc-7` | forecast by family × month, procurement buffer heat | `theme.fcRamp[0..6]` |
+| Diverging jade ↔ plum | `--div-1 … --div-9` | bias, correlation, change vs last year | `theme.diverging[0..8]` |
 
-Diverging: `div-1` is strong **steel (negative pole)**, `div-5` the neutral grey middle, `div-9` strong **rust (positive
-pole)**. Steel is deliberately not cobalt, so a bias map is never read as forecast volume. Always name the poles in
-words in the scale legend ("under-forecast", "over-forecast"). For ordinal use (tiers, horizon buckets) start at step 3.
+Diverging: `div-1` is strong **jade (negative pole, "under")**, `div-5` the warm neutral middle, `div-9` strong **plum
+(positive pole, "over")**. Neither pole is orange, so a bias map never reads as forecast volume. Always print the
+numeric ends and name the poles in words in the legend (`scaleLegend`). For ordinal use start at step 3.
+Deprecated aliases: `--slate-n` = `--hist-n`, `--cobalt-n` = `--fc-n`, `theme.slate` = `hist`, `theme.cobalt` = `fcRamp`.
 
-### 2.5 Spacing, radius, elevation, motion, layout
+### 2.7 Spacing, radius, elevation, z-index, motion, layout
 
 | Group | Tokens |
 |---|---|
 | Spacing (px) | `--sp-2 4 6 8 10 12 14 16 20 24 30 40 48 56` (`var(--sp-14)`); use `gap`, not per-element margins |
-| Layout | `--rail-w` 232px (212 ≤ 1180px) · `--measure` 1128px · `--gutter` 40px (32 ≤ 1280, 24 ≤ 1100, 16 ≤ 900) · `--module-gap` 30px · `--col-gap` 48px |
+| Layout | `--rail-w` 232px (212 ≤ 1180px, 200 ≤ 1100px) · `--measure` 1128px · `--gutter` 40px (32 ≤ 1280, 24 ≤ 1100, 16 ≤ 900) · `--module-gap` 30px · `--col-gap` 48px |
 | Radius | `--r-1` 3px (chips in text, rail item) · `--r-2` 6px (controls) · `--r-3` 10px (popover, drawer) · `--r-tt` 8px (tooltip) · `--r-pill` (pills, badges) |
 | Elevation | flat (everything on the page) or `--shadow-pop` (floating only). **No shadow on modules.** |
-| Motion | `--ease` `cubic-bezier(.2,.7,.2,1)`, `--dur` 180ms, `--dur-fast` 150ms. Hover washes are instant; popovers fade and rise 6px; drawers slide 24px; charts update in 300ms and dim to 60 % while busy; no load animation on numbers; `prefers-reduced-motion` disables all of it. |
-| Borders | 1px everywhere: `--rule` between rows, `--rule-strong` above modules and around controls, `--ink` above the figure strip when it marks where the numbers start (`heavy`). Selected tab: 2px ink underline. |
+| Z-index (only these) | `--z-sticky` 10 (filter bar) · `--z-pop` 20 (popovers, comboboxes, menus) · `--z-tooltip` 30 (skip link, tooltips) · `--z-overlay` 50 (drawer scrim, drawer, toasts) |
+| Motion | `--ease` `cubic-bezier(.2,.7,.2,1)`, `--dur` 180ms, `--dur-fast` 150ms. Hover feedback is colour / opacity / box-shadow over 150ms (never a transform that shifts layout); popovers fade and rise 6px; drawers slide 24px; charts update in 300ms and dim to 60 % while busy; no load animation on numbers; continuous animation only for loading; `prefers-reduced-motion` disables all of it. |
+| Borders | 1px everywhere: `--rule` between rows, `--rule-strong` above modules and around controls, `--ink` above the figure strip when it marks where the numbers start (`heavy`). Selected tab: 2px ink underline. The masthead carries the single 2px `--orange` rule. |
 
-Deprecated aliases (`--surface`, `--muted`, `--hair`, `--history`, `--demand`, `--accent-ink`, …) exist only for views
-not yet restyled. Do not use them in new code.
+Deprecated aliases (`--surface`, `--muted`, `--hair`, `--history`, `--demand`, `--accent-ink`, `--slate-*`,
+`--cobalt-*` …) exist only for views not yet restyled. Do not use them in new code.
 
 ---
 
@@ -161,9 +217,9 @@ CDN request at runtime (Vite fingerprints and bundles them).
 
 | Family | Token | Use | Fallback |
 |---|---|---|---|
-| **Source Serif 4** (variable opsz 8–60, wght 400–700) | `--font-serif` | the editorial voice: headline, standfirst, the brief, drawer headline, recommended action | Source Serif Pro, Georgia, Times New Roman |
-| **IBM Plex Sans** (variable 400–700) | `--font-sans` | interface and evidence: labels, numbers, tables, charts | Helvetica Neue, Arial, system-ui |
-| **IBM Plex Mono** 400 / 500 | `--font-mono` | identifiers: SKU codes, Record_IDs, hashes, commands | ui-monospace, Menlo, Consolas |
+| **Source Serif 4** (variable opsz 8–60, wght 400–700) | `--font-serif` | **computed sentences only**: view headline, standfirst, the brief, drawer headline, recommended action. Never a number in a chart, figure, table or tooltip. | Source Serif Pro, Georgia, Times New Roman |
+| **IBM Plex Sans** (variable 400–700) | `--font-sans` | interface and evidence: labels, every number, tables, charts | Helvetica Neue, Arial, system-ui |
+| **IBM Plex Mono** 400 / 500 | `--font-mono` | **real codes only**: SKU IDs, Record_IDs, hashes, CLI commands, file paths. Never for numbers or flavour. | ui-monospace, Menlo, Consolas |
 
 Scale (use the shorthand tokens: `font: var(--t-title)`):
 
@@ -177,49 +233,66 @@ Scale (use the shorthand tokens: `font: var(--t-title)`):
 | `--t-title` | 17/1.35 · 600 · sans | module conclusion title |
 | `--t-brief` | 15.5/1.55 · 400/600 · serif, opsz 16 | the brief, the recommended action |
 | `--t-body` | 14/1.50 · 400 · sans | default UI text |
-| `--t-small` | 13/1.50 · sans | dek, table body, chips |
+| `--t-small` | 13/1.50 · sans | dek (max 75ch), table body, chips |
 | `--t-caption` | 12/1.45 · sans | figure context, annotations, footnotes |
 | `--t-axis` | 11.5/1 · sans | axis ticks |
-| `--t-eyebrow` | 11/1.3 · 600 · sans, UPPERCASE, +0.09em | section labels, brief lead-ins, FORECAST zone label (class `.eyebrow`) |
+| `--t-eyebrow` | 11/1.3 · 600 · sans, UPPERCASE, +0.09em | **only** the rail group names and the FORECAST zone label (`.eyebrow`) |
 
-Numerals: **proportional** on hero and figure values (`tabular-nums` makes "121" look loose); **`tabular-nums`** in
-tables, axis ticks, tooltips, the range strip and every column of numbers (`.num`). Utility classes: `.mono`, `.id`
-(mono 500), `.serif`, `.eyebrow`, `.caption`, `.ink-2`, `.muted`, `.visually-hidden`. Sentence case everywhere;
-UPPERCASE only for eyebrows; no title case.
+- **Uppercase is reserved** for the four rail group names and the FORECAST zone label on charts. Everything else is
+  sentence case: the brand subtitle, the masthead section, filter labels, brief lead-ins (12.5px 600 ink-2), drawer
+  kickers (`.kicker`, 12.5px ink-3) and drawer sub-headings. Never put an eyebrow above a module title.
+- **Numerals**: proportional on hero and figure values (`tabular-nums` makes "121" look loose); `tabular-nums` in
+  tables, axis ticks, tooltips, the range strip and every column of numbers (`.num`).
+- **Narrow screens** (≤ 700px): prose steps up to at least 16px (standfirst and brief 16px, deks and figure context
+  14px); body line height stays 1.5; prose measure 65–75 characters.
+- Utility classes: `.mono`, `.id` (mono 500), `.serif`, `.kicker`, `.caption`, `.ink-2`, `.muted`, `.visually-hidden`.
 
 ---
 
 ## 4. Layout and the shell
 
 ```
-┌ rail 232 ┬─────────────────────────────────────────────────────────────────────────────┐
-│ Celeris  │ masthead 56: view | SECTION (i) [provisional pill]   Units|USD  Orders|Latent ☾ Copy link │
-│ key      ├─────────────────────────────────────────────────────────────────────────────┤
-│ guide    │ filter bar (sticky): Family▾ SKU▾ Region▾ Channel▾ Customer▾        3,093 series in view Reset │
-│ TOC      ├─────────────────────────────────────────────────────────────────────────────┤
-│ …        │ .page (max 1128 + gutters): lede 8|4 → modules, gap 30                       │
-│ foot     │                                                                              │
-└──────────┴──────────────────────────────────────────────────────────────────────────────┘
+┌ rail 232 (black band) ┬──────────────────────────────────────────────────────────────────┐
+│ ▮▮▮ Celeris            │ masthead (cream): view | section (i) [pill]  Units|USD  Orders|Latent ☾ Copy link │
+│ Planning control tower ├══════════════════ 2px orange rule ═══════════════════════════════════════╡
+│ ■ Actuals  Jan 2019 –  │ filter bar (sticky): Family▾ SKU▾ Region▾ Channel▾ Customer▾   3,093 series in view Reset │
+│ ■ Forecast Nov 2026 –  ├──────────────────────────────────────────────────────────────────┤
+│ OVERVIEW / WHAT …      │ .page (cream, max 1128 + gutters): lede 8|4 → modules, gap 30     │
+│ ▌active item           │                                                                  │
+│ ✓ quantile engine      ├──────────────────────────────────────────────────────────────────┤
+│                        │ footer (black band): Data as of · Source · Pipeline run · Built   │
+└────────────────────────┴──────────────────────────────────────────────────────────────────┘
 ```
 
-- **Rail** (`components/shell/Rail.tsx`): wordmark with the two-ink-one-cobalt glyph; the colour key with the actual
-  and forecast spans (computed from the calendar); a dismissible reading guide (remembered in `localStorage`); the
-  table of contents in reading order with section markers (Overview = split ink/cobalt, What happened = ink, What will
-  happen = cobalt, Act = outlined) and the live exception count; the provenance footer (quantile self-check). Below
-  900px it collapses to a top bar with a "Views" button.
-- **Masthead** (`components/shell/Masthead.tsx`): view name, section eyebrow, an "i" with the view's question
-  (`VIEWS[].blurb` in `app/context.ts`), the provisional status pill **only while `meta.provisional`** (now false, so
-  it is absent), and the global lenses as quiet segmented controls, the theme toggle and Copy link (toast "Link copied").
-- **Filter bar** (`components/FilterBar.tsx`): five cascading chips in hierarchy order; each opens a combobox popover
-  (search for SKU and Customer; the SKU list is ranked by last-12-month units with mono codes and volume bars; the
-  customer note explains "customer at the time"). Right end: "**N** series in view" and Reset. It writes the URL hash.
-- **Page** (`main.page`): a single grid column with `gap: 30px`. A view returns a fragment of top-level blocks (Lede,
+- **Rail** (`components/shell/Rail.tsx`, black band with the dot grid): wordmark with the two-chalk-one-orange glyph;
+  the colour key (chalk square "Actuals", orange square "Forecast", spans computed from the calendar); the table of
+  contents in reading order with section markers (Overview = split chalk/orange, What happened = chalk, What will
+  happen = orange, Act = outlined) and the live exception count; the active item marked by a 2px orange inset on a
+  `--band-2` surface; the provenance footer (quantile self-check). Below 900px it collapses to a top bar with "Views".
+- **Masthead** (`components/shell/Masthead.tsx`, cream): view name, section (sentence case), an "i" with the view's
+  question (`VIEWS[].blurb` in `app/context.ts`), the provisional status pill **only while `meta.provisional`** (now
+  false, so it is absent), the global lenses as quiet segmented controls, the theme toggle and Copy link (toast "Link
+  copied"; icon-only below 1180px with an `aria-label`). Its bottom border is the single orange rule.
+- **Filter bar** (`components/FilterBar.tsx`): five cascading chips in hierarchy order, each labelled for assistive
+  tech ("Family filter: All"); each opens a combobox popover (search for SKU and Customer; the SKU list is ranked by
+  last-12-month units with mono codes and volume bars; the customer note explains "customer at the time"). Right end:
+  "**N** series in view" (live region) and Reset. Defaults to all. It writes the URL hash. Sticky above 700px.
+- **Footer** (`components/shell/Footer.tsx`, black band, mounted by the shell on every view): data as of (last actual
+  month, forecast window), source (bundle version, export command, package version, history cells, forecast rows),
+  pipeline run (short SHA-256 of the forecast and submission files, final or provisional inputs), and when the bundle
+  was built (the server's `Last-Modified` of `meta.json`). Views never render their own provenance footer; a view may
+  add a method colophon (`aside.colophon`).
+- **Skip link** "Skip to content" (first focusable element) jumps to `main#main`.
+- **Page** (`main.page`): one grid column with `gap: 30px`. A view returns a fragment of top-level blocks (Lede,
   Modules, FigureStrip, column wrappers); never wrap them in a card.
 - **Column helpers**: `.cols-7-5`, `.cols-5-7`, `.cols-4-8`, `.cols-2`, `.cols-3` (all `minmax(0, …)`, stack below
   1180px; `.cols-4-8` below 1100px), and `.stack` for a vertical group of modules inside a column.
-- **Responsive**: works down to 1100px with the rail; 1280px hides the masthead eyebrow, 1180px stacks columns, folds
-  the figure strip to 2×2 and hides "Copy link"'s label; 900px collapses the rail; below 640px chart annotations
-  become a numbered list.
+- **Breakpoints, tested at 1440 / 1280 / 1024 / 768 / 375 px with no horizontal page scroll**: 1280 hides the masthead
+  section; 1180 stacks columns, folds the figure strip to 2×2 and hides "Copy link"'s label; 1100 narrows the rail;
+  900 collapses the rail into a top bar; ≤ 700 the lede and the figure strip come first (top three figures first),
+  everything else stacks below, the filter bar stops being sticky, touch targets grow to 44px and prose to 16px;
+  ≤ 640px chart annotations become a numbered list under the chart; ≤ 480 bar-table columns marked `hideNarrow`
+  drop out. Wide ledgers scroll inside their own `.table-wrap`.
 
 Global state lives in the URL hash (`state/url.ts`): `#/<view>?fam=HYD&sku=HYD-004&reg=Europe&ch=…&cust=…&m=usd&lens=latent`.
 Put in-view UI state there too with `setParam(patch, true)` (replace, no history entry), so every state is a link. The
@@ -235,7 +308,7 @@ deprecated `Card`, `Kpi`, `TimelineLegend`). All props are typed; the signatures
 ### 5.1 The view header: `Lede` (`components/Figure.tsx`)
 
 ```ts
-Lede({ headline: string; standfirst?: string | ReactNode; eyebrow?: ReactNode; figure?: ReactNode })
+Lede({ headline: string; standfirst?: string | ReactNode; eyebrow?: ReactNode /* sentence-case kicker */; figure?: ReactNode })
 // alias: ViewHeader
 ```
 Headline and standfirst on 8 columns, the hero figure on 4 behind a vertical `--rule-strong` hairline. A string
@@ -276,13 +349,13 @@ Inline visuals:
 
 ```ts
 RangeStrip({ p10: number; p90: number; mid: number; reference?: number; refLabel?: string; format: (v: number) => string; bandLabel?: string })
-// band P10–P90 with edges, cobalt tick at `mid`, ink tick at `reference`; each label sits at the track end nearest its
+// band P10–P90 with edges, orange tick at `mid`, ink tick at `reference`; each label sits at the track end nearest its
 // mark; in figures narrower than 290px the labels take a row each.
 Ladder({ rows: { label: string; value: number; me?: boolean }[]; max?: number; format: (v: number) => string; foot?: ReactNode })
 Sparkline({ history: ArrayLike<number|null>; forecast?: ArrayLike<number|null>; divider?: number; height?: number; ariaLabel: string; floor?: number })
-// inline SVG; history ink, forecast cobalt (repeat the last actual as its first point), window washed from `divider`
+// inline SVG; history ink, forecast orange (repeat the last actual as its first point), window washed from `divider`
 Meter({ segments: { value: number; tone: "good" | "warn" | "ink" | "accent" | "rest"; label?: string }[]; ariaLabel: string })
-Delta({ value: number; digits?: number; suffix?: ReactNode })   // "▲ 3.5%" in ink: a change of demand takes no status colour
+Delta({ value: number; digits?: number; suffix?: ReactNode })   // SVG triangle + "3.5%" in ink: a change of demand takes no status colour
 Rich({ text: string })                                          // "**x**" -> <b>x</b>, no HTML injection
 ```
 
@@ -323,7 +396,7 @@ StatusPill({ tone?: "neutral" | "warn" | "good" | "crit" | "forecast"; children:
 Button({ variant?: "default" | "primary" | "quiet"; size?: "sm" | "md"; children } & ButtonHTMLAttributes)
 IconButton({ label: string; children } & ButtonHTMLAttributes)
 LinkButton({ onClick: () => void; children: ReactNode; title?: string })      // an action inside prose
-MoreLink({ onClick?: () => void; href?: string; children: ReactNode })      // "Data health →" evidence link
+MoreLink({ onClick?: () => void; href?: string; children: ReactNode })      // underlined ink evidence link + ArrowRight icon
 ```
 - **Segmented** sets a lens or mode (Units | USD, Open | All, New | In review | Resolved): grey track, the pressed
   segment raised with a ring, never ink-filled (the headline stays the darkest object on screen).
@@ -345,8 +418,8 @@ BarCol<R> = { key: string; label: ReactNode; kind?: "label" | "text" | "num" | "
 BarSpec<R> = { value: (r: R) => number; tone?: "forecast" | "history" | "loss"; leader?: (r: R) => boolean; max?: number }
 ```
 Exactly one column has `kind: "bar"`. Mixed signs draw a 1px ink-3 zero line at the centre; all-negative bars grow
-leftwards from the right edge. The leader is cobalt (forecast) or ink (history), the rest tinted (`--accent-tint`,
-`--slate-3`). Bars are 10px high with a 2px data-end radius.
+leftwards from the right edge. The leader is orange (forecast, `--accent`) or ink (history), the rest tinted
+(`--accent-tint`, `--hist-3`). Bars are 10px high with a 2px data-end radius.
 
 ```tsx
 <BarTable ariaLabel="Change by region" rows={change.rows} rowKey={(r) => r.label} onRow={(r) => pick("region", r.idx)}
@@ -369,9 +442,9 @@ InlineBar({ value: number; max: number; label: ReactNode; lead?: boolean; tone?:
 toCsv(rows, cols): string;   download(name, text, type?)
 ```
 Header 11.5px ink-3 over a `--rule-strong` line, ▾ / ▴ on the sorted column; rows 13px on `--rule` hairlines, no zebra,
-hover wash; selected row = `--accent-wash` + 2px cobalt inset on the first cell. `num` right-aligns with tabular
+hover wash; selected row = `--accent-wash` + 2px orange inset on the first cell (the one selected marker). `num` right-aligns with tabular
 numerals; `id` sets Plex Mono 500; `clamp` clamps long text to 2 lines (full text in the title tooltip or the drawer);
-`fc` heads a forecast column with a 2px cobalt rule (the colour grammar inside a table). Rows are focusable and Enter
+`fc` heads a forecast column with a 2px orange rule (the colour grammar inside a table). Rows are focusable and Enter
 opens. Every chart should have a table twin with the same columns as its CSV.
 
 ### 5.6 Floating surfaces (`components/overlays.tsx`)
@@ -380,14 +453,14 @@ opens. Every chart should have a table twin with the same columns as its CSV.
 Popover({ trigger: ReactNode; triggerClassName?: string; ariaLabel?: string; title?: string; align?: "left" | "right";
           width?: number; children: ReactNode | ((close: () => void) => ReactNode) })
 Info({ what: ReactNode; how?: ReactNode; source?: string; align?: "left" | "right"; size?: "sm" | "md" })   // the "i"
-Drawer({ title: ReactNode; sub?: ReactNode; eyebrow?: ReactNode; onClose: () => void; children: ReactNode; width?: number })
+Drawer({ title: ReactNode; sub?: ReactNode; eyebrow?: ReactNode /* sentence-case kicker */; onClose: () => void; children: ReactNode; width?: number })
 toast(text: string)            // bottom-left, auto-dismiss after 4 s; <ToastHost/> is mounted once by the shell
 useDismiss(open, close)        // ref for "close on outside click and Escape"
 ```
 - Every module carries an `Info`: **what it shows · how it is computed · source file**. 340px, 12.5px.
-- `Drawer` anatomy (case file, lineage): eyebrow ("CASE 1 OF 286 · LOST ACCOUNT") → serif computed headline
-  (`--t-case`) → identity line (`sub`) → in the body: three-figure strip → series chart → "Why it is flagged" (sans,
-  `h3` renders as an eyebrow) → "Recommended action" in serif (`className="action"`) → facts `<dl className="facts">`
+- `Drawer` anatomy (case file, lineage): kicker ("Case 1 of 286, lost account", sentence case) → serif computed
+  headline (`--t-case`) → identity line (`sub`) → in the body: three-figure strip → series chart → "Why it is flagged"
+  (`h3`: sans 600 13px) → "Recommended action" in serif (`className="action"`) → facts `<dl className="facts">`
   → status segmented, note, actions. It slides from the right over a 30 % paper scrim; Escape closes; focus moves in
   and returns.
 
@@ -430,7 +503,7 @@ Close, Search, Menu, ArrowRight, Download, TableIcon, Glyph` (all take `size`). 
 `const { theme } = useApp()` gives the `Theme` read from the CSS tokens for the active theme; put `theme` in your
 `useMemo` deps so charts re-render on the toggle. Fields: `paper raised hover ink ink2 ink3 ink4 rule ruleStrong grid
 accent accentText accentStrong accentWash accentBand accentEdge accentTint loss lossFill good warn warnMark crit
-scenario cat[8] slate[7] cobalt[7] diverging[9] shadowPop` (plus deprecated aliases `surface muted axis history demand
+scenario cat[8] hist[7] fcRamp[7] diverging[9] orange onOrange band bandInk bandInk2 shadowPop` (plus deprecated aliases `slate cobalt surface muted axis history demand
 forecast forecastBand forecastP50 baseline zone seq[13] div[7] error event tooltipBg tooltipBorder` for unconverted views).
 
 | Helper | Signature | What it gives |
@@ -448,6 +521,9 @@ forecast forecastBand forecastP50 baseline zone seq[13] div[7] error event toolt
 | `esc` | `(s) => string` | escape data labels before they go into tooltip HTML |
 | `onFill` | `(t, fill) => string` | ink or paper label colour by fill luminance (heatmap cells, bar labels) |
 | `barStyle`, `BAR_MAX` | `(color, horizontal?)`, `24` | 2px data-end radius, square baseline; bars at most 24px thick |
+| `barLabel` | `(t, format, horizontal = true)` | value label at the bar end in ink-2 11.5px (ranked bars carry their values) |
+| `scaleLegend` | `(t, { min, max, colors, format, low?, high?, dimension? })` | numeric heatmap legend: printed end values, poles named in words |
+| `waterfallLabel` | `(t, (index) => string)` | a label on every waterfall step |
 | `readTheme`, `cssVar` | `(name)`, `(varName)` | read the tokens (the shell does this; views use `useApp().theme`) |
 
 Every chart obeys: solid hairline gridlines, never dashed; **never a dual axis** (index to a common base, or use two
@@ -462,7 +538,7 @@ const option = useMemo(() => ({
   xAxis: categoryAxis(t, labels),
   yAxis: valueAxis(t, { max: niceMax(maxV * 1.1), usd }),
   tooltip: axisTooltip(t, (items) => ttHead(monthLong(m.months[i0 + items[0].dataIndex]), "actual") + ttRow(t.ink, "lost", fmtInt(v), "box") + ttEnd()),
-  series: [{ type: "bar", data, barMaxWidth: BAR_MAX, itemStyle: barStyle(t.slate[3]) }],
+  series: [{ type: "bar", data, barMaxWidth: BAR_MAX, itemStyle: barStyle(t.hist[3]), label: barLabel(t, fmtInt, false) }],
 }), [t, …]);
 <EChart option={option} height={260} ariaLabel="Lost units by month, 2019–2026" />
 ```
@@ -473,7 +549,7 @@ const option = useMemo(() => ({
 EChart({ option: EChartsCoreOption; height: number; onClick?: (e: ChartEvent) => void; onXClick?: (index: number) => void;
          xGrid?: number; ariaLabel: string; className?: string; busy?: boolean; onLayout?: (chart: ECharts) => void; children?: ReactNode })
 ```
-Tree-shaken ECharts 6 (line, bar, scatter, heatmap, custom; grid, tooltip, markArea / Line / Point, visualMap, legend,
+Every chart gets an ECharts `aria` description from `ariaLabel`: state the finding there. Tree-shaken ECharts 6 (line, bar, scatter, heatmap, custom; grid, tooltip, markArea / Line / Point, visualMap, legend,
 dataZoom, aria). `busy` dims the previous render to 60 %; `onLayout` fires after each setOption and resize (for overlays
 using `convertToPixel`); `children` render over the canvas; with focus, ← → move the crosshair and Esc hides it. The
 `height` includes the axis band.
@@ -482,7 +558,7 @@ using `convertToPixel`); `children` render over the canvas; with focus, ← → 
 
 Every view that shows history and forecast uses it. One continuous axis Jan 2019 – May 2028. Layers bottom to top:
 forecast-window wash → lost-sales gap → P10–P90 band (starting at the last actual with zero width) → P10 / P90 edges →
-shipped hairline (only where lower) → unconstrained demand (ink) → rebuilt-cell rings → forecast (cobalt, first point =
+shipped hairline (only where lower) → unconstrained demand (ink) → rebuilt-cell rings → forecast (orange, first point =
 last actual) → last-actual rule → HTML annotations → end label.
 
 ```ts
@@ -503,11 +579,12 @@ timelineOption(spec) => EChartsCoreOption        // legacy: option only, no over
 rangePresets(m) => Option[]                      // computed labels "2019–2028", "Since 2024", "Forecast window"
 rangeStart(m, preset) => number;  laneEvents(m, filters);  eventTitle(description)
 timelineAnnotations({ spec, model, exceptions?, exceptionRows?, include? }) => Annotation[]
+anomalyAnnotations(model, items: { month, value, cls, title, text, impact }[], max = 3) => Annotation[]   // marker + text
 ```
 
 Behaviour you get for free: range presets (no slider); a zero baseline with headroom for annotations; the P50 dotted line
 only when it departs by more than 1px (`p50Drawn`; use `p50MaxRel` in the footnote); **one series → `columns: true`**:
-history as ink columns (shipped + lost stacked), forecast as cobalt columns with P10–P90 whiskers, the divider and
+history as ink columns (shipped + lost stacked), forecast as orange columns with P10–P90 whiskers, the divider and
 wash on the band edge; the latent lens swaps history and forecast to latent demand and drops the band (say so in the
 dek); `unknownDemand` keeps ERP-blank cells out of the lost-sales gap; the tooltip lists demand, shipped, lost and
 rebuilt cells in history and forecast, P90, P50, P10 in the window, plus any extra line.
@@ -537,7 +614,7 @@ Annotations are **generated from data, never typed**. The default generators in 
 Placement: labels are measured and wrapped (title 12.5px 600 ink, text 12px ink-3, max 190px), then placed in empty
 space above or below the lines (never over a line, another label or the divider), choosing the shortest leader; past
 labels stay left of the divider; future labels start at the divider, capped at the window width. A 1px ink-3 leader
-runs from a 3.5px dot (ink for the past, cobalt for the future, 2px paper ring) and stops at the label's edge when it
+runs from a 3.5px dot (ink for the past, orange for the future, 2px paper ring) and stops at the label's edge when it
 would cross it. At most five story labels per chart; below 640px only the zone and end labels remain and the rest
 become a numbered list under the chart. Write your own generator returning `Annotation[]` for other charts and pass
 it to `TimelineChart.annotate` (or use `AnnotationLayer` with `EChart.onLayout`).
@@ -546,16 +623,21 @@ it to `TimelineChart.annotate` (or use `AnnotationLayer` with `EChart.onLayout`)
 
 - **Bar tables** (rankings, change): HTML `BarTable`, not canvas.
 - **Small multiples**: one per entity on a shared scale; prefer the **moving annual total** indexed to the last 12
-  actual months = 100 with a hairline at 100; history ink, forecast cobalt, window washed, a dot at "year to Oct 2027";
+  actual months = 100 with a hairline at 100; history ink, forecast orange, window washed, a dot at "year to Oct 2027";
   the header carries name, change and volume; clicking filters the page. (Overview `MiniMat` is the reference.)
-- **Heatmaps**: slate for history, cobalt for forecast, steel ↔ rust for signed values; 2px paper gaps between cells
-  (`itemStyle.borderColor: t.paper, borderWidth: 2`); a value label only where the cell fits, coloured with `onFill`;
-  a scale legend with the poles named in words.
-- **Waterfall** (forecast X-ray, row waterfall): horizontal slate steps, the final bar cobalt (forecast) or ink
-  (history total), multiplicative steps labelled "× 1.12 season", connectors 1px `--rule-strong`.
-- **Gantt** (lifecycle): active span slate step 4, in-window part cobalt tint; ▲ launch, ■ EOL, ○ planned; the
+- **Heatmaps**: warm grey (`t.hist`) for history, orange (`t.fcRamp`) for forecast, jade ↔ plum (`t.diverging`)
+  for signed values; 2px paper gaps between cells (`itemStyle.borderColor: t.paper, borderWidth: 2`); a value label
+  only where the cell fits, coloured with `onFill`; always a **numeric** scale legend with the poles named in words
+  (`visualMap: scaleLegend(t, { min, max, colors, format, low: "under-forecast", high: "over-forecast" })`).
+- **Waterfall** (forecast X-ray, row waterfall): horizontal warm-grey steps, distinct start and end bars (the final
+  bar orange for a forecast, ink for a history total), **every step labelled** (`waterfallLabel`: "× 1.12 season",
+  "+1,204"), connectors 1px `--rule-strong`.
+- **Gantt** (lifecycle): active span `--hist-4`, in-window part `--accent-tint`; ▲ launch, ■ EOL, ○ planned; the
   predecessor link a hairline; a "today" rule at the last actual.
 - **Dot / dumbbell** for before → after comparisons (data health, accuracy by aggregation level).
+- **Ranked bars** are sorted descending (natural order excepted) and carry value labels (`barLabel`).
+- **Anomalies** get a marker and a text annotation (`anomalyAnnotations`); never a marker alone.
+- **No pie** with more than five segments (use a ranked bar); no radar; no dual axis.
 - **Benchmarks** dashed 4/3 in ink-3 / ink-4; **scenarios** solid `--scenario`; **end labels** instead of legends for
   ≤ 4 lines.
 
@@ -669,8 +751,13 @@ Copy rules:
 - Months "Oct 2026" in charts and tables, "October 2026" in serif prose, **never ISO (`2026-10`) in reading text**
   (ISO stays in CSV, the URL and code). Pipeline prose that contains ISO months goes through `readableMonths()`
   (`insights/briefing.tsx`).
-- Sentence case; UPPERCASE only for eyebrows; no exclamation marks; no "simply", "just", "powerful".
-- Figures: label, value, one line of context in plain words, an evidence link ("Data health →").
+- Sentence case; UPPERCASE only for the rail group names and the FORECAST zone label; no exclamation marks; no
+  "simply", "just", "powerful"; no decorative copy, taglines or notes explaining the UI.
+- **Middle dot** only between two fields of one identifier (`PTC-002 · North America`); elsewhere a comma or a line
+  break. **Arrows** only as the `ArrowRight` icon on evidence links (`MoreLink`), never on buttons, never typed.
+- **Mono** only for codes (SKU, Record_ID, hashes, commands, paths). Non-breaking space between a figure and its unit.
+- Figures: label, value with its unit, a **comparison** (vs the last 19 months, a benchmark, a share of the total),
+  one line of context in plain words, an evidence link ("Data health").
 - Empty and error states say what happened and what to do; errors name the cause and the fix.
 - Every number on screen comes from the bundle. If a number is not in the bundle, it does not go on screen.
 
@@ -678,12 +765,15 @@ Copy rules:
 
 ## 9. Accessibility
 
-- **Contrast**: text uses `--ink`, `--ink-2`, `--ink-3` (≥ 5.6:1 on paper in both themes), `--accent-text` for links,
-  `--loss` for the lost label. `--ink-4` is for marks only.
+- **Contrast** (measured, [§2](#2-colour)): text uses `--ink`, `--ink-2`, `--ink-3` (≥ 5.3:1 on paper and on the
+  forecast wash, ≥ 7.3:1 on night), `--accent-text` for orange text (≥ 4.8:1), `--loss` / `--crit` / `--good` / `--warn`
+  for status words (≥ 5.0:1). `--ink-4` and `--orange` on cream are for marks and fills only (3.0:1 and 2.3:1); text
+  on an orange fill is ink (6.42:1).
 - **Colour is never alone**: status pills carry a word, warn/crit dots carry a visually hidden label, anomaly types are
   double-encoded by shape (diamond / triangle), the past/future split is also a rule and a wash, forecast columns in
-  tables are headed by a cobalt rule *and* sit right of the history.
-- **Focus**: a 2px `--accent` outline with 2px offset on every interactive element (`:focus-visible`). Table rows,
+  tables are headed by an orange rule *and* sit right of the history.
+- **Focus**: a 2px `--focus` outline (burnt orange on cream, orange on black) with 2px offset on every interactive
+  element (`:focus-visible`). Table rows,
   small multiples and rank rows are buttons or focusable rows; Enter opens.
 - **Keyboard**: Segmented, RangePresets and Tabs move with ← → (roving tabindex); filter comboboxes open with ↓, move
   with ↑ ↓, choose with Enter, close with Escape; popovers and drawers close with Escape; charts take focus and move
@@ -705,10 +795,10 @@ Copy rules:
 | Open every view with `Lede`: computed headline, standfirst, one `HeroFigure` | Start a view with a row of equal KPI tiles |
 | Separate modules with the `Module` rule and 30px of space | Put modules in cards with borders, radius or shadow |
 | Write titles as computed conclusions with a descriptive fallback | Type a number into a title, or describe the chart ("Mix shift") |
-| Draw history in ink, the forecast in cobalt, the band in `--accent-band` | Use blue for a category, a status or a "nice" accent |
+| Draw history in ink, the forecast in orange (`--accent` on cream), the band in `--accent-band` | Use orange for a category, a status, a link or decoration; use blue at all |
 | Use `TimelineChart` for any history-into-forecast chart | Build a second timeline with its own colours and a zoom slider |
 | Annotate 2–5 facts on the data; keep a short inline key | Ship a 7-item legend or a number on every point |
-| Use slate for history magnitudes, cobalt for forecast magnitudes, steel ↔ rust for signed values | Use a rainbow, or cobalt for a bias map |
+| Use warm grey for history magnitudes, orange for forecast magnitudes, jade ↔ plum for signed values | Use a rainbow, or orange for a bias map |
 | Emphasise one entity and grey the rest (`--ink-4`) | Paint eight categorical hues when the story is one line |
 | Use `Segmented` for lenses, `Tabs` for content, `RangePresets` for time | Fill a segmented control with ink |
 | Format with `data/format.ts`; months as "Oct 2026" | Show ISO months, hyphen-minus or `toFixed` output |
@@ -742,45 +832,45 @@ Copy rules:
 
 Every view: masthead, filter bar, then a lede (headline and standfirst on 8 columns, the hero figure on 4), then modules.
 
-- **Data health** (history). Modules: row waterfall (horizontal slate, 248,248 raw rows → 245,548 grid cells, each step
+- **Data health** (history). Modules: row waterfall (horizontal warm grey, 248,248 raw rows → 245,548 grid cells, each step
   labelled with its rule, the final bar ink); rows affected by rule (bar table coloured by recovery method, categorical
-  slots 1–3 with a key, sorted by rows); issue × month heat strip (slate, ERP months annotated); every check before and
+  slots 1–3 with a key, sorted by rows); issue × month heat strip (warm grey with a numeric legend, ERP months annotated); every check before and
   after (ledger with ✓ pass / ✕ fail pills and tabular metrics); duplicates and restatements (ledger, mono Record_IDs);
   numeric-state census (small bar table). A check row opens the lineage drawer filtered to that rule.
 - **Demand explorer** (history). Left 4 columns: navigator (breadcrumb "All › Hydraulic Systems › HYD-004", search,
   ranked list with mono codes, two-line descriptions, volume bar and share; drills family → SKU → region → customer).
   Right 8 columns: the timeline (columns for a single series; "continue into forecast" on by default). Below:
   seasonality (current year ink, other years `--ink-4` hairlines, average dashed, labels on current year and average
-  only); zero-month calendar (scheduled zero = slate 2 with "·", unexplained = crit-wash with ✕, non-zero = slate
+  only); zero-month calendar (scheduled zero = `--hist-2` with a dot, unexplained = crit-wash with a cross icon, non-zero = warm-grey
   magnitude, tooltip with the reason); series card (`dl`: ordering cycle and changes, customers over time as a mini
   Gantt, demand class, stock-outs, fixes). Clicking a month opens the lineage drawer.
-- **Anomaly monitor** (history). The timeline with anomaly marks (rust hollow diamonds = errors fixed, teal triangles =
+- **Anomaly monitor** (history). The timeline with anomaly marks (rose hollow diamonds = errors fixed, jade triangles =
   real events, key inline); counts by type (bar table); the register (ledger: type chip, reason clamped to 2 lines,
-  action, a 4px slate confidence meter, impact; group by cause; CSV). A row opens the series in the explorer with the
+  action, a 4px warm-grey confidence meter, impact; group by cause; CSV). A row opens the series in the explorer with the
   lineage drawer.
 - **Stock-outs & lost sales** (history). Shipped versus unconstrained timeline with the loss gap; lost versus
-  back-ordered by month (lost = `--loss-fill` with a solid edge, back-ordered = slate 4, each labelled once); shortfall
-  heatmap family × month (slate; semiconductor months annotated); lost USD by year / family / region / reason (tabbed
+  back-ordered by month (lost = `--loss-fill` with a solid edge, back-ordered = `--hist-4`, each labelled once); shortfall
+  heatmap family × month (warm grey with a numeric legend; semiconductor months annotated); lost USD by year / family / region / reason (tabbed
   bar table, `tone: "loss"`); back-order mechanics (small ledger); largest lost-sales series (ledger → explorer).
-- **Macro lead / lag** (history). Family × indicator matrix (diverging steel ↔ rust, ★ on the model's drivers at
+- **Macro lead / lag** (history). Family × indicator matrix (diverging jade ↔ plum, ★ on the model's drivers at
   their lag, r printed where it fits); lag profile by era (small multiples, eras as ink shades, chosen lag dotted);
   model-free check (indicator shifted by its lag against demand, **indexed to 100 on one axis**, never dual-axis);
   indicator paths into the window with repaired cells as rings; EV shift by powertrain; per-SKU sensitivities as a dot
   plot.
 - **Forecast & accuracy** (prediction). The timeline plus the time machine (segmented "Live | as of …"; the backtest
-  forecast in cobalt with its own wash, actuals in ink continuing through, seasonal naive dashed ink-3); forecast table
-  (month / quarter / year tabs with quantiles; forecast columns headed by the cobalt rule; a ✓ stamp "Bundle =
+  forecast in orange with its own wash, actuals in ink continuing through, seasonal naive dashed ink-3); forecast table
+  (month / quarter / year tabs with quantiles; forecast columns headed by the orange rule; a ✓ stamp "Bundle =
   submission.csv (2,793,254 units, 58,219 rows)"); forecast X-ray waterfall with a month selector; forecast value added
   (bar table naive → seasonal naive → cycle-aware → final, the noise floor as a labelled vertical hairline); WAPE by
-  horizon (lines with end labels; final cobalt, baselines dashed ink-3 / ink-4); bias family × region (diverging,
+  horizon (lines with end labels; final orange, baselines dashed ink-3 / ink-4); bias family × region (diverging,
   click filters); interval calibration (100 % bars below P10 / inside / above P90 with target ticks 10 / 80 / 10);
   accuracy by aggregation level (dumbbell naive → final).
 - **Lifecycle** (prediction). Gantt of launches, EOL-announced, discontinued and planned SKUs by family with a "today"
   rule; run-offs to zero (small multiples ending in ■ at EOL, ✓ when the forecast is 0 after EOL); cold starts versus
-  predecessor (predecessor history ink, the new SKU's forecast cobalt, aligned on launch month); recent launches still
+  predecessor (predecessor history ink, the new SKU's forecast orange, aligned on launch month); recent launches still
   ramping.
 - **What-if** (prediction). Left 4 columns: scenario builder (preset chips, indicator, shift slider, start and end,
-  "remove window events" checkboxes, an ink-filled Apply). Right 8: the timeline with the base forecast (cobalt) and the
+  "remove window events" checkboxes, an orange-filled primary Apply with ink text). Right 8: the timeline with the base forecast (orange) and the
   scenario (`--scenario`, solid), the difference labelled at the end. Below: change in P90 cover, impact by family
   (diverging bar table). The scenario goes into the hash.
 - **Exception inbox** (act). Hero: revenue at risk with a three-colour review meter (resolved / in review / new). Cause
@@ -790,7 +880,7 @@ Every view: masthead, filter bar, then a lede (headline and standfirst on 8 colu
   series as columns, the pre-loss level as a dashed crit line and the "at risk if it returns" area washed in crit across
   the window). Status and notes stay in the browser. `case=<row>` in the hash opens a case (the overview uses it).
 - **Procurement plan** (act). Tools: service level segmented (P80 | P90 | P95 | P97.5) and a lead-time stepper. Mean
-  plus buffer by month (cobalt mean, cobalt-tint buffer stacked with a 2px gap); aggregate versus naive sum of quantiles
+  plus buffer by month (orange mean, `--accent-tint` buffer stacked with a 2px gap); aggregate versus naive sum of quantiles
   (two bars with a risk-pooling annotation); buffer by SKU (bar table in units and USD); footnote "Gross requirements
   only: no inventory positions are provided."
 - **Data download** (act). Extracts of the current selection (four rows with row count, size and "Build CSV"); bundle
@@ -810,7 +900,7 @@ dashboard/src/
   styles/components.css      lede, figures, modules, keys, annotations, controls, tables, tooltips, overlays, states, brief, rank list, multiples
   styles/legacy.css          TRANSITIONAL re-skin of Card / Kpi / grids / legends / badges (shrink it, never grow it)
   assets/fonts/              Source Serif 4, IBM Plex Sans (variable), IBM Plex Mono 400 / 500 (woff2, OFL)
-  app/context.ts             AppState (useApp), VIEWS (titles, rail labels, blurbs), GROUPS (sections, eyebrows, markers)
+  app/context.ts             AppState (useApp), VIEWS (titles, rail labels, blurbs), GROUPS (sections, masthead section names, markers)
   app/hooks.ts               useSelection(): segs, runs, series, single, h (HistoryAgg), fc (ForecastAgg)
   charts/theme.ts            readTheme, Theme, axis / grid / tooltip / bar helpers
   charts/EChart.tsx          the ECharts wrapper
@@ -824,7 +914,7 @@ dashboard/src/
   components/overlays.tsx    Popover, Info, Drawer, toast, ToastHost, useDismiss
   components/states.tsx      Skeleton, SkeletonText, SkeletonChart, Loading, Empty, ErrorState, Notice
   components/icons.tsx       inline SVG icons
-  components/shell/          Rail.tsx, Masthead.tsx
+  components/shell/          Rail.tsx, Masthead.tsx, Footer.tsx (provenance band on every view)
   components/FilterBar.tsx   the five cascading filter chips
   components/Lineage.tsx     the cell lineage drawer
   components/ui.tsx          barrel + deprecated Card, Kpi, TimelineLegend
@@ -839,3 +929,77 @@ dashboard/src/
 
 Dependencies are unchanged: React 19, ECharts 6, Vite 7, TypeScript 5.9. No UI or CSS framework, no icon package, no
 font CDN.
+
+---
+
+## 13. Acceptance gates: every view, before it ships
+
+Tick both gates against screenshots (light and dark at 1440×900 and 1280×720, plus 1024, 768 and 375 px, one filtered
+state and one single series). The UI/UX Pro Max gate comes first. A view that fails an item does not ship.
+
+### 13.1 UI/UX Pro Max gate (18 points; skill `ui-ux-pro-max`, notes in `research/dashboard-skill-ui-ux-pro-max.md`)
+
+Accessibility (critical)
+1. Text contrast at least 4.5:1 in light and dark; no grey text on grey.
+2. Visible focus ring on every interactive element; outline never removed without a replacement.
+3. Everything reachable by keyboard; tab order follows visual order; no keyboard traps; a "skip to main content" link.
+4. Icon-only buttons have `aria-label`; decorative icons are `aria-hidden`; form controls (the filters) have labels.
+5. Semantic elements (`button`, `a`, `label`, `table`, `nav`, `main`) before ARIA roles; async updates announced with `aria-live="polite"`.
+6. Each chart has a text alternative: a title that states the finding, an accessible description, and its data available as a table or download.
+
+Interaction (critical)
+7. `cursor: pointer` on everything clickable; hover feedback by colour or opacity in 150–300 ms, never a transform that shifts layout.
+8. Click or tap for primary actions, not hover-only; touch targets at least 44 × 44 px on narrow screens.
+9. Loading shows a skeleton or spinner, never a frozen screen; space is reserved so content does not jump.
+10. Empty states show a helpful message and a next action; errors appear next to the problem.
+11. The active view is highlighted in the navigation; the URL reflects view, filters and toggles (deep linking).
+
+Layout and responsive (high)
+12. Works at 1440, 1024, 768 and 375 px: no horizontal page scroll; wide tables scroll inside their own container or collapse to cards.
+13. A defined z-index scale (10 / 20 / 30 / 50); popovers, drawers and sticky bars never fight.
+14. Body line height 1.5–1.75; prose line length 65–75 characters; body text at least 16 px on narrow screens.
+
+Motion and performance (medium)
+15. `prefers-reduced-motion` respected; continuous animation only for loading; animate `transform` / `opacity`, not size.
+16. Views are lazy-loaded; heavy lists are not re-rendered needlessly; no layout shift when data arrives.
+
+Style and charts
+17. One style across all twelve views; SVG icons only; nothing ornate.
+18. Chart form matches the data; actual versus forecast distinguishable at a glance; anomalies marked and annotated; bars sorted with value labels; heatmaps with a numeric legend.
+
+How the shared layer already covers it: tokens and focus ring (1, 2); skip link, roving tabindex, Escape-closable
+popovers and drawers (3); `aria-label` on icon buttons, `aria-hidden` icons, labelled filter chips (4); `nav`,
+`main`, `button`, `table`, live regions on the headline and the series count (5); `EChart` aria description,
+computed titles, `DataTable` CSV (6); global hover transitions and pointer cursors (7); 44px targets ≤ 700px (8);
+`LoadingFrame`, `Skeleton*`, `busy` dimming (9); `Empty`, `ErrorState`, `Notice` (10); rail active marker and URL
+state (11); breakpoints and `.table-wrap` (12); `--z-*` tokens (13); type tokens (14); reduced-motion block (15);
+lazy views and memoised options (16); one component set and `icons.tsx` (17); `TimelineChart`, `barLabel`,
+`scaleLegend`, `waterfallLabel`, `anomalyAnnotations` (18). Each view still has to use them.
+
+### 13.2 dashboard-designer gate (16 points; skill `dashboard-designer`, notes in `research/dashboard-design-skills.md` §9)
+
+1. Passes the **5-second test**: after five seconds a stranger can say what the most important thing on the view is.
+2. The view's decision and audience are obvious from its headline.
+3. The Executive overview has 3–5 headline figures; no view shows more than 8 charts on one screen (a small-multiple
+   set counts as one chart).
+4. The hero figure is top-left / top and visibly the largest element.
+5. Every headline figure has a comparison value and a unit.
+6. Every chart title states the insight.
+7. No more than 4–5 colours on screen; grey / ink is the default; colour is consistent with every other view.
+8. Red / green / amber appear only for status, and never as the only cue.
+9. The date range is labelled on every time chart (in the dek or on the axis); history and forecast are distinguishable at a glance.
+10. Filters are at the top and default to "all".
+11. Numbers are formatted with sensible precision and units.
+12. Data source and "data as of" are visible in the footer (the shared `ViewFooter` does this).
+13. White space is about 15–20 %: neither cramped nor half-empty.
+14. Data is labelled directly where possible; no legend-hunting; no pie with more than five segments.
+15. Usable at 768 px (stacked) and not broken at 390 px; the top three figures come first on narrow screens.
+16. Contrast is at least 4.5:1 and the palette is colour-blind safe in both light and dark themes.
+
+### 13.3 Also apply
+
+The 30-item QA checklist in `research/dashboard-design-skills.md` §6 and the dataviz skill's anti-pattern catalogue.
+The research notes (§3 there) also explain how this editorial look stays distinctive rather than a generic "broadsheet":
+serif only for computed sentences, uppercase only where it labels data or navigation, mono only for codes, the range
+strip and the ink / orange grammar as the signature, and no newspaper costume (no columns of justified text, no drop
+caps, no datelines).

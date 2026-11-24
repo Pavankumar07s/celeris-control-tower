@@ -5,6 +5,7 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { Info, type InfoProps } from "./overlays";
 import { MoreLink } from "./controls";
+import { Trend } from "./icons";
 
 /** Render a template string with **bold** markers as text + <b> (no HTML injection possible). */
 export function Rich({ text }: { text: string }) {
@@ -46,7 +47,7 @@ export const ViewHeader = Lede;
 export interface RangeStripProps {
   p10: number;
   p90: number;
-  /** The tick in cobalt (the submitted total or the P50). */
+  /** The tick in orange (the submitted total or the P50). */
   mid: number;
   /** The reference tick in ink (e.g. the last 19 months of demand). */
   reference?: number;
@@ -56,7 +57,7 @@ export interface RangeStripProps {
   bandLabel?: string;
 }
 
-/** Range strip (signature): track, P10-P90 band with edge hairlines, cobalt tick, ink reference tick.
+/** Range strip (signature): track, P10-P90 band with edge hairlines, orange tick, ink reference tick.
  *  Labels are anchored to the two ends of the track so they never collide. */
 export function RangeStrip({ p10, p90, mid, reference: ref, refLabel = "Reference", format, bandLabel = "P10–P90" }: RangeStripProps) {
   const vals = [p10, p90, mid, ...(ref !== undefined ? [ref] : [])].filter(Number.isFinite);
@@ -141,11 +142,13 @@ export function FigureStrip({ children, heavy, columns, ariaLabel = "Headline fi
 
 /** "▼ 3.2%" in ink: demand down is neither good nor bad, so a delta takes no status colour. */
 export function Delta({ value, digits = 1, suffix }: { value: number; digits?: number; suffix?: ReactNode }) {
-  const arrow = value > 0.0005 ? "▲" : value < -0.0005 ? "▼" : "●";
+  const dir = value > 0.0005 ? "up" : value < -0.0005 ? "down" : "flat";
   return (
     <>
       <span className="delta">
-        <span aria-hidden="true">{arrow}</span> {Math.abs(value * 100).toFixed(digits)}%
+        <Trend dir={dir} size={10} />
+        <span className="visually-hidden">{dir === "up" ? "up" : dir === "down" ? "down" : "unchanged"}</span>
+        {Math.abs(value * 100).toFixed(digits)}%
       </span>
       {suffix && <> {suffix}</>}
     </>
@@ -155,7 +158,7 @@ export function Delta({ value, digits = 1, suffix }: { value: number; digits?: n
 export interface LadderRow {
   label: string;
   value: number;
-  /** Our model: cobalt bar, bold label. */
+  /** Our model: orange bar (it is the forecast), bold label. */
   me?: boolean;
 }
 /** Benchmark ladder (accuracy): naive -> seasonal naive -> our model, lower is better. */
@@ -180,7 +183,7 @@ export function Ladder({ rows, max, format, foot }: { rows: LadderRow[]; max?: n
 export interface SparklineProps {
   /** History values (ink), index-aligned with the full month axis. */
   history: ArrayLike<number | null>;
-  /** Forecast values (cobalt), same axis; should repeat the last actual as its first point. */
+  /** Forecast values (orange), same axis; should repeat the last actual as its first point. */
   forecast?: ArrayLike<number | null>;
   /** Index of the last actual (the window wash starts here). */
   divider?: number;
@@ -190,7 +193,7 @@ export interface SparklineProps {
   floor?: number;
 }
 
-/** Inline SVG sparkline: history in ink, forecast in cobalt, the forecast window washed. */
+/** Inline SVG sparkline: history in ink, forecast in orange, the forecast window washed. */
 export function Sparkline({ history, forecast, divider, height = 34, ariaLabel, floor = 0.85 }: SparklineProps) {
   const n = Math.max(history.length, forecast?.length ?? 0);
   const vals: number[] = [];

@@ -73,7 +73,7 @@ export function Masthead({ themeName, onToggleTheme }: { themeName: ThemeName; o
         <button type="button" className="icon-btn" onClick={onToggleTheme} aria-label={themeName === "dark" ? "Switch to the light theme" : "Switch to the dark theme"} title={themeName === "dark" ? "Light theme" : "Dark theme"}>
           {themeName === "dark" ? <Sun /> : <Moon />}
         </button>
-        <button type="button" className="btn" onClick={copy} title="Copy a link to this view with its filters">
+        <button type="button" className="btn" onClick={copy} title="Copy a link to this view with its filters" aria-label="Copy link">
           <LinkIcon /> <span className="lbl-wide">Copy link</span>
         </button>
       </div>

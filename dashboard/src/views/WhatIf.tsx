@@ -225,7 +225,7 @@ export default function WhatIf() {
         <Kpi label="P90 of the 19-month total" value={p90 ? fmtMeasure(p90.scen, measure, 2) : "–"} foot={p90 ? `base ${fmtMeasure(p90.base, measure, 2)} · Δ ${compact(p90.scen - p90.base, 2)}` : ""} info={<Info what="Procurement cover at P90 under the scenario (noise and level-error variances held at base)." how="Contract aggregate-quantile formula with the scenario's means." />} />
         <Kpi label="Forecast rows changed" value={fmtInt(result?.changed ?? 0)} foot={`of ${fmtInt(runs.reduce((a, r) => a + m.rLen[r], 0))} rows in the selection; structural zeros untouched`} />
       </div>
-      <Card title={`Base vs scenario · ${usd ? "USD" : "units"} per month`} sub="Blue = submitted base forecast with its P10–P90 range; violet dashed = scenario order mean." info={<Info what="The scenario on the shared timeline." source="computed in the browser from the bundle" />}>
+      <Card title={`Base vs scenario · ${usd ? "USD" : "units"} per month`} sub="Orange = submitted base forecast with its P10–P90 range; violet dashed = scenario order mean." info={<Info what="The scenario on the shared timeline." source="computed in the browser from the bundle" />}>
         <EChart option={option} height={340} ariaLabel="Scenario timeline" />
         <TimelineLegend
           latent={false}

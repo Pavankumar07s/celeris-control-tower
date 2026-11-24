@@ -105,6 +105,7 @@ function Combo(props: ComboProps) {
         className={`chip ${props.value !== null ? "on" : ""}`}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={`${props.label} filter: ${valueText}`}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" && !open) {

@@ -15,7 +15,7 @@ export interface Annotation {
   text?: string;
   /** above / below the lines; zone = label at the top of the plot beside the divider; end = right margin. */
   anchor: "above" | "below" | "zone" | "end";
-  /** past = ink dot, future = cobalt dot (and the label stays inside the forecast window). */
+  /** past = ink dot, future = orange dot (and the label stays inside the forecast window). */
   tone: "past" | "future";
   /** Preferred side of the leader for the label (left = label starts right of the leader). */
   align?: "left" | "right";
@@ -150,8 +150,15 @@ export function layoutAnnotations(chart: ECharts, items: Annotation[], f: Annota
     } else if (a.anchor === "end") {
       const [ex, ey] = px(a.at, a.value);
       const b = box(a.title, a.text, Math.max(40, W - ex - 12));
-      const y = Math.max(yTop - 22, Math.min(ey - 20, yBot - b.h));
-      placed.push({ a, x: ex + 10, y, ...b, cls: "end" });
+      let x = ex + 10;
+      let y = Math.max(yTop - 22, Math.min(ey - 20, yBot - b.h));
+      if (x + b.w > W - 2) {
+        // too narrow for the right margin: pull the label inside and lift it above the lines it would cover
+        x = Math.max(0, W - 2 - b.w);
+        const bnd = band(x, W - 2);
+        y = Math.max(yTop - 22, (bnd ? Math.min(bnd.top, ey) : ey) - b.h - 8);
+      }
+      placed.push({ a, x, y, ...b, cls: "end" });
     }
   }
 

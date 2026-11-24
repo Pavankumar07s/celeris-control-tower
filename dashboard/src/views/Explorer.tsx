@@ -374,7 +374,7 @@ export default function Explorer() {
         </Card>
       </div>
       <div className="grid g3">
-        <Card title="Seasonality" sub="Monthly index of latent demand (1 = the year's average); thin lines are years, blue the average excluding 2020." info={<Info what="Month-of-year profile of the selection, on latent demand so ordering cycles do not create fake peaks." how="Each year's 12 months divided by that year's mean; years with an empty month are skipped." source="history.json" />}>
+        <Card title="Seasonality" sub="Monthly index of latent demand (1 = the year's average); thin lines are years, the coloured line the average excluding 2020." info={<Info what="Month-of-year profile of the selection, on latent demand so ordering cycles do not create fake peaks." how="Each year's 12 months divided by that year's mean; years with an empty month are skipped." source="history.json" />}>
           {season ? <EChart option={season} height={260} ariaLabel="Seasonality" /> : <Empty>Not enough full years for a profile.</Empty>}
         </Card>
         <Card

@@ -1,5 +1,5 @@
 // Controls: segmented (lenses and modes), range presets, tabs (content inside a module), chips, rule chips,
-// status pills, buttons and links.  All are keyboard reachable and carry the 2px cobalt focus ring.
+// status pills, buttons and links.  All are keyboard reachable and carry the 2px burnt-orange focus ring.
 import type { ButtonHTMLAttributes, KeyboardEvent, ReactNode } from "react";
 import { ArrowRight } from "./icons";
 

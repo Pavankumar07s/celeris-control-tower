@@ -173,7 +173,7 @@ export default function Stockouts() {
         <Kpi label="Unconstrained vs shipped" value={fmtSignedPct(uplift, 2)} foot="demand above shipments over the selection's history" />
       </div>
       <div className="grid g2">
-        <Card title="Shipped vs unconstrained demand" sub="The dashed orange line is requested demand where stock-outs censored shipments (and back-order catch-up is removed)." info={<Info what="History of the selection: cleaned shipments and unconstrained demand, the basis of the forecast (business rule 7)." source="history.json" />}>
+        <Card title="Shipped vs unconstrained demand" sub="The ink line is unconstrained demand: requested demand where stock-outs censored shipments (and back-order catch-up is removed)." info={<Info what="History of the selection: cleaned shipments and unconstrained demand, the basis of the forecast (business rule 7)." source="history.json" />}>
           <EChart option={option} height={300} ariaLabel="Shipped vs unconstrained demand" />
           <TimelineLegend latent={false} band={false} />
         </Card>

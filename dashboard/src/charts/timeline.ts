@@ -2,7 +2,7 @@
 // Layers, bottom to top (docs/design_system.md, "The shared timeline"):
 //   1 forecast-window wash  2 lost-sales gap (shipped vs demand)  3 P10-P90 band, fanning out of the last
 //   actual  4 P10 / P90 edge hairlines  5 shipped hairline (only where lower)  6 unconstrained demand (ink)
-//   7 rebuilt-row rings  8 forecast (cobalt), whose first point IS the last actual  9 last-actual rule
+//   7 rebuilt-row rings  8 forecast (orange), whose first point IS the last actual  9 last-actual rule
 //   10 HTML annotation overlay (charts/Annotations.tsx)  11 end label (last forecast value and its range).
 // Range presets replace the zoom slider; one selected series switches to columns with P10-P90 whiskers.
 import type { EChartsCoreOption } from "echarts/core";
@@ -52,7 +52,7 @@ export interface TimelineSpec {
   showEvents?: boolean;
   /** Legacy, ignored: there is no zoom slider any more. */
   slider?: boolean;
-  /** Columns instead of lines (one selected series): history as ink columns, forecast as cobalt columns. */
+  /** Columns instead of lines (one selected series): history as ink columns, forecast as orange columns. */
   columns?: boolean;
   /** Narrow layout (< 640px): tighter grid. */
   narrow?: boolean;
@@ -309,7 +309,7 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
       });
     }
   } else {
-    // one series: orders read as events -> columns; forecast columns in cobalt with P10-P90 whiskers
+    // one series: orders read as events -> columns; forecast columns in orange with P10-P90 whiskers
     const histBar = nulls(N);
     const lostBar = nulls(N);
     for (let i = 0; i <= asOf; i++) {
@@ -496,7 +496,7 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
         }
         for (const line of s.lines ?? []) if (line.data[i] !== null && line.data[i] !== undefined) h += ttRow(line.color, line.name, fv(line.data[i]), !!line.dashed);
         // anomaly marks and (with the rug on) events of this month, as notes: an axis tooltip covers them all
-        for (const a of (s.anomalies ?? []).filter((x) => x.month === i).slice(0, 2)) h += ttNote(`${a.cls === "data_error" ? "◇ Data error fixed" : "▲ Real event"}: ${a.text}`);
+        for (const a of (s.anomalies ?? []).filter((x) => x.month === i).slice(0, 2)) h += ttNote(`${a.cls === "data_error" ? "Data error fixed" : "Real event"}: ${a.text}`);
         const evHere = ev.filter((e) => e.start <= i && e.end >= i);
         for (const e of evHere.slice(0, 3)) h += ttNote(`${m.dims.events.type[e.i]}: ${m.dims.events.description[e.i]}`);
         if (evHere.length > 3) h += ttNote(`and ${evHere.length - 3} more events`);
@@ -722,4 +722,23 @@ export function timelineAnnotations(c: AnnotationContext): Annotation[] {
     }
   }
   return out;
+}
+
+/** Annotations for anomaly marks (marker AND text): the `max` largest by |impact| you pass in, each labelled
+ *  with its type and a short reason.  Use with <TimelineChart annotate> on the anomaly monitor. */
+export function anomalyAnnotations(model: TimelineModel, items: { month: number; value: number; cls: "data_error" | "real_event"; title: string; text: string; impact: number }[], max = 3): Annotation[] {
+  return [...items]
+    .filter((a) => a.month >= model.start && a.month < model.start + model.labels.length)
+    .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+    .slice(0, max)
+    .map((a, k) => ({
+      id: `anom-${a.month}-${k}`,
+      at: a.month - model.start,
+      value: a.value,
+      title: `${a.cls === "data_error" ? "Data error fixed" : "Real event"}: ${a.title}`,
+      text: a.text,
+      anchor: "above" as const,
+      tone: "past" as const,
+      priority: 5 + k,
+    }));
 }

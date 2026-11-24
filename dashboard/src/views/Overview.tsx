@@ -9,7 +9,7 @@ import { useApp } from "../app/context";
 import { useSelection } from "../app/hooks";
 import { TimelineChart } from "../charts/TimelineChart";
 import { rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec } from "../charts/timeline";
-import { RangePresets, RuleChip, Tabs } from "../components/controls";
+import { MoreLink, RangePresets, RuleChip, Tabs } from "../components/controls";
 import { Delta, Figure, FigureStrip, HeroFigure, Ladder, Lede, RangeStrip, Rich, Sparkline } from "../components/Figure";
 import { Module, timelineKey } from "../components/Module";
 import { Notice } from "../components/states";
@@ -231,7 +231,7 @@ export default function Overview() {
           label={usd ? `Forecast units, next ${m.nWin} months` : `Forecast revenue, next ${m.nWin} months`}
           value={usd ? fmtNum(alt19) : fmtMoney(alt19)}
           unit={usd ? "units" : undefined}
-          visual={<Sparkline history={altHist} forecast={altFc} divider={m.asOf} ariaLabel={`${usd ? "Units" : "Revenue"} per month, ${fullRange}, history in ink and forecast in cobalt`} />}
+          visual={<Sparkline history={altHist} forecast={altFc} divider={m.asOf} ariaLabel={`${usd ? "Units" : "Revenue"} per month, ${fullRange}, history in ink and forecast in orange`} />}
           context={
             altLast19 > 0
               ? `**${fmtSignedPct(alt19 / altLast19 - 1)}** vs ${usd ? `${fmtNum(altLast19)} units` : fmtMoney(altLast19)} in the last ${m.nWin} months${!usd && priceYears.length ? `; list prices ${priceYears.map(([y, v]) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}% in ${y}`).join(", ")}` : ""}. Per month, ${fullRange}`
@@ -303,7 +303,7 @@ export default function Overview() {
             <Module
               title={changeTitle(change)}
               dek={changeDek(change)}
-              info={{ what: "Where the 12-month change comes from: next 12 forecast months against the last 12 months of unconstrained demand, by region, family or channel. Click a row to filter the page.", how: "Exact sums over the selection; share is the entity's share of the next 12 months; the bar is the absolute change, the leader in cobalt.", source: "history.json, forecast.json" }}
+              info={{ what: "Where the 12-month change comes from: next 12 forecast months against the last 12 months of unconstrained demand, by region, family or channel. Click a row to filter the page.", how: "Exact sums over the selection; share is the entity's share of the next 12 months; the bar is the absolute change, the leader in orange.", source: "history.json, forecast.json" }}
             >
               <Tabs ariaLabel="Break down by" value={dim} options={openDims.map((d) => ({ value: d, label: DIM_LABEL[d] }))} onChange={(v) => setParam({ by: v === openDims[0] ? null : v }, true)} />
               <BarTable
@@ -360,9 +360,7 @@ export default function Overview() {
               )}
               {top.rows.length > 0 && (
                 <p style={{ marginTop: 10 }}>
-                  <button type="button" className="more-link" onClick={() => go("exceptions")}>
-                    All {fmtInt(top.rows.length)} exceptions in the inbox →
-                  </button>
+                  <MoreLink onClick={() => go("exceptions")}>All {fmtInt(top.rows.length)} exceptions in the inbox</MoreLink>
                 </p>
               )}
             </Module>
@@ -374,7 +372,7 @@ export default function Overview() {
         <Module
           title={render(OUTLOOK_TEMPLATES.title, { unit: outlook.dim, units: outlook.dim === "family" ? "families" : `${outlook.dim}s`, items: outlook.items.map((x) => ({ label: x.label, chg: x.chg })) }).text}
           dek={`Moving annual total (rolling 12-month sum) of unconstrained demand${usd ? " in USD" : ""}, continued by the forecast, indexed to the year to ${monthLong(m.months[m.asOf])} = 100. The dot is the year to ${monthLong(m.months[Math.min(m.nMonths - 1, m.asOf + 12)])}, the change beside each name. Click one to filter the page.`}
-          info={{ what: `One small multiple per ${outlook.dim}, on a shared scale, history in ink and the forecast in cobalt.`, how: "Rolling 12-month sums remove the ordering-cycle noise, so the trend reads as the planner's own measure.", source: "history.json, forecast.json" }}
+          info={{ what: `One small multiple per ${outlook.dim}, on a shared scale, history in ink and the forecast in orange.`, how: "Rolling 12-month sums remove the ordering-cycle noise, so the trend reads as the planner's own measure.", source: "history.json, forecast.json" }}
         >
           <div className="multiples" style={{ ["--sm-cols" as string]: Math.min(7, outlook.items.length) }}>
             {outlook.items.map((x) => (

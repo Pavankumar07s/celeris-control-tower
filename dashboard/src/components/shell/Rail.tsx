@@ -1,4 +1,5 @@
-// The rail: a table of contents in reading order with the colour key (ink = actuals, cobalt = forecast),
+// The rail (a black band): a table of contents in reading order with the colour key (chalk / ink = actuals,
+// orange = forecast),
 // section markers in the colour grammar, the live exception count and the provenance footer.
 import { useState } from "react";
 import { GROUPS, VIEWS, useApp } from "../../app/context";

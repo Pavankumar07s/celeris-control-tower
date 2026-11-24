@@ -68,6 +68,8 @@ export function EChart({ option, height, onClick, onXClick, xGrid = 0, ariaLabel
   const layoutRef = useRef(onLayout);
   layoutRef.current = onLayout;
   const tip = useRef(-1);
+  const ariaRef = useRef(ariaLabel);
+  ariaRef.current = ariaLabel;
 
   useEffect(() => {
     const el = ref.current;
@@ -106,7 +108,9 @@ export function EChart({ option, height, onClick, onXClick, xGrid = 0, ariaLabel
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
-    c.setOption(option, { notMerge: true, lazyUpdate: false });
+    // every chart carries an accessible description (ECharts aria) stating what it shows
+    const o = option as { aria?: { enabled?: boolean; label?: Record<string, unknown> } };
+    c.setOption({ ...option, aria: { ...(o.aria ?? {}), enabled: true, decal: { show: false }, label: { ...(o.aria?.label ?? {}), description: ariaRef.current } } }, { notMerge: true, lazyUpdate: false });
     tip.current = -1;
     layoutRef.current?.(c);
   }, [option]);

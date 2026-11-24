@@ -1,10 +1,24 @@
 /* App shell: rail (table of contents), masthead (where you are + global lenses), filter bar, page grid. */
 .shell { display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); min-height: 100vh; }
 
+/* ---- black bands (rail, footer): the tokens are re-scoped so every component reads chalk on black ---- */
+.rail, .view-foot {
+  --paper: var(--band); --raised: #1C1C1C; --hover: var(--band-2);
+  --ink: var(--band-ink); --ink-2: #CFC8BA; --ink-3: var(--band-ink-2); --ink-4: #6E685E;
+  --rule: var(--band-rule); --rule-strong: #3A3833;
+  --accent: var(--orange); --accent-text: var(--orange); --focus: var(--orange); --link: var(--band-ink);
+  --good: #2FBF4F; --crit: #F06A5F; --warn: #E8C547; --warn-mark: #E8C547;
+  color-scheme: dark;
+  background-color: var(--band);
+  background-image: radial-gradient(var(--band-dots) 1px, transparent 1.4px);
+  background-size: 14px 14px;
+  color: var(--ink);
+}
+
 /* ---- rail ---------------------------------------------------------------------------------------- */
 .rail {
   position: sticky; top: 0; height: 100vh; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--rail); border-right: 1px solid var(--rule);
+  border-right: 1px solid var(--band-rule);
   padding: 22px 18px 18px; display: flex; flex-direction: column; gap: 22px;
   scrollbar-width: thin;
 }
@@ -23,8 +37,8 @@
 .colour-key dd { margin: 0; color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mark { width: 8px; height: 8px; border-radius: 1px; flex: none; display: inline-block; }
 .mark.past { background: var(--ink); }
-.mark.future { background: var(--accent); }
-.mark.both { background: linear-gradient(90deg, var(--ink) 50%, var(--accent) 50%); }
+.mark.future { background: var(--orange); }
+.mark.both { background: linear-gradient(90deg, var(--ink) 50%, var(--orange) 50%); }
 .mark.act { box-shadow: inset 0 0 0 1.5px var(--ink-2); }
 .toc { display: grid; gap: 18px; }
 .toc-sec { display: grid; gap: 2px; }
@@ -38,7 +52,8 @@
   color: var(--ink-2); text-decoration: none; font-size: 13.5px; line-height: 1.35;
 }
 .toc a:hover { background: var(--hover); color: var(--ink); }
-.toc a[aria-current="page"] { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: inset 0 0 0 1px var(--rule-strong); }
+/* the active view: the one orange marker in the rail */
+.toc a[aria-current="page"] { background: var(--band-2); color: var(--ink); font-weight: 600; box-shadow: inset 2px 0 0 var(--orange); }
 .count-badge {
   margin-left: auto; font: 600 11px/1 var(--font-sans); color: var(--ink-2); background: var(--hover);
   padding: 3px 6px; border-radius: var(--r-pill); font-variant-numeric: tabular-nums;
@@ -50,9 +65,10 @@
 
 /* ---- main column -------------------------------------------------------------------------------- */
 .main { min-width: 0; display: flex; flex-direction: column; }
+/* the masthead carries the app's single orange rule (the reference banner's signature) */
 .masthead {
   display: flex; align-items: center; gap: 14px; padding: 12px var(--gutter); min-height: 56px;
-  border-bottom: 1px solid var(--rule); background: var(--paper);
+  border-bottom: 2px solid var(--orange); background: var(--paper);
 }
 .crumbs { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .crumbs .view { font: 600 14px/1.2 var(--font-sans); color: var(--ink); white-space: nowrap; }
@@ -121,9 +137,9 @@
 .skip-link:focus { top: 12px; }
 .page:focus { outline: none; }
 
-/* provenance footer on every view (components/shell/Footer.tsx) */
-.view-foot { border-top: 1px solid var(--rule); padding-top: 12px; margin-top: 10px; }
-.view-foot dl { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
+/* provenance footer on every view (components/shell/Footer.tsx): a black band under the page */
+.view-foot { margin-top: auto; padding: 18px var(--gutter) 22px; border-top: 1px solid var(--band-rule); }
+.view-foot dl { margin: 0; max-width: var(--measure); display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
 .view-foot dl > div { display: flex; gap: 6px; min-width: 0; }
 .view-foot dt { color: var(--ink-2); font-weight: 600; white-space: nowrap; }
 .view-foot dd { margin: 0; }
@@ -134,7 +150,6 @@
   .page > * { order: 2; }
   .page > .lede { order: 0; }
   .page > .figures { order: 1; }
-  .page > .view-foot { order: 3; }
   .filterbar { position: static; }
   .mast-tools .seg button { padding: 7px 8px; }
 }
