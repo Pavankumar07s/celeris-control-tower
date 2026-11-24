@@ -152,7 +152,7 @@ export function Dumbbell({ rows, max, baseLabel }: { rows: { label: string; base
 }
 
 /** Scenario strip: the base forecast's P10–P90 band (orange), the base tick (orange) and the scenario tick
- *  (violet).  Labels sit at the two ends of the track so they never collide. */
+ *  (ink).  Labels sit at the two ends of the track so they never collide. */
 export function ScenarioStrip({ p10, p90, base, scen, format }: { p10: number; p90: number; base: number; scen: number; format: (v: number) => string }) {
   const vals = [p10, p90, base, scen].filter(Number.isFinite);
   const a = Math.min(...vals);

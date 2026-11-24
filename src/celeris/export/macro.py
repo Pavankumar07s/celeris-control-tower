@@ -43,8 +43,9 @@ def build_macro(macro: pd.DataFrame, change_log: pd.DataFrame, leadlag: pd.DataF
                 per_era.append(nums(series, 3))
             per_indicator.append(per_era)
             drivers = part[part["is_driver"].astype(bool)]
-            whole = drivers[drivers["era"] == "all"]
-            lags = (whole if len(whole) else drivers)["lag"]
+            # only the full-history fit's drivers: an indicator chosen in one era only is not a driver of the
+            # shipped model, so the dashboard must not outline it as one (the era fits stay in ``corr``)
+            lags = drivers[drivers["era"] == "all"]["lag"]
             per_driver.append(int(lags.iloc[0]) if len(lags) else -1)
         corr.append(per_indicator)
         driver.append(per_driver)

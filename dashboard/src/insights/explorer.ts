@@ -24,30 +24,44 @@ export function cycleWords(code: string | null | undefined): string {
 }
 
 // ---- zero months -----------------------------------------------------------------------------------------
+/** The ONE classification of a zero month, used by the standfirst, the module title, the 12-month strip and the
+ *  calendar alike, so their counts always sum to the zero months.  Order matters: the demand stage sets
+ *  `structural_zero` AND `lost_tail` on the months after an account is lost (including the months its cycle
+ *  would have ordered), so the lost-account test comes first; then the cycle's scheduled off-months; then a
+ *  zero in a row that was missing from the extract and rebuilt; anything else is a zero on an order month. */
+export type ZeroClass = "lost" | "sched" | "missing" | "unexp";
+export function zeroClass(m: Model, fl: number): ZeroClass {
+  const b = m.bit;
+  if (fl & b.lost_tail) return "lost";
+  if (fl & b.structural_zero) return "sched";
+  if (fl & b.missing_row) return "missing";
+  return "unexp";
+}
 export interface ZeroStats {
   cells: Int32Array;
   zeros: Int32Array;
+  /** The four classes of zeroClass(): lost + sched + missing + unexp = zeros, month by month. */
+  lost: Int32Array; // after the account was lost (no order since)
   sched: Int32Array; // off-month of the ordering cycle
-  lost: Int32Array; // lost-account tail
+  missing: Int32Array; // zero in a row missing from the extract (rebuilt), not on an off-month
   unexp: Int32Array; // zero on an order month
-  missing: Int32Array; // rows missing from the extract (rebuilt)
+  /** Of the lost months, those the cycle would have ordered (on-phase): the orders that never came. */
+  lostOn: Int32Array;
 }
 export function zeroStats(m: Model, segs: number[]): ZeroStats {
   const n = m.asOf + 1;
-  const z: ZeroStats = { cells: new Int32Array(n), zeros: new Int32Array(n), sched: new Int32Array(n), lost: new Int32Array(n), unexp: new Int32Array(n), missing: new Int32Array(n) };
-  const b = m.bit;
+  const z: ZeroStats = { cells: new Int32Array(n), zeros: new Int32Array(n), lost: new Int32Array(n), sched: new Int32Array(n), missing: new Int32Array(n), unexp: new Int32Array(n), lostOn: new Int32Array(n) };
   for (const g of segs) {
     for (let k = 0; k < m.gLen[g]; k++) {
       const t = m.gStart[g] + k;
       const i = m.gOff[g] + k;
-      const fl = m.f[i];
       z.cells[t]++;
-      if (fl & b.missing_row) z.missing[t]++;
       if (m.d[i] !== 0) continue;
+      const fl = m.f[i];
       z.zeros[t]++;
-      if (fl & b.structural_zero) z.sched[t]++;
-      else if (fl & b.lost_tail) z.lost[t]++;
-      else z.unexp[t]++;
+      const c = zeroClass(m, fl);
+      z[c][t]++;
+      if (c === "lost" && fl & m.bit.on_phase) z.lostOn[t]++;
     }
   }
   return z;
@@ -74,10 +88,17 @@ export interface ExplorerFacts {
   cycleBefore: string | null;
   cycleChange: string | null;
   zeros: number;
+  /** zeros = sched + lost + missing + unexp (one classification: zeroClass). */
   sched: number;
   lost: number;
+  lostOn: number;
+  missing: number;
   unexp: number;
   cells: number;
+  /** Series that order monthly: every month (kind M) plus every month but one annual shutdown month (kind A).
+   *  One variable for the hero strip's "Monthly" segment, the standfirst and the composition title. */
+  monthly: number;
+  monthlyShutdown: number;
   /** Month (absolute index) with the most unexplained zeros, its count and a covering disruption event. */
   peakUnexp: number;
   peakUnexpN: number;
@@ -155,8 +176,12 @@ export function explorerFacts(a: {
     zeros: tot(z.zeros),
     sched: tot(z.sched),
     lost: tot(z.lost),
+    lostOn: tot(z.lostOn),
+    missing: tot(z.missing),
     unexp: tot(z.unexp),
     cells: tot(z.cells),
+    monthly: (kinds.M ?? 0) + (kinds.A ?? 0),
+    monthlyShutdown: kinds.A ?? 0,
     peakUnexp: peak,
     peakUnexpN: peak >= 0 ? z.unexp[peak] : 0,
     peakEvent: peak >= 0 ? a.eventTitleAt(peak) : null,
@@ -221,9 +246,9 @@ export const EXPLORER_TEMPLATES = {
         const zeros =
           f.zeros === 0
             ? `Every one of its ${fmtInt(f.cells)} months carried an order.`
-            : f.unexp === 0 && f.lost === 0
+            : f.sched === f.zeros
               ? `${months} were zero, all of them scheduled off-months of that cycle: none is lost demand or a missing record.`
-              : `${months} were zero: ${joinList([f.sched ? `${fmtInt(f.sched)} scheduled off-${plural(f.sched, "month")}` : "", f.lost ? `${fmtInt(f.lost)} after the account was lost` : "", f.unexp ? `${fmtInt(f.unexp)} on an order month` : ""].filter(Boolean))}.`;
+              : `${months} were zero: ${joinList(zeroParts(f))}.`;
         const cust =
           f.customers.length > 1
             ? ` Bought by ${f.customers[f.customers.length - 1].name} since ${monthName(monthKey(f, f.customers[f.customers.length - 1].from))}, after ${joinList(f.customers.slice(0, -1).map((c) => c.name))}.`
@@ -234,8 +259,9 @@ export const EXPLORER_TEMPLATES = {
         return `${zeros}${cust}${life}${vol}`;
       }
       const peak = f.peakUnexp >= 0 && f.unexp > 0 ? `${f.unexp === 1 ? ", in" : ", most of them in"} ${monthName(monthKey(f, f.peakUnexp))}${f.peakEvent ? ` (${f.peakEvent})` : ""}` : "";
-      const monthly = (f.kinds.M ?? 0) / Math.max(1, f.nSeries);
-      return `**${fmtInt(f.zeros)}** of ${fmtInt(f.cells)} history cells are zero. ${fmtInt(f.sched)} fall on the off-months of a customer's ordering cycle; ${f.unexp ? `${fmtInt(f.unexp)} fell on an order month${peak}` : "none fell on an order month"}${f.lost ? `, and ${fmtInt(f.lost)} follow a lost account` : ""}. ${cap(fractionWord(monthly))} of the ${fmtInt(f.nSeries)} ${plural(f.nSeries, "series", "series")} order every month.${vol}`;
+      // the four classes of zeroClass(), in one sentence that sums to the zero cells
+      const rest = [f.unexp ? `${fmtInt(f.unexp)} fell on an order month${peak}` : "none fell on an order month", f.missing ? `${fmtInt(f.missing)} sit in rows missing from the extract and rebuilt` : "", f.lost ? `${fmtInt(f.lost)} follow a lost account` : ""].filter(Boolean);
+      return `**${fmtInt(f.zeros)}** of ${fmtInt(f.cells)} history cells are zero. ${fmtInt(f.sched)} fall on the off-months of a customer's ordering cycle; ${rest.join("; ")}. ${monthlySentence(f)}${vol}`;
     },
     fallback: (f) => noHistoryWords(f),
   },
@@ -252,7 +278,14 @@ export const EXPLORER_TEMPLATES = {
     id: "explorer.zeros.title",
     when: (f) => f.zeros > 0,
     text: (f) => {
-      if (f.single) return f.unexp === 0 && f.lost === 0 ? `All ${fmtInt(f.zeros)} zero months are scheduled off-months` : `${fmtInt(f.sched)} of ${fmtInt(f.zeros)} zero months are scheduled off-months`;
+      if (f.single) {
+        if (f.sched === f.zeros) return `All ${fmtInt(f.zeros)} zero months are scheduled off-months`;
+        if (f.lost === f.zeros) return `All ${fmtInt(f.zeros)} zero months follow the lost account`;
+        if (f.lost && f.sched === f.zeros - f.lost) return `${fmtInt(f.lost)} of the ${fmtInt(f.zeros)} zero months follow the lost account; the other ${fmtInt(f.sched)} are scheduled off-months`;
+        const others = [f.sched ? `${fmtInt(f.sched)} ${plural(f.sched, "is a scheduled off-month", "are scheduled off-months")}` : "", f.missing ? `${fmtInt(f.missing)} ${plural(f.missing, "sits in a rebuilt row", "sit in rebuilt rows")}` : "", f.unexp ? `${fmtInt(f.unexp)} fell on an order month` : ""].filter(Boolean);
+        if (f.lost) return `${fmtInt(f.lost)} of the ${fmtInt(f.zeros)} zero months follow the lost account; ${joinList(others)}`;
+        return `${fmtInt(f.sched)} of ${fmtInt(f.zeros)} zero months are scheduled off-months`;
+      }
       if (f.peakUnexp >= 0 && f.peakUnexpN > 1) return `Unexplained zeros peak in ${monthName(monthKey(f, f.peakUnexp))} (${fmtInt(f.peakUnexpN)})${f.peakEvent ? `, during the ${lowerFirst(f.peakEvent)}` : ""}`;
       return f.unexp === 0 ? "Every zero month is a scheduled off-month" : `${fmtInt(f.unexp)} zero ${plural(f.unexp, "month")} fell on an order month`;
     },
@@ -262,6 +295,25 @@ export const EXPLORER_TEMPLATES = {
 
 /** The month label of an absolute index. */
 const monthKey = (f: ExplorerFacts, t: number): string => f.months[t] ?? "";
+
+/** One series' zero months in words, one phrase per class of zeroClass() (they sum to f.zeros). */
+function zeroParts(f: ExplorerFacts): string[] {
+  return [
+    f.sched ? `${fmtInt(f.sched)} scheduled off-${plural(f.sched, "month")} of that cycle` : "",
+    f.lost ? `${fmtInt(f.lost)} since the last order${f.lastOrder ? ` in ${monthName(f.lastOrder)}` : ""}${f.lostOn ? ` (${fmtInt(f.lostOn)} of them ${plural(f.lostOn, "a month", "months")} the cycle would have ordered)` : ""}` : "",
+    f.missing ? `${fmtInt(f.missing)} in ${plural(f.missing, "a row", "rows")} missing from the extract and rebuilt` : "",
+    f.unexp ? `${fmtInt(f.unexp)} on an order month` : "",
+  ].filter(Boolean);
+}
+
+/** "Three quarters of the 3,093 series order monthly (775 of them skip one shutdown month a year)": the same count
+ *  as the hero strip's "Monthly" segment (kinds M and A), with the definition said in the sentence. */
+export function monthlySentence(f: ExplorerFacts, the = true): string {
+  const share = f.monthly / Math.max(1, f.nSeries);
+  const skip = f.monthlyShutdown ? ` (${fmtInt(f.monthlyShutdown)} of them skip one shutdown month a year)` : "";
+  if (f.monthly === 0) return `None of the ${fmtInt(f.nSeries)} ${plural(f.nSeries, "series", "series")} orders monthly.`;
+  return `${cap(fractionWord(share))} of ${the ? "the " : ""}${fmtInt(f.nSeries)} ${plural(f.nSeries, "series", "series")} order monthly${skip}.`;
+}
 /** "Semiconductor shortage" -> "semiconductor shortage"; "COVID-19 lockdowns" stays. */
 const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
 

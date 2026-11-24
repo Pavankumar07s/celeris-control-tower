@@ -52,6 +52,13 @@ export function ViewFooter() {
             <dd>{built.format(written)}</dd>
           </div>
         )}
+        <div>
+          <dt>Licences</dt>
+          <dd>
+            {/* relative links: the site also works under a sub-path (GitHub Pages) */}
+            <a href="licenses/NOTICE.md">third-party notices</a>; fonts under the SIL Open Font License: <a href="licenses/OFL-IBM-Plex.txt">IBM Plex</a>, <a href="licenses/OFL-Source-Serif-4.txt">Source Serif 4</a>
+          </dd>
+        </div>
       </dl>
     </footer>
   );

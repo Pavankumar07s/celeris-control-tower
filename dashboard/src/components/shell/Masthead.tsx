@@ -32,7 +32,7 @@ export function Masthead({ themeName, onToggleTheme }: { themeName: ThemeName; o
             <>
               Every figure on this page is computed in the browser from the pipeline&rsquo;s data bundle for the filters below; headlines and titles are deterministic templates over those figures.
               <br />
-              <b>Words used here.</b> <i>Orders as booked</i>: demand in the month the customer booked it. <i>Latent demand</i>: each order spread over the months it covers, so ordering-cycle zeros disappear. <i>Unconstrained demand</i>: shipments with stock-out losses added back. <i>Cycle-aware naive</i>: last year&rsquo;s demand placed on the customer&rsquo;s ordering cycle. <i>In-hindsight floor</i>: the error a forecast that knew each series&rsquo; level in hindsight would still make.
+              <b>Words used here.</b> <i>Orders as booked</i>: demand in the month the customer booked it. <i>Latent demand</i>: what the customer uses each month; an order that covers two months counts half in each, so the zeros of a customer who orders every second month disappear. <i>Unconstrained demand</i>: shipments with stock-out losses added back. <i>Cycle-aware naive</i>: a simple benchmark, last year&rsquo;s demand placed on the months the customer actually orders. <i>In-hindsight floor</i>: the error a forecast would still make even if it had known each series&rsquo; true level in hindsight, the noise no model can remove.
             </>
           }
           align="left"
@@ -79,7 +79,7 @@ export function Masthead({ themeName, onToggleTheme }: { themeName: ThemeName; o
           onChange={(v) => setParam({ lens: v === "latent" ? "latent" : null })}
           options={[
             { value: "orders", label: "Orders as booked", title: "Orders in the months customers booked them (ordering-cycle zeros visible)" },
-            { value: "latent", label: "Latent demand", title: "Each order spread over the months it covers (ordering cycles removed)" },
+            { value: "latent", label: "Latent demand", title: "What customers use each month: each order spread over the months it covers, so ordering-cycle zeros disappear" },
           ]}
         />
         <button type="button" className="icon-btn" onClick={onToggleTheme} aria-label={themeName === "dark" ? "Switch to the light theme" : "Switch to the dark theme"} title={themeName === "dark" ? "Light theme" : "Dark theme"}>

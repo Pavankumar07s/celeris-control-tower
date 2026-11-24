@@ -104,7 +104,8 @@ export default function Macro() {
     const evBase = evIdx ? (evIdx.slice(y23, y23 + 12).filter((x): x is number => x !== null).reduce((a, b) => a + b, 0) / 12) : 0;
     const lines = [
       { name: "EV SKUs", data: roll(sums[0]), color: theme.cat[6], width: 2, strong: true },
-      { name: "ICE SKUs", data: roll(sums[1]), color: theme.cat[0], width: 2, strong: true },
+      // EV jade, ICE violet: not the jade / rose pair, which read as good / bad (a status), round-2 review
+      { name: "ICE SKUs", data: roll(sums[1]), color: theme.cat[1], width: 2, strong: true },
       { name: "Universal SKUs", data: roll(sums[2]), color: theme.ink4, width: 1.5 },
       { name: "EV adoption", data: evIdx && evBase > 0 ? evIdx.slice(0, m.asOf + 1).map((x) => (x === null ? null : (x / evBase) * 100)) : null, color: theme.ink, width: 1 },
     ].filter((l): l is { name: string; data: (number | null)[]; color: string; width: number; strong: boolean } => l.data !== null);
@@ -174,7 +175,7 @@ export default function Macro() {
             }
             context={`Stable = a model driver whose correlation at its lag keeps its sign and |r| ≥ ${STABLE_R} in ${eraLabel(mf.leadlag.eras[1] ?? "")} and in ${eraLabel(mf.leadlag.eras[2] ?? "")}`}
             info={{
-              what: "How many families follow a public indicator that the forecast can lean on: a driver the model selected whose link holds in both eras.",
+              what: "How many families follow a public indicator that the forecast can lean on: a driver of the shipped model (its full-history fit) whose link holds in both eras. A stricter test in the methodology (section 6.2: the same indicator at the same lag chosen at every backtest decision origin) is passed by fewer families; the two counts answer different questions.",
               how: "Weighted correlation of the family's macro index (log demand over the model's expectation without the macro factor) with the standardised indicator lagged 0–12 months, per era; drivers come from the model's forward selection with the economic sign.",
               source: "macro.json (leadlag) ← features/macro_leadlag.csv",
             }}
@@ -184,7 +185,7 @@ export default function Macro() {
 
       <Module
         title={render(MATRIX_TEMPLATES.title, facts).text}
-        dek={`Correlation of each family's macro index with each indicator, ${monthName(m.months[0])} – ${monthName(m.months[m.asOf])}. Full colour with an ink outline: the model's drivers, at the model's lag. Faded: not a driver, shown at its strongest lag; lag ${maxLag} is the edge of the search window, so a strong faded cell there is usually a seasonal echo, not a lead. Click a cell to inspect it; the orange outline is the selection.`}
+        dek={`Correlation of each family's macro index with each indicator, ${monthName(m.months[0])} – ${monthName(m.months[m.asOf])}. Full colour and outlined: the drivers of the shipped model (its full-history fit), at the model's lag. Faded: not a driver, shown at its strongest lag; lag ${maxLag} is the edge of the search window, so a strong faded cell there is usually a seasonal echo, not a lead. Click a cell to inspect it; the orange outline is the selection.`}
         info={{ what: "The family × indicator lead / lag matrix of the features stage.", how: "Positive r: demand rises after the indicator rises. The lag is in months the indicator leads demand.", source: "macro.json (leadlag)" }}
       >
         <div ref={wref} className={narrow ? "g2-scroll" : undefined}>
@@ -269,7 +270,7 @@ export default function Macro() {
           info={{ what: "The shift to electric vehicles in the order book: demand for EV, ICE and universal SKUs against EV adoption.", how: "Each powertrain's rolling 12-month sum of latent demand divided by its 2023 average; the EV adoption index divided by its own 2023 average.", source: "history.json, dims.json (powertrain), macro.json" }}
           keyItems={[
             { kind: "line", color: "var(--cat-7)", label: "EV SKUs" },
-            { kind: "line", color: "var(--cat-1)", label: "ICE SKUs" },
+            { kind: "line", color: "var(--cat-2)", label: "ICE SKUs" },
             { kind: "line", color: "var(--ink-4)", label: "Universal SKUs" },
             { kind: "thin", color: "var(--ink)", label: "EV adoption index" },
           ]}

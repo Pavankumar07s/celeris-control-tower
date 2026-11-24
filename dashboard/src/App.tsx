@@ -110,6 +110,16 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = themeName;
   }, [themeName]);
+  // `theme=` in the hash applies on every hash change, not only on a full load, so the URL always reflects the
+  // state (a link pasted into the same tab, or the back button).  Not saved: a shared link does not overwrite the
+  // reader's own choice.
+  const hashTheme = route.params.get("theme");
+  useEffect(() => {
+    if ((hashTheme === "dark" || hashTheme === "light") && hashTheme !== document.documentElement.dataset.theme) {
+      document.documentElement.dataset.theme = hashTheme;
+      setThemeName(hashTheme);
+    }
+  }, [hashTheme]);
   // the chart type scale follows the viewport (1 up to 1600px wide, see typeScale): re-read the theme when it changes
   // (stepped by 0.02 so dragging a window edge does not rebuild every chart on every frame)
   const [fsKey, setFsKey] = useState(() => Math.round(typeScale() * 50) / 50);

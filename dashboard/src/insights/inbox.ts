@@ -212,6 +212,8 @@ export const LIST_TEMPLATES = {
 export interface WhereFacts {
   dim: string;
   top: { label: string; usd: number; share: number; rule: string; ruleShare: number } | null;
+  /** The runner-up: when it is within 5 % of the leader the title names both (a near tie is not a leader). */
+  second?: { label: string; usd: number; share: number } | null;
   rowsN: number;
   total: number;
 }
@@ -222,6 +224,11 @@ export const WHERE_TEMPLATES = {
     when: (w) => w.rowsN >= 2 && !!w.top && w.top.share >= 0.2,
     text: (w) => {
       const t = w.top as NonNullable<WhereFacts["top"]>;
+      const s2 = w.second;
+      if (s2 && t.usd > 0 && s2.usd / t.usd >= 0.95) {
+        const each = fractionWord((t.share + s2.share) / 2);
+        return `${t.label} and ${s2.label} each carry about ${each} of the risk`;
+      }
       const from = t.ruleShare > 0.5 ? `, most of it from ${t.rule}` : `, led by ${t.rule}`;
       return `${t.label} carries ${fractionWord(t.share)} of the risk${from}`;
     },

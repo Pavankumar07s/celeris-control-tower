@@ -5,7 +5,7 @@
 //  -> accuracy by family / region / channel (bar table)  -> bias family x region | WAPE by horizon
 //  -> forecast table (month / quarter / year, coherent quantiles) | forecast X-ray
 //  -> forecast value added | interval calibration | accuracy by aggregation level  -> colophon.
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useApp } from "../app/context";
 import { useSelection, useElementWidth } from "../app/hooks";
 import { EChart } from "../charts/EChart";
@@ -130,7 +130,7 @@ export default function Forecast() {
       measure,
       lens,
       filters,
-      hist: { shipped: latent ? h.latent : h.shipped, demand: latent ? h.latent : h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand },
+      hist: { shipped: latent ? h.latent : h.shipped, demand: latent ? h.latent : h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknown: h.unknown, unknownDemand: h.unknownDemand },
       fc: latent ? (fLatent ? { value: fLatent } : undefined) : { value: fc.fc, p10: fc.p10, p50: fc.p50, p90: fc.p90 },
       range,
       columns: single !== null,
@@ -195,6 +195,22 @@ export default function Forecast() {
   const xrMonth = xrParam && m.months.indexOf(xrParam) >= m.w0 ? m.months.indexOf(xrParam) : firstForecastMonth(m, runs);
   const setXr = (mm: number) => setParam({ xr: mm === firstForecastMonth(m, runs) ? null : m.months[mm] }, true);
   const xray = useMemo(() => (detail.data && runs.length ? xraySteps(m, runs, detail.data, xrMonth, usd) : null), [detail.data, m, runs, xrMonth, usd]);
+  // `at=xray` (the Overview hero's link): once the X-ray has rendered, bring it into view, move focus to its title,
+  // and drop the parameter so later clicks on other months do not scroll again
+  const at = params.get("at");
+  useEffect(() => {
+    if (at !== "xray" || !xray) return;
+    const el = document.getElementById("xray");
+    if (!el) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+    const h = el.querySelector<HTMLElement>(".mod-title");
+    if (h) {
+      h.tabIndex = -1;
+      h.focus({ preventScroll: true });
+    }
+    setParam({ at: null }, true);
+  }, [at, xray, setParam]);
 
   // ---- forecast table (quantiles of each period's total) ---------------------------------------------------------
   const rollup = (["month", "year"].includes(params.get("tb") ?? "") ? params.get("tb") : "quarter") as Rollup;
@@ -334,7 +350,7 @@ export default function Forecast() {
             }
             context={acc && Number.isFinite(facts.final) && facts.best ? heroContext(facts.final, facts.best, facts.snaive) : bt.loading ? "Reading the backtest…" : "No scored backtest cells for this selection."}
             info={{
-              what: "Weighted absolute percentage error of the submitted model in a rolling-origin backtest with a 19-month horizon, for the series in the selection, against three benchmarks.",
+              what: "Weighted absolute percentage error of the submitted model in a rolling-origin backtest with a 19-month horizon, for the series in the selection, against three benchmarks: naive (the last month repeated), seasonal naive (the same month last year) and cycle-aware naive (last year's demand placed on the months the customer actually orders). The in-hindsight floor is the error a forecast would still make even if it had known each series' true level in hindsight: the noise no model can remove.",
               how: `WAPE = Σ|actual − forecast| / Σ actual over every scored series-month, pooled over the ${foldWords} that chose the model; actual = unconstrained demand. The floor is the error of an in-hindsight forecast of each series' level: no honest forecast goes below it.`,
               source: "backtest.json (series_buckets)",
             }}
@@ -484,6 +500,7 @@ export default function Forecast() {
           </div>
         </Module>
         <Module
+          id="xray"
           title={xray ? render(XRAY_TEMPLATE, { month: m.months[xrMonth], steps: xray.steps, measure }).text : "Forecast X-ray"}
           dek="Why this number: the multiplicative components of latent demand, then the ordering cycle that turns latent months into orders."
           info={{
@@ -548,7 +565,7 @@ export default function Forecast() {
           </span>
           {why && (
             <span>
-              <b>Model choice</b> {cap(why)}
+              <b>Model choice</b> {cap(why.replace(/\bin only 0 of (\d+) folds\b/, "in none of the $1 folds"))}
             </span>
           )}
         </aside>

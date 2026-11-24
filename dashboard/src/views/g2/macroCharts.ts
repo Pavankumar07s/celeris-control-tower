@@ -25,7 +25,7 @@ function toward(t: Theme, c: string, k: number): string {
   return `#${a.map((v, i) => Math.round(p[i] + (v - p[i]) * k).toString(16).padStart(2, "0")).join("")}`;
 }
 
-/** The family x indicator matrix.  The model's drivers carry the full diverging colour and a 2px ink outline;
+/** The family x indicator matrix.  The model's drivers (full-history fit) carry the full diverging colour and a 2px outline (ink, chalk in dark);
  *  every other cell (shown at its strongest lag, often a seasonal echo at the edge of the search window) is faded
  *  to 35 % towards the paper with muted text, so the eye lands on the drivers, not on the artefacts.  The colour
  *  scale legend stays (a visualMap bound to an empty series), and each cell's colour is the legend's colour. */

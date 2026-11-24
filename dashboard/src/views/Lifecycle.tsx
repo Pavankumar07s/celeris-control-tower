@@ -97,7 +97,7 @@ export default function Lifecycle() {
           const fc = forecastAgg(m, selectRuns(m, g), "units");
           const last3 = sum(h.demand, m.asOf - 2, m.asOf + 1) / 3;
           const next12 = sum(fc.fc, 0, 12) / 12;
-          return { k: s.k, id: s.id, launch: s.launch as number, series: new Set(segs.map((x) => m.gSeries[x])).size, last3, next12, ramp: last3 > 0 ? next12 / last3 : NaN };
+          return { k: s.k, id: s.id, launch: s.launch as number, series: new Set(segs.map((x) => m.gSeries[x])).size, last3, next12, ramp: Math.round(last3) > 0 ? Math.round(next12) / Math.round(last3) : NaN }; // from the printed (rounded) averages, so 31 -> 107 reads ×3.45
         })
         .sort((a, b) => (b.ramp || 0) - (a.ramp || 0)),
     [skus, filters, m],

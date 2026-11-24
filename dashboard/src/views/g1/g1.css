@@ -62,6 +62,8 @@
 .g1-issues tbody tr.row { cursor: pointer; }
 .g1-issues tbody tr.row:hover td { background: var(--hover); }
 .g1-issues td.what { color: var(--ink); }
+/* the rule title and "how it was fixed" wrap instead of being cut ("…" never hides the end of a rule) */
+.g1-issues td.what, .g1-issues td.how { white-space: normal; text-overflow: clip; }
 .g1-issues tr.more td { padding: calc(9 * var(--u)) 2px; font-size: calc(12.5 * var(--u)); color: var(--ink-3); white-space: normal; }
 .g1-issues td.bar { padding-left: calc(12 * var(--u)); padding-right: calc(4 * var(--u)); overflow: visible; }
 .g1-issues .ib { position: relative; height: calc(10 * var(--u)); }
@@ -84,6 +86,7 @@
 .g1-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: calc(5 * var(--u)) calc(16 * var(--u)); margin: calc(12 * var(--u)) 0 0; font-size: calc(12.5 * var(--u)); }
 .g1-facts dt { color: var(--ink-3); }
 .g1-facts dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 0; }
+.g1-facts dd .sub { display: block; color: var(--ink-3); }
 
 /* ===== Demand explorer =============================================================================== */
 .g1-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: calc(4 * var(--u)) calc(6 * var(--u)); margin-top: var(--sp-12); font-size: calc(12.5 * var(--u)); color: var(--ink-3); }
@@ -122,7 +125,10 @@
 .g1-strip .cells .sched i { background: var(--hist-2); }
 .g1-strip .cells .sched i::after { content: ""; width: calc(4 * var(--u)); height: calc(4 * var(--u)); border-radius: 50%; background: var(--ink-3); }
 .g1-strip .cells .unexp i { background: var(--crit-wash); box-shadow: inset 0 0 0 1px var(--crit); }
-.g1-strip .cells .lost i { background: none; box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.g1-strip .cells .lost i, .g1-strip .lostkey i { background: repeating-linear-gradient(135deg, var(--ink-4) 0 1px, transparent 1px 4px); box-shadow: inset 0 0 0 1px var(--ink-4); }
+.g1-strip .cells .missing i { background: var(--crit-wash); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.g1-strip .lostkey { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); margin-left: calc(10 * var(--u)); }
+.g1-strip .lostkey i { display: inline-block; width: calc(12 * var(--u)); height: calc(10 * var(--u)); border-radius: 2px; flex: none; }
 .g1-strip .cells .out i { background: none; box-shadow: inset 0 0 0 1px var(--rule); }
 .g1-strip .cells em { font: 400 calc(10.5 * var(--u))/1 var(--font-sans); font-style: normal; color: var(--ink-3); }
 .g1-strip .cap { font-size: calc(11.5 * var(--u)); color: var(--ink-3); }
@@ -142,7 +148,7 @@
 .g1-cal .c.sched { background: var(--hist-2); }
 .g1-cal .c.sched::after { content: ""; width: calc(4 * var(--u)); height: calc(4 * var(--u)); border-radius: 50%; background: var(--ink-3); }
 .g1-cal .c.unexp { background: var(--crit-wash); color: var(--crit); }
-.g1-cal .c.lost { background: var(--paper); box-shadow: inset 0 0 0 1px var(--rule-strong); color: var(--ink-3); }
+.g1-cal .c.lost { background: repeating-linear-gradient(135deg, var(--ink-4) 0 1px, var(--paper) 1px 4px); box-shadow: inset 0 0 0 1px var(--ink-4); color: var(--ink-3); }
 .g1-cal .c.miss { box-shadow: inset 0 0 0 1.5px var(--ink); }
 .g1-cal .c svg { display: block; }
 .g1-cal-key { display: flex; flex-wrap: wrap; gap: calc(6 * var(--u)) calc(16 * var(--u)); margin-top: calc(10 * var(--u)); font-size: calc(12 * var(--u)); color: var(--ink-2); }
@@ -151,6 +157,7 @@
 .g1-cal-key i.sched { background: var(--hist-2); }
 .g1-cal-key i.sched::after { content: ""; width: calc(4 * var(--u)); height: calc(4 * var(--u)); border-radius: 50%; background: var(--ink-3); }
 .g1-cal-key i.unexp { background: var(--crit-wash); color: var(--crit); }
+.g1-cal-key i.lost { background: repeating-linear-gradient(135deg, var(--ink-4) 0 1px, var(--paper) 1px 4px); box-shadow: inset 0 0 0 1px var(--ink-4); }
 .g1-cal-key i.miss { background: var(--hist-1); box-shadow: inset 0 0 0 1.5px var(--ink); }
 .g1-cal-key i.ramp { width: calc(46 * var(--u)); background: linear-gradient(90deg, var(--hist-1), var(--hist-4), var(--hist-6)); }
 .g1-cal-key .ends { font-variant-numeric: tabular-nums; color: var(--ink-3); }
@@ -204,3 +211,7 @@
 /* a class heading above a type table may run long ("Data errors: … corrected and … with units unknown"): it wraps */
 h3.g1-h3.g1-type { display: flex; align-items: flex-start; white-space: normal; }
 h3.g1-h3.g1-type > .km { margin-top: calc(4 * var(--u)); }
+
+/* register evidence: the JSON object as readable "field value" pairs */
+.g1-ev { display: inline-flex; flex-wrap: wrap; gap: calc(2 * var(--u)) calc(14 * var(--u)); }
+.g1-ev em { font-style: normal; color: var(--ink-3); margin-right: calc(3 * var(--u)); }

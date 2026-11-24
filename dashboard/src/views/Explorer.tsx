@@ -23,8 +23,8 @@ import { useResource } from "../data/load";
 import { historyPrice, seriesMatches, type Filters, type Model } from "../data/model";
 import type { ExceptionFile, ForecastDetail, ProfilesFile } from "../data/types";
 import { exceptionRowsIn } from "../insights/briefing";
-import { cap, countWord, fractionWord, plural, render, renderFirst, selectionWords } from "../insights/headlines";
-import { EXPLORER_HEADLINES, EXPLORER_TEMPLATES, SEASON_TEMPLATES, cycleWords, explorerFacts, noHistoryWords, seasonFacts, zeroStats, type ExplorerFacts, type SeasonFacts, type ZeroStats } from "../insights/explorer";
+import { cap, countWord, plural, render, renderFirst, selectionWords } from "../insights/headlines";
+import { EXPLORER_HEADLINES, EXPLORER_TEMPLATES, SEASON_TEMPLATES, cycleWords, explorerFacts, monthlySentence, noHistoryWords, seasonFacts, zeroClass, zeroStats, type ExplorerFacts, type SeasonFacts, type ZeroStats } from "../insights/explorer";
 import { SplitBar } from "./g1/parts";
 import "./g1/g1.css";
 import { TimelineChart } from "../charts/TimelineChart";
@@ -166,7 +166,7 @@ export default function Explorer() {
       measure,
       lens,
       filters,
-      hist: { shipped: latent ? h.latent : h.shipped, demand: latent ? h.latent : h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand },
+      hist: { shipped: latent ? h.latent : h.shipped, demand: latent ? h.latent : h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknown: h.unknown, unknownDemand: h.unknownDemand },
       fc: !withForecast ? undefined : latent ? (fLatent ? { value: fLatent } : undefined) : { value: fc.fc, p10: fc.p10, p50: fc.p50, p90: fc.p90 },
       range,
       columns: single !== null,
@@ -207,10 +207,10 @@ export default function Explorer() {
             label={`${latent ? "Latent demand" : usd ? "Revenue" : "Demand"}, last 12 months`}
             value={fmtValue(facts.last12, measure)}
             unit={usd ? undefined : "units"}
-            visual={single !== null ? <CycleStrip m={m} s={single} z={z} /> : <CycleMix facts={facts} />}
+            visual={single !== null ? <CycleStrip m={m} s={single} z={z} lastOrder={facts.lostAccount ? facts.lastOrder : null} /> : <CycleMix facts={facts} />}
             context={facts.prev12 > 0 ? <Delta value={facts.chg} suffix={`vs the 12 months to ${monthName(m.months[m.asOf - 12])}`} /> : "No demand in the year before to compare with."}
             info={{
-              what: `${latent ? "Latent monthly demand" : "Unconstrained demand"} of the selection over ${monthName(m.months[m.asOf - 11])} – ${monthName(m.months[m.asOf])}, against the 12 months before.${single !== null ? " The strip shows the last 12 months of the series: order months in ink, scheduled off-months as dots." : " The bar shows how the series in view order: their customers' ordering cycles."}`,
+              what: `${latent ? "Latent monthly demand" : "Unconstrained demand"} of the selection over ${monthName(m.months[m.asOf - 11])} – ${monthName(m.months[m.asOf])}, against the 12 months before.${single !== null ? " The strip shows the last 12 months of the series: order months in ink, scheduled off-months as dots, months after a lost account hatched, a zero on an order month crossed." : " The bar shows how the series in view order: their customers' ordering cycles. Monthly counts the series that order every month and those that skip one shutdown month a year."}`,
               how: "Exact sums of the cleaned history (stock-outs added back to demand). Ordering cycles are detected per series by the demand stage.",
               source: "history.json, dims.json (series.cycle)",
             }}
@@ -258,13 +258,18 @@ export default function Explorer() {
 }
 
 // ---- hero visuals ---------------------------------------------------------------------------------------------
-/** The last 12 months of one series: order months in ink, scheduled off-months as dots, unexplained zeros
- *  crossed: the ordering cycle at a glance. */
-function CycleStrip({ m, s, z }: { m: Model; s: number; z: ZeroStats }) {
-  const cells = Array.from({ length: 12 }, (_, k) => m.asOf - 11 + k).map((t) => ({ t, state: z.cells[t] === 0 ? "out" : z.sched[t] ? "sched" : z.unexp[t] ? "unexp" : z.lost[t] ? "lost" : z.zeros[t] ? "unexp" : "order" }));
+/** The last 12 months of one series: order months in ink, scheduled off-months as dots, months after a lost
+ *  account hatched, zeros on an order month crossed: the ordering cycle at a glance.  The states come from the
+ *  same zeroClass() as the standfirst and the calendar. */
+const STRIP_WORD: Record<string, [string, string]> = { order: ["order month", "order months"], sched: ["scheduled off-month", "scheduled off-months"], lost: ["month after the last order", "months after the last order"], missing: ["rebuilt zero row", "rebuilt zero rows"], unexp: ["zero on an order month", "zeros on an order month"], out: ["month outside the sales window", "months outside the sales window"] };
+function CycleStrip({ m, s, z, lastOrder }: { m: Model; s: number; z: ZeroStats; lastOrder: string | null }) {
+  const cells = Array.from({ length: 12 }, (_, k) => m.asOf - 11 + k).map((t) => ({ t, state: z.cells[t] === 0 ? "out" : z.zeros[t] === 0 ? "order" : z.lost[t] ? "lost" : z.sched[t] ? "sched" : z.missing[t] ? "missing" : "unexp" }));
   const code = m.dims.series.cycle[s];
+  const count = new Map<string, number>();
+  for (const c of cells) count.set(c.state, (count.get(c.state) ?? 0) + 1);
+  const lost = count.get("lost") ?? 0;
   return (
-    <div className="g1-strip" role="img" aria-label={`Last 12 months: ${cells.filter((c) => c.state === "order").length} order months, ${cells.filter((c) => c.state === "sched").length} scheduled off-months`}>
+    <div className="g1-strip" role="img" aria-label={`Last 12 months: ${[...count.entries()].map(([k, n]) => `${n} ${plural(n, STRIP_WORD[k][0], STRIP_WORD[k][1])}`).join(", ")}`}>
       <div className="cells">
         {cells.map((c) => (
           <span key={c.t} className={c.state}>
@@ -275,6 +280,12 @@ function CycleStrip({ m, s, z }: { m: Model; s: number; z: ZeroStats }) {
       </div>
       <span className="cap">
         {code ? <span title={`Cycle code ${code}`}>{cap(cycleWords(code))}</span> : "No ordering cycle yet"}
+        {lost > 0 && (
+          <span className="lostkey">
+            <i aria-hidden="true" />
+            {lastOrder ? (lost === 12 ? `no order since ${monthName(lastOrder)}` : `${lost} ${plural(lost, "month")} since the last order, ${monthName(lastOrder)}`) : `${lost} ${plural(lost, "month")} after the account was lost`}
+          </span>
+        )}
       </span>
     </div>
   );
@@ -295,13 +306,15 @@ function CycleMix({ facts }: { facts: ExplorerFacts }) {
     .map((p) => ({ ...p, text: fmtInt(p.value) }));
   const none = facts.kinds.unknown ?? 0;
   const counted = parts.reduce((a, p) => a + p.value, 0);
+  // the "Monthly" segment is facts.monthly (kinds M + A): the same variable as the standfirst, with its definition
+  const notes = [facts.monthlyShutdown > 0 ? `Monthly includes ${fmtInt(facts.monthlyShutdown)} that skip one shutdown month a year` : "", none > 0 ? `${fmtInt(none)} with no history yet` : ""].filter(Boolean);
   return (
     <div className="g1-cyclemix">
       <span className="cap">
         How the <b>{fmtInt(facts.nSeries)}</b> series in view order (series counts, by ordering cycle)
       </span>
-      <SplitBar parts={parts} ariaLabel={`Ordering cycles of the ${fmtInt(counted)} series with history: ${parts.map((p) => `${p.label} ${p.text}`).join(", ")}`} />
-      {none > 0 && <span className="cap">and {fmtInt(none)} with no history yet</span>}
+      <SplitBar parts={parts} ariaLabel={`Ordering cycles of the ${fmtInt(counted)} series with history: ${parts.map((p) => `${p.label} ${p.text}`).join(", ")}${facts.monthlyShutdown > 0 ? `; monthly includes ${fmtInt(facts.monthlyShutdown)} with one shutdown month a year` : ""}`} />
+      {notes.length > 0 && <span className="cap">{notes.join("; ")}.</span>}
     </div>
   );
 }
@@ -500,24 +513,28 @@ function ZeroModule({ m, facts, z, single, segs, onCell }: { m: Model; facts: Ex
       const miss = v.fl & b.missing_row ? " miss" : "";
       const extra = `${v.fl & b.missing_row ? "; row rebuilt from the Record_ID grid, not zero-filled" : ""}${v.fl & (b.stockout_listed | b.stockout_inferred) ? "; stock-out month, demand unconstrained" : ""}${v.fl & b.one_off ? "; one-off order" : ""}${(v.fl & m.accumMask) > 1 ? `; the order carries ${v.fl & m.accumMask} months` : ""}`;
       if (v.d === 0) {
-        if (z.sched[t]) return { cls: `sched${miss}`, tip: `${label}: zero, a scheduled off-month of the ordering cycle${extra}`, glyph: null, bg: undefined };
-        if (z.lost[t]) return { cls: `lost${miss}`, tip: `${label}: zero, after the account was lost${extra}`, glyph: "L", bg: undefined };
+        // the same zeroClass() as the standfirst, the title and the hero strip
+        const zc = zeroClass(m, v.fl);
+        if (zc === "lost") return { cls: `lost${miss}`, tip: `${label}: zero, after the last order${facts.lastOrder ? ` (${monthName(facts.lastOrder)})` : ""}: the account was lost${v.fl & b.on_phase ? "; the cycle would have ordered this month" : ""}${extra}`, glyph: null, bg: undefined };
+        if (zc === "sched") return { cls: `sched${miss}`, tip: `${label}: zero, a scheduled off-month of the ordering cycle${extra}`, glyph: null, bg: undefined };
+        if (zc === "missing") return { cls: `unexp${miss}`, tip: `${label}: zero in a row missing from the extract and rebuilt, on an order month${extra}`, glyph: "x", bg: undefined };
         return { cls: `unexp${miss}`, tip: `${label}: zero on an order month (launch ramp, lockdown or a skipped order)${extra}`, glyph: "x", bg: undefined };
       }
       return { cls: `order${miss}`, tip: `${label}: ${fmt1(v.d)} units${extra}`, glyph: null, bg: ramp[Math.min(4, Math.round((v.d / vmax) * 4))] };
     }
-    const n = z.unexp[t];
+    const n = z.unexp[t] + z.missing[t];
+    const parts = [z.sched[t] ? `${fmtInt(z.sched[t])} scheduled off-${plural(z.sched[t], "month")}` : "", z.lost[t] ? `${fmtInt(z.lost[t])} after a lost account` : "", z.missing[t] ? `${fmtInt(z.missing[t])} in rebuilt rows` : "", z.unexp[t] ? `${fmtInt(z.unexp[t])} on an order month` : ""].filter(Boolean).join(", ");
     return n > 0
-      ? { cls: "unexp", tip: `${label}: ${fmtInt(z.zeros[t])} zero cells of ${fmtInt(z.cells[t])}; ${fmtInt(n)} on an order month`, glyph: fmtInt(n), bg: undefined }
-      : { cls: "sched", tip: `${label}: ${fmtInt(z.zeros[t])} zero cells of ${fmtInt(z.cells[t])}, every one a scheduled off-month${z.lost[t] ? " or a lost-account tail" : ""}`, glyph: null, bg: undefined };
+      ? { cls: "unexp", tip: `${label}: ${fmtInt(z.zeros[t])} zero cells of ${fmtInt(z.cells[t])}: ${parts}`, glyph: fmtInt(n), bg: undefined }
+      : { cls: "sched", tip: `${label}: ${fmtInt(z.zeros[t])} zero cells of ${fmtInt(z.cells[t])}${parts ? `: ${parts}` : ""}`, glyph: null, bg: undefined };
   };
   return (
     <Module
       title={title}
       dek={
         single !== null
-          ? `Every month of the series, ${years[0]}–${years[years.length - 1]}: shade is units, a dot is a scheduled off-month, a cross a zero on an order month. Click a month for its lineage.`
-          : `Months of ${years[0]}–${years[years.length - 1]}: a dot means every zero cell that month was a scheduled off-month; a number counts zeros that fell on an order month.`
+          ? `Every month of the series, ${years[0]}–${years[years.length - 1]}: shade is units, a dot is a scheduled off-month, ${facts.lost ? "hatching a month after the account was lost, " : ""}a cross a zero on an order month. Click a month for its lineage.`
+          : `Months of ${years[0]}–${years[years.length - 1]}: a dot means every zero cell that month was a scheduled off-month${facts.lost ? " or followed a lost account" : ""}; a number counts zeros that fell on an order month.`
       }
       info={{
         what: "Why the zeros are there. Most zero months are the off-months of a customer's ordering cycle (every second month, quarterly, two months in three, an annual shutdown), not missing demand.",
@@ -546,6 +563,11 @@ function ZeroModule({ m, facts, z, single, segs, onCell }: { m: Model; facts: Ex
             <span>
               <i className="sched" /> Scheduled off-month
             </span>
+            {facts.lost > 0 && (
+              <span>
+                <i className="lost" /> After the account was lost
+              </span>
+            )}
             <span>
               <i className="unexp">
                 <Cross />
@@ -559,7 +581,7 @@ function ZeroModule({ m, facts, z, single, segs, onCell }: { m: Model; facts: Ex
         ) : (
           <>
             <span>
-              <i className="sched" /> Every zero scheduled
+              <i className="sched" /> {facts.lost ? "Every zero scheduled or after a lost account" : "Every zero scheduled"}
             </span>
             <span>
               <i className="unexp" style={{ fontSize: fz(10), fontWeight: 600 }}>
@@ -723,9 +745,19 @@ function SeriesCard({ m, s, prof, loading, facts }: { m: Model; s: number; prof:
               {events.map((i) => {
                 const ae = prof.account_events;
                 const ratio = ae.level_ratio[i];
+                const kind = String(ae.event_type[i]);
+                const before = ae.before[i] === null || ae.before[i] === undefined ? "" : String(ae.before[i]);
+                const after = ae.after[i] === null || ae.after[i] === undefined ? "" : String(ae.after[i]);
+                // readable per event type: cycle codes in words, a lost account by its last order month (no ISO, no dangling "to")
+                const what =
+                  kind === "cycle_change"
+                    ? `${cycleWords(before)} to ${cycleWords(after)}`
+                    : kind === "lost_account"
+                      ? before ? `last order ${monthName(before)}` : "account lost"
+                      : before && after ? `${before} to ${after}` : before || after;
                 return (
                   <span key={i} className="sub" style={{ color: "var(--ink)" }}>
-                    {cap(String(ae.event_type[i]).replace(/_/g, " "))}, {monthName(String(ae.month[i]))}: {String(ae.before[i] ?? "")} to {String(ae.after[i] ?? "")}
+                    {cap(kind.replace(/_/g, " "))}, {monthName(String(ae.month[i]))}: {what}
                     {ratio !== null ? `, level ×${Number(ratio).toFixed(2)}` : ""}
                   </span>
                 );
@@ -757,9 +789,19 @@ function Composition({ m, series, prof, facts }: { m: Model; series: number[]; p
     const st = m.dims.skus.status[k] ?? "–";
     status.set(st, (status.get(st) ?? 0) + 1);
   }
-  const monthly = (facts.kinds.M ?? 0) / Math.max(1, facts.nSeries);
-  const ending = (status.get("EOL Announced") ?? 0) + (status.get("Discontinued") ?? 0);
-  const title = `${cap(fractionWord(monthly))} of ${fmtInt(facts.nSeries)} series order every month; ${lost ? `${countWord(lost)} ${plural(lost, "account")} ${lost === 1 ? "was" : "were"} lost` : "no account was lost"}`;
+  // SKUs whose end-of-life month falls in the forecast window, apart from those already discontinued before it
+  let endIn = 0;
+  let endedBefore = 0;
+  for (const k of skus) {
+    const st = m.dims.skus.status[k];
+    if (st !== "EOL Announced" && st !== "Discontinued") continue;
+    const e = m.dims.skus.eol[k];
+    const t = e ? m.months.indexOf(e) : -1;
+    if (t >= m.w0 || (st === "EOL Announced" && t < 0)) endIn++;
+    else endedBefore++;
+  }
+  // the monthly count is facts.monthly (kinds M + A), one variable with the hero strip and the standfirst
+  const title = `${monthlySentence(facts, false).replace(/ \(.*\)\.$/, "").replace(/\.$/, "")}; ${lost ? `${countWord(lost)} ${plural(lost, "account")} ${lost === 1 ? "was" : "were"} lost` : "no account was lost"}`;
   const stOrder = ["Active", "EOL Announced", "Discontinued", "Planned Launch"];
   const stColor: Record<string, string> = { Active: "var(--hist-6)", "EOL Announced": "var(--hist-4)", Discontinued: "var(--hist-3)", "Planned Launch": "var(--hist-2)" };
   return (
@@ -781,7 +823,10 @@ function Composition({ m, series, prof, facts }: { m: Model; series: number[]; p
         <dt>Customer switches</dt>
         <dd>{fmtInt(switches)}</dd>
         <dt>Ending in the window</dt>
-        <dd>{ending ? `${fmtInt(ending)} ${plural(ending, "SKU")} discontinued or end of life announced` : "None"}</dd>
+        <dd>
+          {endIn ? `${fmtInt(endIn)} ${plural(endIn, "SKU")} with end of life in ${monthName(m.months[m.w0])} – ${monthName(m.months[m.nMonths - 1])}` : "None"}
+          {endedBefore > 0 && <span className="sub">{fmtInt(endedBefore)} more {plural(endedBefore, "was", "were")} discontinued before the window</span>}
+        </dd>
       </dl>
       <p style={{ marginTop: 12 }}>
         <MoreLink onClick={() => go("lifecycle")}>Launches and end of life in the forecast window</MoreLink>

@@ -212,7 +212,7 @@ export function CaseFile(p: CaseFileProps) {
       measure,
       lens: "orders",
       filters: f,
-      hist: { shipped: h.shipped, demand: h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand },
+      hist: { shipped: h.shipped, demand: h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknown: h.unknown, unknownDemand: h.unknownDemand },
       fc: { value: fc.fc, p10: fc.p10, p50: fc.p50, p90: fc.p90 },
       range: [first, m.nMonths - 1],
       columns: true,

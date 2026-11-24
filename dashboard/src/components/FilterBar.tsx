@@ -60,9 +60,13 @@ interface ComboProps {
   allLabel?: string;
 }
 
-/** A filter chip with a listbox popover, following the ARIA combobox pattern: focus stays on one element
- *  (the search input, or the listbox itself when there is no search) and `aria-activedescendant` names the
- *  highlighted option, so the highlight, the focus ring and what Enter picks are always the same option. */
+/** A filter chip with a listbox popover, following the ARIA combobox pattern.  All five filters behave the same:
+ *  opening (click, Enter, Space, ArrowDown / ArrowUp) moves focus into the popover, onto the search input when
+ *  there is one, else onto the listbox itself (focused by a ref in an effect: React ignores `autoFocus` on a div).
+ *  `aria-activedescendant` on that focused element names the highlighted option, so the highlight, the focus ring
+ *  and what Enter picks are always the same option.  Keys: ArrowDown / ArrowUp, Home / End, PageDown / PageUp,
+ *  Enter picks, Escape closes and returns focus to the chip, Tab closes and moves on from the chip; on a list
+ *  without search a typed letter jumps to the next option that starts with it. */
 function Combo(props: ComboProps) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -71,6 +75,8 @@ function Combo(props: ComboProps) {
   const listId = `${uid}-list`;
   const optId = (k: number) => `${uid}-o${k}`;
   const btn = useRef<HTMLButtonElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => {
     setOpen(false);
     setQ("");
@@ -87,6 +93,11 @@ function Combo(props: ComboProps) {
   const maxVol = props.vol ? Math.max(1, ...shown.map((i) => (props.vol as Float64Array)[i])) : 1;
   const total = props.n.reduce((a, b) => a + b, 0);
   const avail = props.n.reduce((a, b) => a + (b > 0 ? 1 : 0), 0);
+  // focus moves into the popover when it opens (the input, or the listbox when there is no search)
+  useEffect(() => {
+    if (!open) return;
+    (props.searchable ? input.current : listRef.current)?.focus({ preventScroll: true });
+  }, [open, props.searchable]);
   // keep the highlighted option in view
   useEffect(() => {
     if (open) document.getElementById(optId(hi))?.scrollIntoView({ block: "nearest" });
@@ -109,10 +120,10 @@ function Combo(props: ComboProps) {
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHi((h) => Math.max(h - 1, 0));
-    } else if (e.key === "Home" && !props.searchable) {
+    } else if (e.key === "Home") {
       e.preventDefault();
       setHi(0);
-    } else if (e.key === "End" && !props.searchable) {
+    } else if (e.key === "End") {
       e.preventDefault();
       setHi(last);
     } else if (e.key === "PageDown") {
@@ -130,7 +141,21 @@ function Combo(props: ComboProps) {
       close();
       btn.current?.focus();
     } else if (e.key === "Tab") {
+      // hand focus back to the chip first, so the browser's Tab moves on from the chip, not from <body>
+      btn.current?.focus();
       close();
+    } else if (!props.searchable && e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // type-ahead on a list without search: the next option whose label starts with the letter
+      const ch = e.key.toLowerCase();
+      const n = shown.length;
+      for (let step = 1; step <= n; step++) {
+        const k = ((hi - 1 + step) % n + n) % n;
+        if (props.options[shown[k]].toLowerCase().startsWith(ch)) {
+          e.preventDefault();
+          setHi(k + 1);
+          break;
+        }
+      }
     }
   };
   const valueText = props.value !== null ? props.options[props.value] : props.allLabel ?? "All";
@@ -148,10 +173,12 @@ function Combo(props: ComboProps) {
         aria-label={`${props.label} filter: ${valueText}`}
         onClick={() => (open ? close() : openList())}
         onKeyDown={(e) => {
-          if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !open) {
-            e.preventDefault();
-            openList();
-          }
+          if (!open) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              openList();
+            }
+          } else if (e.target === e.currentTarget) onKey(e); // defensive: keys reach the list even if focus stayed on the chip
         }}
         title={props.value !== null ? `${props.label}: ${valueText}${props.sub ? ` · ${props.sub(props.value)}` : ""}` : `${props.label}: all ${avail.toLocaleString("en-US")}`}
       >
@@ -163,7 +190,7 @@ function Combo(props: ComboProps) {
         <div className="combo-pop" onKeyDown={onKey}>
           {props.searchable && (
             <input
-              autoFocus
+              ref={input}
               role="combobox"
               aria-expanded="true"
               aria-controls={listId}
@@ -184,8 +211,8 @@ function Combo(props: ComboProps) {
             role="listbox"
             id={listId}
             aria-label={props.label}
+            ref={listRef}
             tabIndex={props.searchable ? -1 : 0}
-            autoFocus={!props.searchable}
             aria-activedescendant={props.searchable ? undefined : active}
           >
             <div id={optId(0)} className={`combo-opt ${props.value === null ? "sel" : ""} ${hi === 0 ? "hi" : ""}`} role="option" aria-selected={props.value === null} onClick={() => choose(null)} onMouseMove={() => hi !== 0 && setHi(0)}>

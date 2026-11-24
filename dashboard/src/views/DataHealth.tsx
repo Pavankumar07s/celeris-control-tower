@@ -392,8 +392,8 @@ function IssuesModule({ q, f, m, onCell, all: showAll, onAll }: { q: QualityFile
           <b>{fmtInt(f.approximate)}</b> approximate
         </span>
         <span>
-          <b>{fmtInt(f.unknown)}</b> blank in the files with units unknown
-          {f.hist && f.hist.unknown !== f.unknown ? `; ${fmtInt(f.hist.unknown)} still unknown in the history after ${fmtInt(Math.abs(f.unknown - f.hist.unknown))} ${plural(Math.abs(f.unknown - f.hist.unknown), "was", "were")} restored from shipments, kept out of fitting` : ", kept out of fitting"}
+          <b>{fmtInt(f.unknown)}</b> records with units blank in the files (ERP migration)
+          {f.hist && f.hist.unknown !== f.unknown ? `; ${fmtInt(f.hist.unknown)} grid cells keep their units unknown after ${fmtInt(Math.abs(f.unknown - f.hist.unknown))} ${plural(Math.abs(f.unknown - f.hist.unknown), "was", "were")} restored from the stock-out file's shipped units, kept out of fitting` : ", kept out of fitting"}
         </span>
       </p>
     </Module>
@@ -443,7 +443,7 @@ function heatOption(q: QualityFile, m: Model, t: Theme, narrow: boolean): EChart
       inverse: true,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), interval: 0, width: narrow ? 40 : 230, overflow: "truncate" },
+      axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), interval: 0, width: narrow ? 40 : fz(250), overflow: "truncate", ellipsis: "…" },
       splitLine: { show: false },
     },
     visualMap: {

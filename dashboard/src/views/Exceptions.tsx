@@ -195,6 +195,7 @@ function Inbox({ E }: { E: ExceptionFile }) {
     const max = Math.max(1e-9, ...lines.flatMap((l) => [...l.cells.values()]));
     const top = lines.length ? lines.reduce((a, b) => (b.total > a.total ? b : a)) : null;
     const topRule = top ? [...top.cells.entries()].sort((a, b) => b[1] - a[1])[0] : null;
+    const second = top ? lines.filter((l) => l !== top).reduce<typeof top | null>((a, b) => (!a || b.total > a.total ? b : a), null) : null;
     return {
       dim,
       lines,
@@ -205,6 +206,7 @@ function Inbox({ E }: { E: ExceptionFile }) {
         rowsN: lines.length,
         total: facts.total,
         top: top && topRule ? { label: top.label, usd: top.total, share: facts.total > 0 ? top.total / facts.total : 0, rule: ruleMany(E, topRule[0]), ruleShare: top.total > 0 ? topRule[1] / top.total : 0 } : null,
+        second: second ? { label: second.label, usd: second.total, share: facts.total > 0 ? second.total / facts.total : 0 } : null,
       },
     };
   }, [rows, E, m, filters.family, filters.region, rules, facts.total]);

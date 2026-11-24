@@ -1,7 +1,7 @@
 // O2 What-if (prediction).  Question: what happens to the plan if the economy turns, and where does it land?
 //  lede (computed headline + standfirst | hero: the scenario change with the base forecast's P10-P90 strip)
 //  -> scenario builder (presets, indicator, shift, period, events; one orange Apply) | the shared timeline with the
-//     base forecast (orange, banded) and the scenario (violet, solid)
+//     base forecast (orange, banded) and the scenario (warm ink, dashed: another forecast)
 //  -> P90 cover, peak month, rows changed  -> impact by family (diverging bar table) | effect by month
 // The applied scenario lives in the URL hash (wi, ws, wf, wn, we), so every scenario is a link.
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -90,7 +90,7 @@ export default function WhatIf() {
   const headline = res.data ? render(WHATIF_TEMPLATES.headline, facts).text : "Loading the model's sensitivities…";
   const standfirst = res.data ? render(WHATIF_TEMPLATES.standfirst, facts).text : undefined;
 
-  // ---- timeline: base forecast (orange, banded) and the scenario (violet, solid) --------------------------------
+  // ---- timeline: base forecast (orange, banded) and the scenario (warm ink, dashed: another forecast) --------------------------------
   const range = (["all", "recent"].includes(params.get("tl") ?? "") ? params.get("tl") : "window") as RangePreset;
   const scenLine = useMemo(() => {
     const line = new Array(m.nMonths).fill(null) as (number | null)[];
@@ -107,9 +107,9 @@ export default function WhatIf() {
       measure,
       lens: "orders",
       filters,
-      hist: { shipped: h.shipped, demand: h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand },
+      hist: { shipped: h.shipped, demand: h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknown: h.unknown, unknownDemand: h.unknownDemand },
       fc: { value: fc.fc, p10: fc.p10, p50: fc.p50, p90: fc.p90 },
-      lines: sums ? [{ name: "Scenario (order mean)", data: scenLine, color: theme.scenario, width: 2 }] : [],
+      lines: sums ? [{ name: "Scenario (order mean)", data: scenLine, color: theme.scenario, width: 2, dashed: true }] : [],
       range,
       columns: single !== null,
     }),
@@ -167,14 +167,14 @@ export default function WhatIf() {
       yAxis: { ...valueAxis(theme, { min: yMin, max: yMax, usd }), interval: tick },
       tooltip: axisTooltip(theme, (items: TooltipItem[]) => {
         const k = items[0]?.dataIndex ?? 0;
-        return `${ttHead(monthLong(labs[k]), "forecast")}${ttRow(theme.scenario, "scenario − base", fmtSigned(diff[k], measure, 2), "box")}${ttRow(theme.accent, "base forecast mean", fmtValue(sums.base[k], measure))}${ttRow(theme.scenario, "scenario mean", fmtValue(sums.scen[k], measure))}${ttEnd()}`;
+        return `${ttHead(monthLong(labs[k]), "forecast")}${ttRow(theme.scenarioTint, "scenario − base", fmtSigned(diff[k], measure, 2), "box")}${ttRow(theme.accent, "base forecast mean", fmtValue(sums.base[k], measure))}${ttRow(theme.scenario, "scenario mean", fmtValue(sums.scen[k], measure), "dash")}${ttEnd()}`;
       }),
       series: [
         {
           type: "bar",
           data: diff.map((d, k) => ({ value: d, label: { show: k === peakK && Math.abs(d) > 0.5, position: d < 0 ? "bottom" : "top", distance: 4, color: theme.ink2, fontFamily: FONT, fontSize: fz(11.5), formatter: () => fmtSigned(d, measure, 1) } })),
           barMaxWidth: BAR_MAX,
-          itemStyle: { ...barStyle(theme.scenario), borderRadius: both ? 2 : lo < 0 ? [0, 0, 2, 2] : [2, 2, 0, 0] },
+          itemStyle: { ...barStyle(theme.scenarioTint), borderRadius: both ? 2 : lo < 0 ? [0, 0, 2, 2] : [2, 2, 0, 0] },
         },
       ],
     } as EChartsCoreOption;
@@ -235,7 +235,7 @@ export default function WhatIf() {
             context={baseT > 0 ? `**${fmtSignedPct(chgT)}** vs the base plan of ${fmtValueUnit(baseT, measure)} (forecast means)` : "No forecast rows in this selection."}
             info={{
               what: "Scenario minus base, summed over the 19 forecast months for the selection, on the forecast means (before rounding).",
-              how: "Latent demand × exp(Σ β × Δindicator(t − lag)) per SKU and channel group, re-accumulated through each series' ordering cycle. The strip shows the base forecast's P10–P90 range for the 19-month total (orange band), the base (orange tick) and the scenario (violet tick).",
+              how: "Latent demand × exp(Σ β × Δindicator(t − lag)) per SKU and channel group, re-accumulated through each series' ordering cycle. The strip shows the base forecast's P10–P90 range for the 19-month total (orange band), the base (orange tick) and the scenario (ink tick).",
               source: "forecast_detail.json (latent_mean, accum, f_event), macro.json (sensitivity)",
             }}
           />
@@ -318,7 +318,7 @@ export default function WhatIf() {
           dek={`${usd ? "Revenue in USD" : "Units"} per month, ${rangeText}. The submitted forecast with its P10–P90 range, and the scenario's order mean after the shift.`}
           tools={<RangePresets value={range} options={rangePresets(m)} onChange={(v) => setParam({ tl: v === "window" ? null : v }, true)} />}
           info={{ what: "The base forecast and the scenario on the shared timeline.", how: "The scenario line is the sum of the recomputed order means; the base band is the aggregate P10–P90 of the submitted forecast.", source: "computed in the browser from forecast.json, forecast_detail.json, macro.json" }}
-          keyItems={timelineKey({ latent: false, rebuilt: true, lost: true, columns: single !== null, present: markPresence(spec), extra: [{ kind: "line", color: "var(--scenario)", label: "Scenario" }] })}
+          keyItems={timelineKey({ latent: false, rebuilt: true, lost: true, columns: single !== null, present: markPresence(spec), extra: [{ kind: "dash", color: "var(--scenario)", label: "Scenario" }] })}
         >
           {lens === "latent" && <Notice tone="info">The what-if works on orders as booked; the latent lens does not apply here.</Notice>}
           <TimelineChart

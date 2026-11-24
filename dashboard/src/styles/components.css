@@ -20,6 +20,12 @@
 }
 .standfirst b, .standfirst strong { font-weight: 600; color: var(--ink); }
 .lede > .fig.hero { border-left: 1px solid var(--rule-strong); padding: 2px 0 2px calc(28 * var(--u)); }
+/* extra-large screens: prose keeps its ch limits, so an 8fr / 4fr split left a 500-900px hole between the standfirst
+   and the hero at 2560px and wider.  From 1920px the text column shrinks to its content (at most the prose measure)
+   and the hero sits right beside it, with a capped width; the spare width falls at the far right, as margin. */
+@media (min-width: 1920px) {
+  .lede:not(.no-fig) { grid-template-columns: fit-content(calc(860 * var(--u))) minmax(calc(400 * var(--u)), calc(760 * var(--u))); justify-content: start; column-gap: calc(56 * var(--u)); }
+}
 
 /* ===== Figures (the KPI contract): label, value + thin unit, ONE inline visual, context, evidence link === */
 .fig { padding: calc(13 * var(--u)) calc(20 * var(--u)) calc(15 * var(--u)); border-left: 1px solid var(--rule); display: flex; flex-direction: column; gap: calc(6 * var(--u)); min-width: 0; }
@@ -35,7 +41,9 @@
 .fig.hero .value small { font-size: calc(15 * var(--u)); }
 .fig .ctx { font-size: calc(12.5 * var(--u)); line-height: 1.45; color: var(--ink-3); }
 .fig .ctx b { color: var(--ink-2); font-weight: 600; }
-.fig .more { margin-top: auto; padding-top: calc(4 * var(--u)); align-self: flex-start; }
+.fig .more { margin-top: auto; padding-top: calc(4 * var(--u)); align-self: flex-start; max-width: 100%; }
+/* a figure's evidence link wraps in a narrow column instead of running past the edge (the hero's X-ray link at 1024px) */
+.fig .more .more-link { white-space: normal; text-align: left; max-width: 100%; }
 .figures {
   display: grid; grid-template-columns: repeat(var(--fig-cols, 4), minmax(0, 1fr));
   border-top: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule);
@@ -468,7 +476,7 @@ table.ledger tbody tr.dt-detail:hover td { background: var(--raised); }
 .ranklist .rk { font: 500 calc(12 * var(--u))/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink-3); }
 .ranklist .who { min-width: 0; font-size: calc(13 * var(--u)); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ranklist .who .id { font-weight: 500; }
-.ranklist .why { grid-column: 2; font-size: calc(12 * var(--u)); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranklist .why { grid-column: 2; font-size: calc(12 * var(--u)); line-height: 1.4; color: var(--ink-3); text-wrap: pretty; } /* wraps: a reason is never cut mid-word */
 .ranklist .why .rule-chip { margin-right: calc(6 * var(--u)); }
 .ranklist .amt { grid-row: 1 / span 2; grid-column: 3; display: grid; gap: calc(5 * var(--u)); text-align: right; font: 600 calc(13 * var(--u))/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); align-self: center; }
 .ranklist .amt i { display: block; height: calc(3 * var(--u)); border-radius: 2px 0 0 2px; background: var(--ink-3); justify-self: end; }

@@ -1,7 +1,8 @@
 // R4 Anomaly monitor (training data): which unusual numbers were mistakes and which were real business, and
 // what was done with each?
 //  lede (computed headline + standfirst | hero: share of flagged cells that were real business)
-//  -> the shared timeline with the flags (rose hollow diamonds = errors fixed, jade triangles = real events),
+//  -> the shared timeline with the flags (violet hollow diamonds = data errors, ink triangles = real events: real
+//     events are history, so they wear ink; neither class wears a status red or green),
 //     annotated with the largest ones
 //  -> flags by type: data errors | real events (bar tables; a row filters the register)
 //  -> the register (type, series, period, reason, action, confidence, impact; group by cause; CSV).
@@ -16,22 +17,25 @@ import { LineageDrawer, decodeCell, encodeCell } from "../components/Lineage";
 import { Key, Module, timelineKey, KeyMark } from "../components/Module";
 import { Empty, ErrorState, Loading } from "../components/states";
 import { BarTable, DataTable, download, toCsv, type Column } from "../components/tables";
-import { fmtInt, fmtMoney, fmtPct, fmtSigned, monthName, monthSpan } from "../data/format";
+import { fmtInt, fmtPct, fmtSigned, monthName, monthSpan } from "../data/format";
 import { useResource } from "../data/load";
 import { filterPatch } from "../state/url";
 import type { AnomalyFile } from "../data/types";
 import { readableMonths } from "../insights/briefing";
 import { cap, render, selectionWords } from "../insights/headlines";
 import { repairFacts } from "../insights/health";
-import { ANOMALY_TEMPLATES, anomalyFacts, lab, rowsInSelection, typeLabel, type TypeRow } from "../insights/anomalies";
+import { ANOMALY_TEMPLATES, anomalyFacts, lab, noDemandEffect, repairBridge, rowsInSelection, typeLabel, typePlural, type TypeRow } from "../insights/anomalies";
 import { ConfMeter, SplitBar } from "./g1/parts";
 import "./g1/g1.css";
 import { TimelineChart } from "../charts/TimelineChart";
 
 type Cls = "all" | "data_error" | "real_event";
 type Lvl = "all" | "cell" | "episode";
-const ERR = "var(--cat-1)";
-const REAL = "var(--cat-7)";
+// Neither class is a status (an error was corrected, a real event is history): no red / green pair.  Real events
+// are part of the history, so they wear ink ("ink is the past"); data errors wear violet, a hue that means nothing
+// good or bad here (validated against the ink on both surfaces; shape carries the class too).
+const ERR = "var(--cat-2)";
+const REAL = "var(--ink)";
 
 export default function Anomalies() {
   const { m, theme, filters, measure, lens, params, setParam, go } = useApp();
@@ -52,8 +56,8 @@ export default function Anomalies() {
   const sel = useMemo(() => selectionWords(m, filters), [m, filters]);
   const name = single !== null ? `${m.dims.skus.id[m.sSku[single]]} in ${m.dims.regions[m.sRegion[single]]}` : sel.name;
   // units unknown: one variable with the Overview figure and Data health (history flags of the selection)
-  const unknownHist = useMemo(() => repairFacts(m, segs, "family").total.unknown, [m, segs]);
-  const facts = useMemo(() => (reg.data ? anomalyFacts(m, reg.data, inSel, name, single !== null, unknownHist) : null), [reg.data, m, inSel, name, single, unknownHist]);
+  const repairs = useMemo(() => repairFacts(m, segs, "family").total, [m, segs]);
+  const facts = useMemo(() => (reg.data ? anomalyFacts(m, reg.data, inSel, name, single !== null, repairs.unknown, repairs.touched) : null), [reg.data, m, inSel, name, single, repairs]);
   const rows = useMemo(() => {
     if (!reg.data) return [];
     const a = reg.data;
@@ -63,7 +67,7 @@ export default function Anomalies() {
   // ---- marks on the timeline: every flagged cell for one series; clusters (>= 2x the class's usual month) at aggregate
   const demandArr = latent ? h.latent : h.demand;
   const marks = useMemo(() => {
-    if (!reg.data) return { marks: [] as TimelineAnomaly[], items: [] as { month: number; value: number; cls: TimelineAnomaly["cls"]; title: string; text: string; impact: number }[] };
+    if (!reg.data) return { marks: [] as TimelineAnomaly[], items: [] as { month: number; value: number; cls: TimelineAnomaly["cls"]; title: string; text: string; impact: number; heading?: string }[] };
     const a = reg.data;
     const byMonth = new Map<string, { n: number; types: Map<string, number>; cause: string; action: string; units: number }>();
     for (const i of inSel) {
@@ -85,7 +89,7 @@ export default function Anomalies() {
     const avg = new Map<string, number>();
     for (const [key, v] of byMonth) avg.set(key.split("|")[0], (avg.get(key.split("|")[0]) ?? 0) + v.n / (m.asOf + 1));
     const out: TimelineAnomaly[] = [];
-    const items: { month: number; value: number; cls: TimelineAnomaly["cls"]; title: string; text: string; impact: number }[] = [];
+    const items: { month: number; value: number; cls: TimelineAnomaly["cls"]; title: string; text: string; impact: number; heading?: string }[] = [];
     for (const [key, v] of byMonth) {
       const [c, moS] = key.split("|");
       const mo = Number(moS);
@@ -96,7 +100,19 @@ export default function Anomalies() {
       const text = single !== null ? `${typeLabel(types[0][0])}: ${v.cause}` : `${fmtInt(v.n)} cells: ${types.slice(0, 3).map(([t, n]) => `${typeLabel(t)} ${fmtInt(n)}`).join(", ")}`;
       out.push({ month: mo, value: val, cls: k, text });
       const why = v.cause.toLowerCase() === typeLabel(types[0][0]).toLowerCase() ? v.action : v.cause;
-      items.push({ month: mo, value: val, cls: k, title: cap(typeLabel(types[0][0])), text: single !== null ? why : `${fmtInt(v.n)} cells in ${monthName(m.months[mo])}`, impact: single !== null ? v.units : v.n });
+      // a month cluster is headed by its class and month; the text names the leading type with ITS count, so an
+      // annotation that names a type counts that type ("135 cells, 113 of them ERP blanks")
+      const [t0, n0] = types[0];
+      const lead = n0 === v.n ? `all ${typePlural(t0)}` : `${fmtInt(n0)} of them ${n0 === 1 ? typeLabel(t0) : typePlural(t0)}`;
+      items.push({
+        month: mo,
+        value: val,
+        cls: k,
+        title: cap(typeLabel(t0)),
+        heading: single !== null ? undefined : `${c === "data_error" ? "Data errors" : "Real events"}, ${monthName(m.months[mo])}`,
+        text: single !== null ? why : `${fmtInt(v.n)} ${v.n === 1 ? "cell" : "cells"}, ${lead}`,
+        impact: single !== null ? v.units : v.n,
+      });
     }
     return { marks: out, items };
   }, [reg.data, inSel, m, single, demandArr, cls, type]);
@@ -109,7 +125,7 @@ export default function Anomalies() {
       measure,
       lens,
       filters,
-      hist: { shipped: latent ? h.latent : h.shipped, demand: demandArr, imputed: single !== null ? noRings : h.imputed, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand },
+      hist: { shipped: latent ? h.latent : h.shipped, demand: demandArr, imputed: single !== null ? noRings : h.imputed, cells: h.cells, missing: h.missing, unknown: h.unknown, unknownDemand: h.unknownDemand },
       anomalies: marks.marks,
       range: [0, m.asOf],
       columns: single !== null,
@@ -198,7 +214,7 @@ export default function Anomalies() {
         title={tTitle}
         dek={tDek}
         info={{
-          what: "The selection's history with the anomaly flags, each drawn on its month's value: hollow rose diamonds are data errors (corrected, or kept out of fitting where units are unknown), jade triangles are real events kept in the history. The three largest are labelled with their type and reason.",
+          what: "The selection's history with the anomaly flags, each drawn on its month's value: hollow violet diamonds are data errors (corrected, or kept out of fitting where units are unknown), ink triangles are real events kept in the history. The three largest are labelled with their type and reason.",
           how: "Cell-level register rows matched to the selected series (customer at the time); the register filters below apply to the marks too.",
           source: "anomalies.json, history.json",
         }}
@@ -247,11 +263,13 @@ function TypesModule({ facts, type, onType, usd }: { facts: ReturnType<typeof an
   // ONE bar scale for both tables: side-by-side bars invite comparison, so 5,005 and 982 cells must not look equal
   const sharedMax = Math.max(1, ...[...listOf(facts.realTypes), ...listOf(facts.errTypes)].slice(0).map((r) => r.cells));
   const fixedCells = facts.errCells - facts.unknownCells;
+  const erp = facts.errTypes.find((r) => r.code === "DE.SYSTEM_BLANKING" && r.cells > 0);
   const table = (rows: TypeRow[], kind: "data_error" | "real_event") => {
     const list = listOf(rows);
     const shown = list.slice(0, 8);
     const rest = list.slice(8);
     const restCells = rest.reduce((x, r) => x + r.cells, 0);
+    const restEp = rest.reduce((x, r) => x + r.episodes, 0);
     const total = list.reduce((x, r) => x + r.cells, 0);
     const totalEp = list.reduce((x, r) => x + r.episodes, 0);
     return (
@@ -277,7 +295,7 @@ function TypesModule({ facts, type, onType, usd }: { facts: ReturnType<typeof an
               ...(facts.single
                 ? []
                 : [{ key: "e", label: "Episodes", kind: "num" as const, value: (r: TypeRow) => (r.episodes ? fmtInt(r.episodes) : "–"), width: "13%", hideNarrow: true, title: (r: TypeRow) => (r.episodes ? `${fmtInt(r.episodes)} episode-level flags covering ${fmtInt(r.covered)} cells` : "no episode-level flag") }]),
-              { key: "u", label: usd ? "Impact" : "Impact, units", kind: "num", value: (r) => (usd ? fmtMoney(r.usd, 1) : fmtInt(r.units)), width: "17%", hideNarrow: true, title: () => "Absolute demand the flags moved, in either direction" },
+              { key: "u", label: usd ? "Net impact" : "Net impact, units", kind: "num", value: (r) => (usd ? fmtSigned(r.usd, "usd", 1) : fmtSigned(r.units, "units", 1)), width: "17%", hideNarrow: true, title: () => "Signed demand the flags moved, net (the register's convention); flags whose action changes no demand count zero" },
             ]}
           />
         ) : (
@@ -292,7 +310,19 @@ function TypesModule({ facts, type, onType, usd }: { facts: ReturnType<typeof an
                   , <b>{fmtInt(totalEp)}</b> {totalEp === 1 ? "episode" : "episodes"}
                 </>
               ) : null}
-              {rest.length ? `; ${fmtInt(rest.length)} more ${rest.length === 1 ? "type" : "types"} with ${fmtInt(restCells)} cells in the register` : ""}
+              {rest.length ? `; ${fmtInt(rest.length)} more ${rest.length === 1 ? "type" : "types"} ${restCells ? `with ${fmtInt(restCells)} flagged cells` : restEp ? `flagged only as whole episodes (${fmtInt(restEp)})` : "with no flag in the selection"}` : ""}
+            </span>
+          </p>
+        )}
+        {kind === "data_error" && repairBridge(facts) && (
+          <p className="g1-legend-line">
+            <span>{repairBridge(facts)}</span>
+          </p>
+        )}
+        {kind === "data_error" && erp && erp.cells !== facts.unknownCells && (
+          <p className="g1-legend-line">
+            <span>
+              {cap(erp.label)}: <b>{fmtInt(erp.cells)}</b> records with units blank in train.csv; <b>{fmtInt(facts.unknownCells)}</b> grid cells keep their units unknown after {fmtInt(Math.abs(erp.cells - facts.unknownCells))} {erp.cells - facts.unknownCells === 1 ? "was" : "were"} restored from the stock-out file's shipped units
             </span>
           </p>
         )}
@@ -333,7 +363,8 @@ function RegisterModule({ a, m, rows, inSel, cls, level, lvlDefault, type, group
   onRow: (i: number) => void;
 }) {
   const typesAvail = useMemo(() => [...new Set(inSel.map((i) => lab(a.type, i) ?? ""))].filter(Boolean).sort(), [inSel, a]);
-  const impact = (i: number) => (usd ? a.impact_usd[i] : a.impact_units[i]);
+  // one sign convention with the type tables: signed; a flag whose action changes no demand shows a dash
+  const impact = (i: number) => (noDemandEffect(lab(a.action, i)) ? null : usd ? a.impact_usd[i] : a.impact_units[i]);
   const fmtImpact = (v: number | null) => (v === null ? "–" : usd ? fmtSigned(v, "usd", 1) : fmtSigned(v, "units", 1));
   const scope = (i: number) => (a.series[i] >= 0 ? `${lab(a.sku, i)} · ${lab(a.region, i)}` : (lab(a.scope, i) ?? "–"));
   const period = (i: number) => (a.start[i] < 0 ? "–" : a.start[i] === a.end[i] ? monthName(m.months[a.start[i]]) : monthSpan(m.months[a.start[i]], m.months[Math.min(a.end[i], m.nMonths - 1)]));
@@ -393,8 +424,10 @@ function RegisterModule({ a, m, rows, inSel, cls, level, lvlDefault, type, group
       const cur = g.get(key) ?? { type: lab(a.type, i) ?? "", cls: lab(a.class, i) ?? "", cause: lab(a.cause, i) ?? "", action: lab(a.action, i) ?? "", n: 0, cells: 0, units: 0, usd: 0 };
       cur.n++;
       cur.cells += lab(a.level, i) === "cell" ? 1 : (a.n_cells[i] ?? 0);
-      cur.units += a.impact_units[i] ?? 0;
-      cur.usd += a.impact_usd[i] ?? 0;
+      if (!noDemandEffect(lab(a.action, i))) {
+        cur.units += a.impact_units[i] ?? 0;
+        cur.usd += a.impact_usd[i] ?? 0;
+      }
       g.set(key, cur);
     }
     return [...g.values()];
@@ -497,7 +530,9 @@ function RegisterModule({ a, m, rows, inSel, cls, level, lvlDefault, type, group
                 {a.evidence[i] && (
                   <>
                     <dt>Evidence</dt>
-                    <dd>{readableMonths(a.evidence[i] ?? "")}</dd>
+                    <dd>
+                      <Evidence text={a.evidence[i] ?? ""} />
+                    </dd>
                   </>
                 )}
                 <dt>How it was found</dt>
@@ -515,5 +550,34 @@ function RegisterModule({ a, m, rows, inSel, cls, level, lvlDefault, type, group
         )}
       </div>
     </Module>
+  );
+}
+
+// ---- evidence: the register's JSON object as readable fields ("Units_Sold 332 · file train.csv · rule N12") ----------
+const EV_WORD: Record<string, string> = { raw: "raw value", after: "after", carry_removed: "carry removed", fill_hat: "estimated fill rate", by_channel: "by channel", n: "count" };
+function evValue(v: unknown): string {
+  if (v === null || v === undefined) return "–";
+  if (typeof v === "number") return Number.isInteger(v) ? fmtInt(v) : v.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  if (typeof v === "string") return v === "" ? "blank" : readableMonths(v);
+  if (Array.isArray(v)) return v.map(evValue).join(", ");
+  if (typeof v === "object") return Object.entries(v as Record<string, unknown>).map(([k, x]) => `${readableMonths(k.replace(/_/g, " "))} ${evValue(x)}`).join(", ");
+  return String(v);
+}
+function Evidence({ text }: { text: string }) {
+  let obj: unknown = null;
+  try {
+    obj = JSON.parse(text);
+  } catch {
+    obj = null;
+  }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return <>{readableMonths(text)}</>;
+  return (
+    <span className="g1-ev">
+      {Object.entries(obj as Record<string, unknown>).map(([k, v]) => (
+        <span key={k}>
+          <em>{EV_WORD[k] ?? k.replace(/_/g, " ")}</em> {evValue(v)}
+        </span>
+      ))}
+    </span>
   );
 }

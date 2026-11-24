@@ -151,6 +151,8 @@
 .view-foot dt { color: var(--ink-2); font-weight: 600; white-space: nowrap; }
 .view-foot dd { margin: 0; }
 .view-foot b { color: var(--ink-2); font-weight: 600; }
+.view-foot a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--ink-4); }
+.view-foot a:hover { color: var(--ink); text-decoration-color: currentColor; }
 
 /* narrow screens: the lede and the headline figures come first, then everything else stacks */
 @media (max-width: 700px) {

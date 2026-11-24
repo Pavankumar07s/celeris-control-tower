@@ -188,7 +188,7 @@ export const CHANGE_TEMPLATES = {
     text: (c) => `${lead(c).label} moves most, ${fmtSignedPct(lead(c).pct)}, against a net ${fmtSignedPct(c.total / c.rows.reduce((a, r) => a + r.last, 0))}`,
     fallback: (c) => `Change by ${c.dim}: the next 12 months against the last 12`,
   },
-  /** "The mix barely moves: the largest share shift is North America, −0.27 pts." */
+  /** "The mix barely moves among regions: the largest share shift is North America, −0.27 pts." */
   note: {
     id: "overview.change.note",
     when: (c) => !!c.maxShift && c.rows.length > 1,
@@ -196,7 +196,8 @@ export const CHANGE_TEMPLATES = {
       const s = c.maxShift as ChangeRow;
       const a = Math.abs(s.shareDelta);
       const lead = a < 0.01 ? "The mix barely moves" : a < 0.03 ? "The mix shifts" : "The mix shifts markedly";
-      return `${lead}: the largest share shift is ${s.label}, ${fmtPts(s.shareDelta, 2)}.`;
+      // name the dimension: the brief's mix sentence ranks every region, family and channel, this note one of them
+      return `${lead} among ${c.dim === "family" ? "families" : `${c.dim}s`}: the largest share shift is ${s.label}, ${fmtPts(s.shareDelta, 2)}.`;
     },
     fallback: (c) => (c.rows.length <= 1 ? `The filters fix the ${c.dim}: there is no mix to compare.` : ""),
   },

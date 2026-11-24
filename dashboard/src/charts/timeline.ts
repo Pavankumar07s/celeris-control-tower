@@ -39,7 +39,7 @@ export interface TimelineSpec {
    *  imputed = rebuilt cells (missing rows + unknown units; drives the rings and the rebuilt annotation),
    *  missing = of which rows missing from the extract (tooltip detail), cells = cells in the selection,
    *  unknownDemand = demand on cells whose shipments are unknown (kept out of the lost-sales gap). */
-  hist?: { shipped: ArrayLike<number>; demand: ArrayLike<number>; imputed: ArrayLike<number>; cells: ArrayLike<number>; missing?: ArrayLike<number>; unknownDemand?: ArrayLike<number> };
+  hist?: { shipped: ArrayLike<number>; demand: ArrayLike<number>; imputed: ArrayLike<number>; cells: ArrayLike<number>; missing?: ArrayLike<number>; unknown?: ArrayLike<number>; unknownDemand?: ArrayLike<number> };
   /** Forecast by window month (length nWin). */
   fc?: { value: ArrayLike<number>; p10?: ArrayLike<number>; p50?: ArrayLike<number>; p90?: ArrayLike<number> };
   anomalies?: TimelineAnomaly[];
@@ -451,8 +451,9 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
         data: pts.map((a) => ({ value: [rel(a.month), a.value], text: a.text, symbolOffset: [dx(a.month), 0] })),
         symbol: cls === "data_error" ? "diamond" : "triangle",
         symbolSize: 9,
-        // design system 2.4: data error fixed = hollow rose diamond (cat-1); real event kept = filled jade triangle (cat-7)
-        itemStyle: cls === "data_error" ? { color: t.paper, borderColor: t.cat[0], borderWidth: 1.75 } : { color: t.cat[6], borderColor: t.paper, borderWidth: 1.5 },
+        // design system 2.4: data error = hollow violet diamond (cat-2); real event kept = filled ink triangle (real
+        // events are history: ink is the past).  No red / green pair, so neither class reads as a status.
+        itemStyle: cls === "data_error" ? { color: t.paper, borderColor: t.cat[1], borderWidth: 1.75 } : { color: t.ink, borderColor: t.paper, borderWidth: 1.5 },
         z: cls === "data_error" ? 9 : 8,
         tooltip: { trigger: "item", formatter: (p: { data: { text: string } }) => `<div class="tt" style="max-width:300px">${esc(p.data.text)}</div>` },
       });
@@ -705,13 +706,17 @@ export function timelineAnnotations(c: AnnotationContext): Annotation[] {
       while (b < asOf && miss[b + 1] > thr) b++;
       let total = 0;
       let rowsMissing = 0;
+      let unknownCells = 0;
       for (let i = a; i <= b; i++) {
         total += miss[i];
         rowsMissing += s.hist.missing ? s.hist.missing[i] : miss[i];
+        unknownCells += s.hist.unknown ? s.hist.unknown[i] : 0;
       }
       // one vocabulary with Data health and the anomaly monitor: missing rows are rebuilt from the Record_ID
-      // grid; ERP blanks have units unknown and are kept out of fitting (neither is ever zero-filled)
-      const unknown = Math.max(0, total - rowsMissing);
+      // grid; ERP blanks have units unknown and are kept out of fitting (neither is ever zero-filled).  The
+      // unknown count is the units_unknown flag outside rebuilt rows (HistoryAgg.unknown), the same variable as
+      // the Overview figure and Data health, not "imputed minus missing" (one unknown cell is not imputed).
+      const unknown = s.hist.unknown ? unknownCells : Math.max(0, total - rowsMissing);
       const ev = events.find((e) => E.type[e.i] === "System" && e.start <= b && e.end >= a);
       const mid = Math.round((a + b) / 2);
       const what = [rowsMissing > 0 ? `${fmtInt(rowsMissing)} missing rows rebuilt` : "", unknown > 0 ? `${fmtInt(unknown)} cells with units unknown, kept out of fitting` : ""].filter(Boolean).join("; ");
@@ -795,7 +800,9 @@ export function timelineAnnotations(c: AnnotationContext): Annotation[] {
 
 /** Annotations for anomaly marks (marker AND text): the `max` largest by |impact| you pass in, each labelled
  *  with its type and a short reason.  Use with <TimelineChart annotate> on the anomaly monitor. */
-export function anomalyAnnotations(model: TimelineModel, items: { month: number; value: number; cls: "data_error" | "real_event"; title: string; text: string; impact: number }[], max = 3): Annotation[] {
+/** `heading` (optional) replaces the "<class>: <title>" heading, e.g. "Data errors, May 2023" for a month cluster
+ *  whose text then names the leading type with its own count. */
+export function anomalyAnnotations(model: TimelineModel, items: { month: number; value: number; cls: "data_error" | "real_event"; title: string; text: string; impact: number; heading?: string }[], max = 3): Annotation[] {
   return [...items]
     .filter((a) => a.month >= model.start && a.month < model.start + model.labels.length)
     .sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
@@ -804,7 +811,7 @@ export function anomalyAnnotations(model: TimelineModel, items: { month: number;
       id: `anom-${a.month}-${k}`,
       at: a.month - model.start,
       value: a.value,
-      title: `${a.cls === "data_error" ? "Data error" : "Real event"}: ${a.title}`,
+      title: a.heading ?? `${a.cls === "data_error" ? "Data error" : "Real event"}: ${a.title}`,
       text: a.text,
       anchor: "above" as const,
       tone: "past" as const,

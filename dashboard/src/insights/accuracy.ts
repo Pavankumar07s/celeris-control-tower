@@ -398,6 +398,13 @@ export const HORIZON_TEMPLATES = {
       const a = h.first as number;
       const b = h.last as number;
       const pts = (h.values ?? []).map((v, i) => [v, i] as const).filter((x): x is readonly [number, number] => x[0] !== null && Number.isFinite(x[0]));
+      // a narrow band (the whole curve within 15 % of its peak) reads as steady on an honest 0-based axis: say so,
+      // instead of "grows ... to a peak" over a line that looks flat
+      if (pts.length >= 3) {
+        const top = Math.max(...pts.map((p) => p[0]));
+        const bottom = Math.min(...pts.map((p) => p[0]));
+        if (top > 0 && (top - bottom) / top < 0.15 && shownPct(top) !== shownPct(bottom)) return `Error stays between ${fmtPct(bottom)} and ${fmtPct(top)} at every horizon, ${h.firstLabel} to ${h.lastLabel} ahead`;
+      }
       if (pts.length >= 3 && h.labels) {
         const hi = pts.reduce((x, y) => (y[0] > x[0] ? y : x));
         const lo = pts.reduce((x, y) => (y[0] < x[0] ? y : x));
@@ -477,9 +484,10 @@ export const BIAS_TEMPLATES = {
           if (shown(Math.abs(me.bias)) === shown(Math.abs(most.value))) {
             const others = b.cells.filter((c) => c !== me && shown(Math.abs(c.bias)) === shown(Math.abs(most.value)));
             const name = (c: { fam: string; reg: string }) => (c.fam === me.fam ? c.reg : `${c.fam} in ${c.reg}`);
-            return `${me.fam} in ${me.reg}: bias ${shown(me.bias)}, the largest of any family × region cell${others.length ? `, tied with ${joinList(others.map(name))}` : ""}`;
+            return `The ${me.fam} × ${me.reg} cell: bias ${shown(me.bias)}, the largest of any family × region cell${others.length ? `, tied with ${joinList(others.map(name))}` : ""}`;
           }
-          return `${me.fam} in ${me.reg}: bias ${shown(me.bias)}; the largest cell, ${most.words}, is ${shown(most.value)}`;
+          // name the scope: the cell is the whole family × region, not the selected series (whose bias the hero shows)
+          return `The ${me.fam} × ${me.reg} cell: bias ${shown(me.bias)}; the largest cell, ${most.words}, is ${shown(most.value)}`;
         }
       }
       if (b.selFam || b.selReg) {

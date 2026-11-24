@@ -41,6 +41,7 @@ export interface Theme {
   crit: string;
   critWash: string;
   scenario: string;
+  scenarioTint: string;
   /** Categorical slots 1-7 (families by index; regions use 0-5, channels 0-3) and [7] = "Other" (ink-4).
    *  Orange is reserved for the forecast and is deliberately NOT in this array (nor is any blue). */
   cat: string[];
@@ -70,7 +71,8 @@ const FALLBACK: Record<string, string> = {
   "--accent-band": "rgba(255, 106, 19, 0.24)", "--accent-edge": "rgba(194, 78, 8, 0.55)", "--accent-tint": "#F0C4A2",
   "--loss": "#A8322D", "--loss-fill": "rgba(160, 40, 40, 0.24)", "--good": "#067006", "--good-wash": "#DCE6CC",
   "--warn": "#7A5C00", "--warn-wash": "#EADFB5", "--warn-mark": "#A07A00", "--crit": "#B02E2E", "--crit-wash": "#F0D6CF",
-  "--scenario": "#7862BF",
+  "--scenario": "#3F3A31",
+  "--scenario-tint": "#B3A892",
   "--cat-1": "#B74B61", "--cat-2": "#7862BF", "--cat-3": "#8A7300", "--cat-4": "#A84F8E", "--cat-5": "#6B7F09", "--cat-6": "#9358AC", "--cat-7": "#04896A", "--cat-other": "#8A8475",
   "--hist-1": "#E4DCCB", "--hist-2": "#CFC5B1", "--hist-3": "#B3A892", "--hist-4": "#958B76", "--hist-5": "#766D5C", "--hist-6": "#554E42", "--hist-7": "#2E2A24",
   "--fc-1": "#F6DFCB", "--fc-2": "#F3C29C", "--fc-3": "#EEA06A", "--fc-4": "#E47C3A", "--fc-5": "#C95A14", "--fc-6": "#A3420A", "--fc-7": "#7A2F05",
@@ -126,6 +128,7 @@ export function readTheme(name: ThemeName): Theme {
     crit: v("--crit"),
     critWash: v("--crit-wash"),
     scenario: v("--scenario"),
+    scenarioTint: v("--scenario-tint"),
     cat,
     hist,
     fcRamp,

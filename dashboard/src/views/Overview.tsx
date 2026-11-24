@@ -27,6 +27,7 @@ import { reasonShort, lastOrderPhrase } from "../insights/inbox";
 import { repairFacts } from "../insights/health";
 import { countWord, render, selectionWords } from "../insights/headlines";
 import { CHANGE_TEMPLATES, OUTLOOK_TEMPLATES, OVERVIEW_TEMPLATES, TOP_TEMPLATES, changeDek, changeFacts, changeTitle, overviewFacts, timelineDek } from "../insights/overview";
+import { firstForecastMonth } from "./g2/XRay";
 import "./Overview.css";
 
 const DIMS: BreakdownDim[] = ["region", "family", "channel"];
@@ -76,7 +77,7 @@ export default function Overview() {
       measure,
       lens,
       filters,
-      hist: { shipped: latent ? h.latent : h.shipped, demand: latent ? h.latent : h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand },
+      hist: { shipped: latent ? h.latent : h.shipped, demand: latent ? h.latent : h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknown: h.unknown, unknownDemand: h.unknownDemand },
       fc: latent ? (fLatent ? { value: fLatent } : undefined) : { value: fc.fc, p10: fc.p10, p50: fc.p50, p90: fc.p90 },
       range,
       columns: single !== null,
@@ -104,6 +105,8 @@ export default function Overview() {
   const pa = m.meta.price_assumption.vs_2026_pct;
   const priceYears = Object.entries(pa).filter(([, v]) => v !== 0);
   const { final, naive, snaive, cycle, floor, origins: nOrigins } = ladderFacts(m);
+  const replayOrigin = m.meta.backtest.origins[m.meta.backtest.origins.length - 1] ?? null;
+  const xrMonth = useMemo(() => firstForecastMonth(m, runs), [m, runs]);
   // the best (lowest-WAPE) benchmark, as Forecast & accuracy names it; differences from the printed values
   const best = [cycle, snaive, naive].filter((x): x is NonNullable<typeof x> => !!x).reduce<typeof cycle>((a, b) => (!a || Number((b.wape * 100).toFixed(1)) < Number((a.wape * 100).toFixed(1)) ? b : a), undefined);
   const bestLabel = best === cycle ? "cycle-aware naive" : best === snaive ? "seasonal naive" : "naive";
@@ -287,6 +290,8 @@ export default function Overview() {
             unit={usd ? undefined : "units"}
             visual={facts.total19 > 0 ? <RangeStrip p10={p10} p90={p90} mid={facts.total19} reference={facts.last19 > 0 ? facts.last19 : undefined} refLabel={`Last ${m.nWin} months`} format={fv} /> : undefined}
             context={facts.last19 > 0 && facts.total19 > 0 ? <Delta value={facts.chg19} suffix={`vs the last ${m.nWin} months of demand`} /> : "No demand in the last 19 months to compare with."}
+            // one click to the forecast X-ray: why the first forecast month is what it is (season × macro × EV × lifecycle × event × cycle)
+            link={xrMonth >= m.w0 && fc.fc[xrMonth - m.w0] > 0 ? { label: `Why ${monthName(m.months[xrMonth])} is ${fv(fc.fc[xrMonth - m.w0])}: the forecast X-ray`, onClick: () => go("forecast", { at: "xray", origin: null }) } : undefined}
             info={{
               what: `Sum of the submitted forecast over ${monthName(m.months[m.w0])} – ${monthName(m.months[m.nMonths - 1])} for the selection, with the P10–P90 range of that ${m.nWin}-month total.`,
               how: "The range comes from the contract's aggregate-quantile formula on the summed means, noise variances and shared level and family × region errors, never from summed row quantiles. The change is against the unconstrained demand of the last 19 actual months.",
@@ -330,7 +335,7 @@ export default function Overview() {
           visual={<Sparkline history={altHist} forecast={altFc} divider={m.asOf} ariaLabel={`${usd ? "Units" : "Revenue"} per month, ${fullRange}, history in ink and forecast in orange`} />}
           context={
             altLast19 > 0
-              ? `**${fmtSignedPct(alt19 / altLast19 - 1)}** vs ${usd ? `${fmtNum(altLast19)} units` : fmtMoney(altLast19)} in the last ${m.nWin} months${!usd && priceYears.length ? `; list prices ${priceYears.map(([y, v]) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}% in ${y}`).join(", ")}` : ""}. Per month, ${fullRange}`
+              ? `**${fmtSignedPct(alt19 / altLast19 - 1)}** vs ${usd ? `${fmtNum(altLast19)} units` : fmtMoney(altLast19)} in the last ${m.nWin} months${!usd && priceYears.length ? `; list prices ${priceYears.map(([y, v]) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}% in ${y}`).join(" and ")}, each against ${m.months[m.asOf].slice(0, 4)}` : ""}. Per month, ${fullRange}`
               : `Per month, ${fullRange}`
           }
           info={{
@@ -352,8 +357,9 @@ export default function Overview() {
               />
             ) : undefined
           }
-          link={{ label: "Forecast & accuracy", onClick: () => go("forecast") }}
-          info={{ what: "Rolling-origin backtest at a 19-month horizon over every SKU × region × month, pooled over the scored origins on the cells every model forecast (all series, not the filter).", how: "WAPE = Σ|actual − forecast| / Σ actual on unconstrained demand. Lower is better; the in-hindsight floor is the error a model that knew each series' level in hindsight would still make.", source: "meta.json (backtest ladder)" }}
+          // one click to the backtest time machine: the forecast made at the latest origin, replayed against what happened
+          link={replayOrigin ? { label: `Replay the forecast made in ${monthName(replayOrigin)}`, onClick: () => go("forecast", { origin: replayOrigin }) } : { label: "Forecast & accuracy", onClick: () => go("forecast") }}
+          info={{ what: "Rolling-origin backtest at a 19-month horizon over every SKU × region × month, pooled over the scored origins on the cells every model forecast (all series, not the filter). Seasonal naive repeats the same month last year; cycle-aware naive places last year's demand on the months the customer actually orders. The in-hindsight floor is the error a forecast would still make even if it had known each series' true level in hindsight: the noise no model can remove.", how: "WAPE = Σ|actual − forecast| / Σ actual on unconstrained demand. Lower is better. The link replays the forecast made at the latest backtest origin, month by month against the actuals.", source: "meta.json (backtest ladder)" }}
         />
         <Figure
           label={`Lost sales, ${m.months[0].slice(0, 4)}–${m.months[m.asOf].slice(0, 4)}`}

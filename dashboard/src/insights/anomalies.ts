@@ -114,6 +114,8 @@ export interface AnomalyFacts {
   realCells: number;
   /** Data-error cells whose units stay unknown (ERP blanks): kept out of fitting, not corrected. */
   unknownCells: number;
+  /** History cells of the selection the cleaning repaired (the Overview / Data health figure), for the bridge. */
+  repairedHist: number | null;
   /** Episode-level flags in the selection: on the selected series themselves, and file- or market-wide
    *  episodes (no series) whose scope covers the selection.  episodes = seriesEpisodes + wideEpisodes. */
   episodes: number;
@@ -132,7 +134,7 @@ export interface AnomalyFacts {
 
 /** `unknownHist`: cells of the selection whose units stay unknown, from the history flags (the variable the Overview
  *  and Data health use); without it the register's own "units unknown" actions are counted. */
-export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: string, single: boolean, unknownHist?: number): AnomalyFacts {
+export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: string, single: boolean, unknownHist?: number, repairedHist?: number): AnomalyFacts {
   const byType = new Map<string, TypeRow>();
   const perMonth = new Map<number, Map<string, number>>();
   let errCells = 0;
@@ -152,10 +154,11 @@ export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: str
       r.episodes++;
       r.covered += a.n_cells[i] ?? 0;
     }
-    // impact counts only flags tied to a series: a file- or market-wide episode's impact is not the selection's
-    if (a.series[i] >= 0) {
-      r.units += Math.abs(a.impact_units[i] ?? 0);
-      r.usd += Math.abs(a.impact_usd[i] ?? 0);
+    // impact counts only flags tied to a series: a file- or market-wide episode's impact is not the selection's.
+    // Signed (the register's convention); a flag whose action changes no demand moves nothing.
+    if (a.series[i] >= 0 && !noDemandEffect(lab(a.action, i))) {
+      r.units += a.impact_units[i] ?? 0;
+      r.usd += a.impact_usd[i] ?? 0;
     }
     byType.set(code, r);
     if (isCell) {
@@ -195,6 +198,7 @@ export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: str
     errCells,
     realCells,
     unknownCells: unknownHist ?? unknownCells,
+    repairedHist: repairedHist ?? null,
     episodes,
     seriesEpisodes,
     wideEpisodes: episodes - seriesEpisodes,
@@ -268,3 +272,14 @@ export const ANOMALY_TEMPLATES = {
   },
 } satisfies Record<string, Template<AnomalyFacts>>;
 
+
+/** A flag whose action says it changes no demand (a surcharge in the price table, a reviewed non-event): its
+ *  impact is not demand moved, so the register prints a dash and the type tables count nothing. */
+export const noDemandEffect = (action: string | null | undefined): boolean => /no demand effect/i.test(action ?? "");
+
+/** The bridge to the Overview / Data health "repaired cells" (one sentence under the data-error table): the repaired
+ *  history cells also count value fixes the register logs once per file-wide episode, not per cell. */
+export function repairBridge(f: AnomalyFacts): string {
+  const other = f.repairedHist !== null ? f.repairedHist - f.errCells : 0;
+  return other > 0 ? `The ${fmtInt(f.repairedHist as number)} repaired history cells on the Overview and Data health also count ${fmtInt(other)} value ${plural(other, "fix", "fixes")} the register logs once per file-wide episode (units recovered from revenue, prices in cents or euros, revenue scale), not per cell.` : "";
+}

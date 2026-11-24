@@ -1,13 +1,34 @@
 # Design gate results: every view against both acceptance gates
 
+**Round 2, 25 Nov 2026 (read this first).** A second independent review of the fixed build
+(`research/dashboard-review-r2.md`, 8.4 / 10: 1 critical, 4 major, 18 minor findings) disproved two claims this file
+made after round 1:
+
+- **UI/UX item 3 (keyboard) was marked P but failed on every view.** The Family, Region and Channel filter comboboxes
+  could not be operated by keyboard: the listbox relied on `autoFocus` on a `div`, which React ignores, so focus never
+  left the chip and Enter closed the list without choosing. Round 1 had checked the combobox by reading the code, not by
+  pressing keys. Fixed in round 2 (`components/FilterBar.tsx`: focus moves into the popover by a ref) and now
+  **measured with real key events** (DevTools protocol `Input.dispatchKeyEvent`) on all five chips: ↓ opens with focus
+  on the listbox (Family, Region, Channel) or the search input (SKU, Customer) and `aria-activedescendant` on it; ↓ ↓,
+  End, Home and ↓ ↓ ↑ move the highlight; Enter picks (the hash gains `fam=` / `sku=` / `reg=` / `ch=` / `cust=` and
+  focus returns to the chip); ↓ then Escape closes back to the chip with the hash unchanged; ↓ then Tab closes and moves
+  to the next chip. Identical on all five.
+- **Item 20 (facts agree) was marked P on OV, EX and AN but failed there.** The Demand explorer said "none is lost
+  demand" for a lost account (C1) and "half of the 3,093 series order every month" beside a strip reading "Monthly
+  2,314" (M1); the ERP cells carried 330, 331, 332 and "135 ERP blanks" (M2). All three are fixed (below) and re-checked
+  against the bundle.
+
+Round 2 also fixed the 18 minor findings it judged real (all of them, see "Fixed in round 2"), the favicon and browser
+theme colour (audit S9), and moved the anomaly classes and the EV / ICE lines off the rose / jade pair (N5 closed). The tables below show the state after round 2.
+
 **Fix round, 25 Nov 2026.** The integration pass of 24 Nov marked almost every item "pass". Two independent reviews of
 that build (`research/dashboard-review-art-dataviz-r1.md`, 4 critical / 21 major / 20 minor findings, and
 `research/dashboard-review-usability-r1.md`, 8 major / 27 minor) disproved several of those claims: facts that disagreed
 on the same screen (item 20), keyboard traps and an unnamed dialog (UI/UX 3 and 5), control borders at 1.89:1 (item 27),
 charts that did not draw their claim (UI/UX 18) and no test at all above 1440 px. This file replaces the old one. Every
 item was re-run on the fixed build and records what was **measured**, including what still fails. Gates as defined in
-[`design_system.md`](design_system.md) §13: the 18-point UI/UX Pro Max gate (skill `ui-ux-pro-max`), the 16-point
-dashboard-designer gate (skill `dashboard-designer`), and gate items 17–28 of `research/dashboard-design-skills.md`
+[`design_system.md`](design_system.md) §13: the 18-point UI/UX Pro Max gate, the 16-point
+dashboard-designer gate (the two design checklists), and gate items 17–28 of `research/dashboard-design-skills.md`
 §10.5, plus the team owner's extra-large-screen requirement (1920 / 2560 / 3840 px).
 
 **Evidence.** The production build (`dashboard/dist`) served locally. Screenshots in light and dark at 1440 × 900 and as
@@ -16,17 +37,22 @@ full pages; 375 px (rendered in an iframe, because headless Chrome does not lay 
 Europe; one series ELA-008 · India; the lineage drawer at 4K). A probe page loaded every view at 375, 768, 1024, 1280,
 1440, 1920, 2560 and 3840 px and measured horizontal overflow (document scroll width and any element outside the
 viewport that no scroll container clips), the page column's position, the rail width and the body font size. Contrast
-values are computed from the tokens (WCAG formula). Keyboard behaviour of the combobox and the drawer was checked in the
-code paths (ARIA combobox pattern, Tab trap); hover-only behaviour (tooltips) was not exercised in a live browser. Fork
-screenshots: `research/scratch/dash-fix-r1/forkA/`, `forkB/`; fix log: `research/scratch/dash-fix-r1/fixlog*.md`.
+values are computed from the tokens (WCAG formula). Round 1 checked the keyboard behaviour of the combobox and the
+drawer in the code paths only, which is how the combobox failure above slipped through; round 2 tested the five filter
+comboboxes with real key events and the review tested the drawer live. Hover-only behaviour (tooltips) was not exercised
+in a live browser. Round-1 fork screenshots: `research/scratch/dash-fix-r1/forkA/`, `forkB/`; fix logs:
+`research/scratch/dash-fix-r1/fixlog*.md` and `research/scratch/dash-fix-r2/fixlog.md` (working files, not included in
+the repository). The shipped screenshots are in `docs/screenshots/`.
 
 **Legend.** P = pass. N = passes with a stated limit (see the note). F = fails (see the note). Views: OV Executive
 overview, DH Data health, EX Demand explorer, AN Anomaly monitor, SO Stock-outs & lost sales, MA Macro lead / lag, FA
 Forecast & accuracy, LC Lifecycle, WI What-if, EI Exception inbox, PP Procurement plan, DD Data download.
 
-**Summary.** 0 F on the UI/UX Pro Max gate; 0 F on the dashboard-designer gate; 2 F on items 17–28 (item 21, rows end
-level, on Data health and Data download: content-driven, unchanged); the extra-large-screen rows pass on all 12 views.
-The N items are listed with their limits below; none hides a wrong number.
+**Summary (after round 2).** 0 F on the UI/UX Pro Max gate (item 3 failed on every view before round 2; it now passes,
+measured); 0 F on the dashboard-designer gate; 2 F on items 17–28 (item 21, rows end level, on Data health and Data
+download: content-driven, unchanged); item 20 failed on OV / EX / AN before round 2 and now passes; the
+extra-large-screen rows pass on all 12 views. The N items are listed with their limits below; none hides a wrong
+number.
 
 ## UI/UX Pro Max gate (18 points)
 
@@ -51,8 +77,8 @@ The N items are listed with their limits below; none hides a wrong number.
 | 17 | One style, SVG icons only, nothing ornate | P | P | P | P | P | P | P | P | P | P | P | P |
 | 18 | Chart form fits data; actual vs forecast at a glance; anomalies marked and annotated; sorted labelled bars; numeric heat legends | P | P | P | P | P | P | P | P | P | P | P | P |
 
-Changes behind the re-run: item 3 (the filter combobox follows the ARIA combobox pattern with `aria-activedescendant`, so
-the highlight, the focus ring and what Enter picks are the same option; the drawer traps Tab and Shift+Tab); item 5
+Changes behind the re-run: item 3 (round 2: all five filter comboboxes follow the ARIA combobox pattern and were tested
+with real key events, see the top of this file; the drawer traps Tab and Shift+Tab); item 5
 (the drawer is named by its headline through `aria-labelledby`); item 8 (every "i" has a 24 px hit area at all widths);
 item 12 (the probe now covers 1920 / 2560 / 3840: no overflow on any view); item 18 (the anomaly type tables share one
 bar scale; data-error marks sit on their value; region accuracy is drawn as dot-range rows against seasonal naive and the
@@ -69,7 +95,7 @@ in-hindsight floor; Stock-outs leads with the lost / back-ordered bars; the hori
 | 5 | Every headline figure has a comparison and a unit | P | P | P | P | P | P | P | P | P | P | P | P |
 | 6 | Every chart title states the insight | P | P | P | P | P | P | P | P | P | P | P | P |
 | 7 | ≤ 4–5 colours on screen, ink default, consistent across views | P | P | P | P | P | N4 | P | P | P | P | P | P |
-| 8 | Red / green / amber only for status, never the only cue | P | P | P | N5 | P | N5 | P | P | P | P | P | P |
+| 8 | Red / green / amber only for status, never the only cue | P | P | P | P | P | P | P | P | P | P | P | P |
 | 9 | Date range on every time chart; history vs forecast at a glance | P | P | P | P | P | P | P | P | P | P | P | P |
 | 10 | Filters at the top, default "all" | P | P | P | P | P | P | P | P | P | P | P | P |
 | 11 | Sensible precision and units | P | P | P | P | P | P | P | P | P | P | P | P |
@@ -128,9 +154,15 @@ Measured geometry (probe, all 12 views identical): at 1920 the page runs x = 274
 page was x = 232–1440 at every width, with 480 / 1,120 / 2,400 px of empty cream on the right and 14 px body text.
 Seen in screenshots: Overview at all three sizes (light; `docs/screenshots/final_overview_1920.png`, `_2560`, `_3840`),
 Data health at 1920, Exception inbox at 1920 and at 3840 in dark, Demand explorer at 2560, Forecast & accuracy at 2560
-(full page), Anomaly monitor with the lineage drawer at 3840 (`research/scratch/dash-fix-r1/xl*.png`); the other views by
-the probe (final build: 0 px of overflow on all 12 views at 375, 768, 1024, 1280, 1440, 1920, 2560 and 3840 px) and the
-shared layout.
+(full page), Anomaly monitor with the lineage drawer at 3840 (`research/scratch/dash-fix-r1/xl*.png`, working files, not
+included in the repository); the other views by the probe (final build: 0 px of overflow on all 12 views at 375, 768,
+1024, 1280, 1440, 1920, 2560 and 3840 px) and the shared layout.
+
+Round 2 (m14): at 2560 px and wider the lede left a 500–900 px hole between the 70-ch standfirst and the hero. From
+1920 px the text column now shrinks to its content and the hero sits beside it (see `design_system.md` §4.1); seen in
+`docs/screenshots/final_overview_1920.png`, `_2560`, `_3840`. The probe was re-run on the round-2 build: 0 px of
+horizontal overflow on all 12 views at all eight widths (one regression found and fixed on the way: the hero's new
+X-ray link ran 10 px past the edge at 1024 px until figure links were allowed to wrap).
 
 ## Notes
 
@@ -146,9 +178,9 @@ shared layout.
   "Example" links in the checks ledger and type labels in the anomaly tables stay text-sized.
 - **N4 (colours, MA).** The correlation matrix (diverging jade ↔ plum) and the EV-shift chart put six hues on one scroll
   of the page; each chart alone stays within four.
-- **N5 (status-like hues, AN / MA).** Jade and rose are categorical slots (anomaly classes; EV vs ICE), not status green
-  and red, and they always carry a shape (triangle / diamond) or a direct label, but at a glance they read like good /
-  bad (reviewer finding AD m10, left open: a palette decision for the team owner).
+- **N5 (status-like hues) — closed in round 2.** The anomaly classes and the EV / ICE lines used the jade and rose
+  slots, which read like good / bad. Data errors are now violet hollow diamonds and real events ink triangles (real
+  events are history); on the Macro view EV stays jade and ICE moves to violet. Neither pair is red / green any more.
 - **F6 / N6 (rows end level).** Data health: the row-bridge module ends above the repairs table beside it; Data download:
   the bundle manifest ends about 300 px above the modelling-inputs column. Stock-outs and Forecast & accuracy end within
   about 100 px. Overview at 1440: the brief ends above the change table and top exceptions (at ≥ 1920 px the three sit
@@ -166,7 +198,39 @@ shared layout.
   a tab print in thousands ("$733K") and the total in millions, the tabs can still differ from the total by up to about
   $7K of rounding.
 
-## Fixed in this round (summary; the full log is `research/scratch/dash-fix-r1/fixlog*.md`)
+## Fixed in round 2 (25 Nov 2026; log `research/scratch/dash-fix-r2/fixlog.md`, a working file not included in the repository)
+
+- **C1** Demand explorer, lost account: one classification of zero months (`zeroClass()`, lost account first, because
+  the pipeline also sets `structural_zero` on those months) feeds the standfirst, the module title, the hero's 12-month
+  strip and the calendar. PTC-002 · North America now reads "55 of 94 months were zero: 38 scheduled off-months of that
+  cycle and 17 since the last order in May 2025 (8 of them months the cycle would have ordered)"; the aggregate headline
+  is 98.8 % (it counted 204 lost-account months as ordering cycles at 99.4 %). Bundle check: 55 = 38 + 17, 8 on-phase.
+- **M1** "Monthly" is one variable (every month plus every month but one shutdown month: 1,539 + 775 = 2,314): "Three
+  quarters of the 3,093 series order monthly (775 of them skip one shutdown month a year)", with the same definition
+  under the strip and in the composition title.
+- **M2** ERP cells: the timeline annotation counts the `units_unknown` flag outside rebuilt rows (331, was 330 =
+  imputed − missing); anomaly clusters are headed by class and month and count their leading type ("Data errors,
+  May 2023: 135 cells, 113 of them ERP blanks"); 332 is named as "records with units blank in train.csv" and 331 as "grid
+  cells that keep their units unknown after 1 was restored from the stock-out file's shipped units" on the Anomaly
+  monitor and Data health.
+- **M4** filter comboboxes by keyboard (see the top of this file).
+- **Minor findings m1–m18**: the mix note names its dimension ("among regions"); top-five reasons wrap; list prices
+  "each against 2026"; ramp ratios from the printed averages (×3.45, ×2.04); a near tie in the inbox heat title names
+  both families; the bias title names its scope ("the Electrical Assemblies × India cell"); "in none of the 4 folds";
+  "Error stays between 24.5% and 27.7% at every horizon"; one sign convention for anomaly impact, with a dash where the
+  action changes no demand; evidence as readable fields; a bridge from 2,558 register errors to the 7,917 repaired cells;
+  a scenario token outside the categorical set (warm ink, dashed) with quiet difference bars; `theme=` applied on every
+  hash change; the extra-large lede; "3 SKUs end in the window; 6 more were discontinued before it"; rule labels wrap
+  (and a real ellipsis on the heat-strip axis); "outlined" in the macro deck; "15 more types flagged only as whole
+  episodes".
+- **Also**: the accuracy tile replays the forecast made at the latest backtest origin and the hero opens the forecast
+  X-ray (one click each from the Overview); plain one-line definitions of latent demand, cycle-aware naive and the
+  in-hindsight floor in the glossary and the "i" popovers; the black / orange / cream favicon and `theme-color`; licence
+  links in the footer; the macro matrix outlines only drivers of the full-history fit (`src/celeris/export/macro.py`,
+  bundle re-exported: only `macro.json` and `meta.json` changed; the "5 of 7 stable" count is unchanged); readable
+  account events in the series card (cycle codes in words, no dangling "2025-05 to").
+
+## Fixed in round 1 (summary; the full log is `research/scratch/dash-fix-r1/fixlog*.md`, working files, not included in the repository)
 
 Shared layer: fluid unit `--u` and a centred page whose bars share the content edge; measure steps at 1600 / 1920 / 2240 /
 2560 / 3200 px; chart heights from width and viewport (`chartHeight`); canvas fonts and annotation boxes on the same

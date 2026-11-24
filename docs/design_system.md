@@ -22,14 +22,15 @@ leads; rules and whitespace replace boxes; every chart title states its conclusi
 
 ## 0. Before you start (mandatory)
 
-1. Load the two skills the team owner supplied, with the Skill tool, before touching a view:
-   - **`ui-ux-pro-max`** (`.claude/skills/ui-ux-pro-max/`; first priority, "use this first"). How it applies here:
+1. Read the two design checklists the design follows, both public rule sets used as checklists only:
+   - **UI/UX Pro Max** (github.com/nextlevelbuilder/ui-ux-pro-max-skill; first priority). How it applies here:
      `research/dashboard-skill-ui-ux-pro-max.md`.
-   - **`dashboard-designer`** (`.claude/skills/dashboard-designer/SKILL.md`). How it applies here:
+   - **dashboard-designer** (a community rule set under MIT). How it applies here:
      `research/dashboard-design-skills.md`, section 9.
-   - Also load **`dataviz`** before writing chart code (palette validation, mark specs).
-2. Every view must pass **both acceptance gates in [§13](#13-acceptance-gates-every-view-before-it-ships)**: the
-   18-point UI/UX Pro Max gate first, then the 16-point dashboard-designer gate.
+   - For chart code, follow the chart rules of [§6](#6-charts) (palette validation, mark specs; background in
+     `research/dashboard-design-skills.md` §7).
+2. Every view must pass **both acceptance gates in [§13](#13-acceptance-gates-every-view-before-it-ships)**, the two
+   design checklists: the 18-point UI/UX Pro Max gate first, then the 16-point dashboard-designer gate.
 
 Contents: [1 Principles](#1-principles) · [2 Colour](#2-colour) · [3 Typography](#3-typography) ·
 [4 Layout and shell](#4-layout-and-the-shell) · [5 Components](#5-components) · [6 Charts](#6-charts) ·
@@ -128,7 +129,7 @@ Rules:
 | `--warn` / `--warn-wash` / `--warn-mark` | `#7A5C00` / `#EADFB5` / `#A07A00` | `#E8C547` / `#2A240E` / `#E8C547` | caution, in review; **amber, distinct from the brand orange** | 5.03:1 / mark 3.20:1 |
 | `--crit` / `--crit-wash` | `#B02E2E` / `#F0D6CF` | `#F06A5F` / `#2A1310` | act now, failed check, revenue at risk | 5.16:1 |
 | `--loss` / `--loss-fill` | `#A8322D` / `rgba(160,40,40,.24)` | `#EE7B70` / `rgba(238,123,112,.28)` | lost sales (evaluative, so the red family) | 5.35:1 |
-| `--scenario` | `#7862BF` violet | `#9482DB` | what-if scenario line (solid) | – |
+| `--scenario` / `--scenario-tint` | `#3F3A31` warm ink / `#B3A892` | `#CFC8BA` / `#4E4A42` | what-if scenario line (**dashed**: another forecast) / its difference bars (a quiet warm grey). Outside the categorical set: the old violet equalled `--cat-2` | – |
 
 Alert never reads as forecast: status and loss are red / green / amber, never orange; the warn amber (`#A07A00`, hue
 95°) is far from the brand orange; every status colour ships with an icon (`WarnTriangle`, `CheckCircle`,
@@ -148,9 +149,9 @@ Alert never reads as forecast: status and loss are red / green / amber, never or
 | Forecast window | `--accent-wash` | wash from the last actual to the end |
 | Last actual | `--ink` | solid 1px vertical rule, labelled "Oct 2026 · last actual" |
 | Benchmark / another forecast | `--ink-3`, `--ink-4` | 1.5px **dashed 4/3** (dashes mean "another forecast"; never gridlines, never history) |
-| What-if scenario | `--scenario` | 2px solid; base forecast stays orange; gap labelled at the end |
-| Data error (anomaly: corrected, or units unknown and kept out of fitting) | `--cat-1` rose | 9px hollow diamond on the value with a 2px paper halo, **plus** a text annotation (`anomalyAnnotations`); drawn by `buildTimeline` itself |
-| Real event (anomaly) | `--cat-7` jade | 9px filled triangle **plus** a text annotation; drawn by `buildTimeline` itself |
+| What-if scenario | `--scenario` | 2px **dashed** 4/3 (another forecast); base forecast stays orange with its band; gap labelled at the end; the scenario-minus-base bars use `--scenario-tint` |
+| Data error (anomaly: corrected, or units unknown and kept out of fitting) | `--cat-2` violet | 9px hollow diamond on the value with a 2px paper halo, **plus** a text annotation (`anomalyAnnotations`); drawn by `buildTimeline` itself |
+| Real event (anomaly) | `--ink` | 9px filled triangle with a paper ring **plus** a text annotation; drawn by `buildTimeline` itself. Real events are history, so they wear ink. The two classes never form a red / green pair (round 2 replaced rose / jade, which read as bad / good) |
 
 History and forecast stay distinguishable in greyscale: the divider rule, the wash, the FORECAST zone label and the
 band carry it as well as the hue.
@@ -171,7 +172,7 @@ band carry it as well as the hue.
 In TS: `theme.cat[0..6]` are slots 1–7 and `theme.cat[7]` is "Other". Orange is deliberately **not** in the array.
 
 Chosen on 24 Nov 2026 by searching OKLCH hues that exclude orange / brown (30–80°), blue (225–275°) and the status
-green, then validating every order with the dataviz skill's `validate_palette.js` (Machado 2009 CVD, OKLab ΔE×100) in
+green, then validating every order with a palette validator (`validate_palette.js`: Machado 2009 CVD, OKLab ΔE×100) in
 both themes. ALL PASS:
 
 | Check | Light (on `#EDE6D6`) | Dark (on `#0A0A0A`) |
@@ -288,10 +289,14 @@ through `fz()` ([§6.1](#61-theme-and-helpers-chartsthemets)). Write any new siz
   tech ("Family filter: All"); each opens a combobox popover (search for SKU and Customer; the SKU list is ranked by
   last-12-month units with mono codes and volume bars; the customer note explains "customer at the time"). Right end:
   "**N** series in view" (live region) and Reset. Defaults to all. It writes the URL hash. Sticky above 700px.
-  Keyboard: the popover follows the ARIA combobox pattern. Focus stays on one element (the search input, or the listbox
-  when there is no search) and `aria-activedescendant` names the highlighted option, so the highlight, the focus ring and
-  what Enter picks are always the same option; ↑ ↓, Home / End, Page Up / Down move it, Escape closes and returns focus
-  to the chip, Tab closes. Options are `role="option"` elements, not tab stops.
+  Keyboard: all five chips behave the same and follow the ARIA combobox pattern. Opening (click, Enter, Space, ↓ or ↑)
+  moves focus into the popover: onto the search input for SKU and Customer, onto the listbox itself for Family, Region
+  and Channel (focused by a ref in an effect: React ignores `autoFocus` on a `div`, which is what broke these three in
+  round 1). `aria-activedescendant` on the focused element names the highlighted option, so the highlight, the focus ring
+  and what Enter picks are always the same option; ↑ ↓, Home / End, Page Up / Down move it (a typed letter jumps on the
+  lists without search), Enter picks and returns focus to the chip, Escape closes and returns focus to the chip, Tab
+  closes and moves on from the chip. Options are `role="option"` elements, not tab stops. Verified with real key events
+  on all five chips (`docs/design_gate_results.md`).
 - **Footer** (`components/shell/Footer.tsx`, black band, mounted by the shell on every view): data as of (last actual
   month, forecast window), source (bundle version, export command, package version, history cells, forecast rows),
   pipeline run (short SHA-256 of the forecast and submission files, final or provisional inputs), and when the bundle
@@ -328,6 +333,10 @@ Tested at 1920 × 1080, 2560 × 1440 and 3840 × 2160 (device scale 1) with no h
 
 - **Prose never widens**: the headline (24ch), standfirst (70ch), deks (75ch) and the brief keep their limits; the extra
   width goes to charts, tables and extra grid columns.
+- **The lede from 1920px**: the 8 | 4 split left a 500–900px hole between the standfirst and the hero at 2560px and
+  wider. From 1920px the text column shrinks to its content (`fit-content`, at most 860 × u) and the hero sits right
+  beside it (400–760 × u, `justify-content: start`), so the hero reads with its headline; the spare width falls at the
+  far right as margin.
 - **Charts grow with the screen** (`chartHeight` in `charts/theme.ts`): the shared timeline keeps its 1440 shape (about
   3.1 : 1), between its design height × the type scale and min(2.2 × design, 55 % of the viewport height), so it still
   sits under the headline on a 1080px-high screen; every other chart grows with the viewport (up to 1.6×), never below
@@ -343,7 +352,18 @@ opens the lineage drawer from `cell=<SKU>|<region>|<yyyy-mm>` (`encodeCell` / `d
 so a reload or a shared link reopens it on the same cell.
 
 **Theme.** `theme=dark|light` in the hash wins (a shared link opens in the sender's theme), then the choice saved by the
-toggle (`localStorage` `celeris-theme`), then the system preference. Toggling drops a `theme` carried in by a link.
+toggle (`localStorage` `celeris-theme`), then the system preference. The hash is re-read on every hash change, not only on
+a full load, so pasting a `theme=` link into the same tab or going back switches the theme and the URL always reflects
+it; a theme from a link is not saved. Toggling drops a `theme` carried in by a link.
+
+**Deep links from the Overview.** The hero's evidence link opens the forecast X-ray (`#/forecast?at=xray`: the view
+scrolls to the X-ray once it has rendered, moves focus to its title and drops `at`); the backtest tile opens the time
+machine at the latest backtest origin (`#/forecast?origin=2025-03`).
+
+**Browser chrome.** `index.html` carries an SVG favicon in the rail mark's style (two chalk bars and one orange bar on a
+black tile, with a `prefers-color-scheme: dark` variant) and `theme-color` `#EDE6D6` (light) / `#0A0A0A` (dark). The
+footer links the font licences and third-party notices (`public/licenses/`, relative links so the site works under a
+sub-path).
 
 ---
 
@@ -665,7 +685,7 @@ rebuilt cells in history and forecast, P90, P50, P10 in the window, plus any ext
 
 - **History-only charts** (no forecast and no extra line) end at the last actual with no divider, no wash and no
   end-label margin; columns charts carry no end label either, so their right margin shrinks to 24px (12px on phones).
-- **Anomaly marks** in their roles (rose hollow diamond, jade triangle), drawn ON their value (never offset: on a y axis an
+- **Anomaly marks** in their roles (violet hollow diamond, ink triangle), drawn ON their value (never offset: on a y axis an
   offset reads as another value) with a 2px paper halo; a diamond and a triangle in the same month step 5px apart
   horizontally. Views pass `anomalies` and nothing else.
 - **Phones**: below 640px the year labels thin to every second or third January (ticks stay yearly) and the story
@@ -725,7 +745,7 @@ it to `TimelineChart.annotate` (or use `AnnotationLayer` with `EChart.onLayout`)
 - **Ranked bars** are `BarTable`s: sorted descending (natural order excepted), every value printed in its own column.
 - **Anomalies** get a marker and a text annotation (`anomalyAnnotations`); never a marker alone.
 - **No pie** with more than five segments (use a ranked bar); no radar; no dual axis.
-- **Benchmarks** dashed 4/3 in ink-3 / ink-4; **scenarios** solid `--scenario`; **end labels** instead of legends for
+- **Benchmarks** dashed 4/3 in ink-3 / ink-4; **scenarios** dashed `--scenario`; **end labels** instead of legends for
   ≤ 4 lines.
 
 ---
@@ -901,8 +921,8 @@ Copy rules:
 - **Non-text contrast**: control borders use `--control-edge` (≥ 3:1 on paper, the wash and night); the focus ring and
   the forecast line are ≥ 3:1; `--rule-strong` (1.9:1) is only for structure that is not a control.
 - **Keyboard**: Segmented, RangePresets and Tabs move with ← → (roving tabindex); filter comboboxes follow the ARIA
-  combobox pattern (`aria-activedescendant`, one highlight = the focus ring = what Enter picks; ↓ opens, ↑ ↓ Home End
-  move, Enter chooses, Escape closes back to the chip); popovers and drawers close with Escape; drawers trap Tab and are
+  combobox pattern on all five chips (focus moves into the popover; `aria-activedescendant`, one highlight = the focus
+  ring = what Enter picks; ↓ opens, ↑ ↓ Home End move, Enter chooses, Escape closes back to the chip, Tab moves on); popovers and drawers close with Escape; drawers trap Tab and are
   named by their headline (`aria-labelledby`); register rows expand with a disclosure button; charts take focus and move
   the crosshair with ← →. Hit areas are at least 24px at every width (the small "i" carries an invisible 3px halo) and
   44px below 700px.
@@ -976,11 +996,17 @@ Every view: masthead, filter bar, then a lede (headline and standfirst on 8 colu
   ranked list with mono codes, two-line descriptions, volume bar and share; drills family → SKU → region → customer).
   Right 8 columns: the timeline (columns for a single series; "continue into forecast" on by default). Below:
   seasonality (current year ink, other years `--ink-4` hairlines, average dashed, labels on current year and average
-  only); zero-month calendar (scheduled zero = `--hist-2` with a dot, unexplained = crit-wash with a cross icon, non-zero = warm-grey
-  magnitude, tooltip with the reason); series card (`dl`: ordering cycle and changes, customers over time as a mini
-  Gantt, demand class, stock-outs, fixes). Clicking a month opens the lineage drawer.
-- **Anomaly monitor** (history). The timeline with anomaly marks (rose hollow diamonds = errors fixed, jade triangles =
-  real events, key inline); counts by type (bar table); the register (ledger: type chip, reason clamped to 2 lines,
+  only); zero-month calendar (scheduled zero = `--hist-2` with a dot, after a lost account = `--ink-4` hatching,
+  unexplained = crit-wash with a cross icon, non-zero = warm-grey magnitude, tooltip with the reason); series card (`dl`:
+  ordering cycle and changes, customers over time as a mini Gantt, demand class, stock-outs, fixes, account events in
+  words). Clicking a month opens the lineage drawer. **One classification of zero months** (`zeroClass()` in
+  `insights/explorer.ts`): lost account first (the pipeline also sets `structural_zero` on those months), then the
+  cycle's scheduled off-month, then a zero in a rebuilt row, else a zero on an order month; the standfirst, the module
+  title, the hero's 12-month strip and the calendar all read it, so their counts sum to the zero months. "Monthly" in the
+  hero strip and the prose is one variable: every month plus every month but one annual shutdown, said in both places.
+- **Anomaly monitor** (history). The timeline with anomaly marks (violet hollow diamonds = data errors, ink triangles =
+  real events, key inline; a month cluster is headed by its class and month and names its leading type with that
+  type's own count, e.g. "Data errors, May 2023: 135 cells, 113 of them ERP blanks"); counts by type (bar table); the register (ledger: type chip, reason clamped to 2 lines,
   action, a 4px warm-grey confidence meter, impact; group by cause; CSV). A row opens the series in the explorer with the
   lineage drawer.
 - **Stock-outs & lost sales** (history). Shipped versus unconstrained timeline with the loss gap; lost versus
@@ -1006,7 +1032,7 @@ Every view: masthead, filter bar, then a lede (headline and standfirst on 8 colu
   ramping.
 - **What-if** (prediction). Left 4 columns: scenario builder (preset chips, indicator, shift slider, start and end,
   "remove window events" checkboxes, an orange-filled primary Apply with ink text). Right 8: the timeline with the base forecast (orange) and the
-  scenario (`--scenario`, solid), the difference labelled at the end. Below: change in P90 cover, impact by family
+  scenario (`--scenario`, dashed), the difference labelled at the end; the scenario-minus-base bars in `--scenario-tint`. Below: change in P90 cover, impact by family
   (diverging bar table). The scenario goes into the hash.
 - **Exception inbox** (act). Hero: revenue at risk with a three-colour review meter (resolved / in review / new). Cause
   tabs (seven equal columns: All + six rules, each with name, $ at risk, count and a 3px bar; the selected one carries an
@@ -1083,7 +1109,7 @@ empty half-screen. The UI/UX Pro Max gate comes first. A view that fails an item
 measured, not what was intended: the results, view by view, are in [`docs/design_gate_results.md`](design_gate_results.md)
 (the first integration pass claimed passes that two reviews disproved; the fix round re-ran every item).
 
-### 13.1 UI/UX Pro Max gate (18 points; skill `ui-ux-pro-max`, notes in `research/dashboard-skill-ui-ux-pro-max.md`)
+### 13.1 UI/UX Pro Max gate (18 points; checklist notes in `research/dashboard-skill-ui-ux-pro-max.md`)
 
 Accessibility (critical)
 1. Text contrast at least 4.5:1 in light and dark; no grey text on grey.
@@ -1122,7 +1148,7 @@ state (11); breakpoints and `.table-wrap` (12); `--z-*` tokens (13); type tokens
 lazy views and memoised options (16); one component set and `icons.tsx` (17); `TimelineChart`, `barLabel`,
 `scaleLegend`, `waterfallLabel`, `anomalyAnnotations` (18). Each view still has to use them.
 
-### 13.2 dashboard-designer gate (16 points; skill `dashboard-designer`, notes in `research/dashboard-design-skills.md` §9)
+### 13.2 dashboard-designer gate (16 points; checklist notes in `research/dashboard-design-skills.md` §9)
 
 1. Passes the **5-second test**: after five seconds a stranger can say what the most important thing on the view is.
 2. The view's decision and audience are obvious from its headline.
@@ -1144,7 +1170,7 @@ lazy views and memoised options (16); one component set and `icons.tsx` (17); `T
 
 ### 13.3 Also apply
 
-The 30-item QA checklist in `research/dashboard-design-skills.md` §6 and the dataviz skill's anti-pattern catalogue.
+The 30-item QA checklist in `research/dashboard-design-skills.md` §6 and the chart anti-patterns of §6 and §10 here.
 The research notes (§3 there) also explain how this editorial look stays distinctive rather than a generic "broadsheet":
 serif only for computed sentences, uppercase only where it labels data or navigation, mono only for codes, the range
 strip and the ink / orange grammar as the signature, and no newspaper costume (no columns of justified text, no drop

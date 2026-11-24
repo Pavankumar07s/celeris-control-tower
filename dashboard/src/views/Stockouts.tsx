@@ -67,7 +67,7 @@ export default function Stockouts() {
   // the shared timeline: history only, no rebuilt rings (this view is about supply)
   const noRings = useMemo(() => new Int32Array(m.asOf + 1), [m]);
   const spec = useMemo<Omit<TimelineSpec, "narrow" | "height">>(
-    () => ({ m, theme, measure, lens: "orders", filters, hist: { shipped: h.shipped, demand: h.demand, imputed: noRings, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand }, range: [0, m.asOf], columns: single !== null }),
+    () => ({ m, theme, measure, lens: "orders", filters, hist: { shipped: h.shipped, demand: h.demand, imputed: noRings, cells: h.cells, missing: h.missing, unknown: h.unknown, unknownDemand: h.unknownDemand }, range: [0, m.asOf], columns: single !== null }),
     [m, theme, measure, filters, h, noRings, single],
   );
   const annotate = useCallback((tm: TimelineModel) => timelineAnnotations({ spec: { ...spec }, model: tm, include: ["disruption", "gap"] }), [spec]);

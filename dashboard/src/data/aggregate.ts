@@ -12,6 +12,8 @@ export interface HistoryAgg {
   cells: Int32Array;
   imputed: Int32Array;
   missing: Int32Array;
+  /** Cells whose units stay unknown (ERP blanks: units_unknown outside rebuilt rows), one variable with repairFacts. */
+  unknown: Int32Array;
   stockout: Int32Array;
   oneOff: Int32Array;
   fixed: Int32Array;
@@ -30,6 +32,7 @@ export function historyAgg(m: Model, segs: number[], measure: Measure): HistoryA
     cells: new Int32Array(n),
     imputed: new Int32Array(n),
     missing: new Int32Array(n),
+    unknown: new Int32Array(n),
     stockout: new Int32Array(n),
     oneOff: new Int32Array(n),
     fixed: new Int32Array(n),
@@ -60,6 +63,7 @@ export function historyAgg(m: Model, segs: number[], measure: Measure): HistoryA
       out.cells[t]++;
       if (fl & b.imputed) out.imputed[t]++;
       if (fl & b.missing_row) out.missing[t]++;
+      else if (fl & b.units_unknown) out.unknown[t]++;
       if (fl & so) out.stockout[t]++;
       if (fl & b.one_off) out.oneOff[t]++;
       if (fl & b.numeric_fix) out.fixed[t]++;

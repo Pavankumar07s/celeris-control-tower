@@ -83,7 +83,8 @@
   --good: #067006;  --good-wash: #DCE6CC;   /* 5.08:1 */
   --warn: #7A5C00;  --warn-wash: #EADFB5;  --warn-mark: #A07A00;   /* amber, distinct from the orange: 5.03 / 3.20 */
   --crit: #B02E2E;  --crit-wash: #F0D6CF;   /* 5.16:1 */
-  --scenario: #7862BF;       /* what-if scenario line (violet, solid) */
+  --scenario: #3F3A31;       /* what-if scenario line: warm ink, DASHED ("another forecast"); outside the categorical set */
+  --scenario-tint: #B3A892;  /* what-if difference bars (a quiet warm grey, not a heavy fill) */
 
   /* ---- categorical (families; regions / channels reuse the first slots).  NO ORANGE (orange means the
          forecast), no blue.  Validated (Machado CVD, OKLab dE x100) on #EDE6D6: worst adjacent CVD 10.6,
@@ -184,7 +185,7 @@
     --focus: #FF6A13; --link: #F2EDE3;
     --loss: #EE7B70; --loss-fill: rgba(238, 123, 112, 0.28);
     --good: #2FBF4F; --good-wash: #10230F; --warn: #E8C547; --warn-wash: #2A240E; --warn-mark: #E8C547;
-    --crit: #F06A5F; --crit-wash: #2A1310; --scenario: #9482DB;
+    --crit: #F06A5F; --crit-wash: #2A1310; --scenario: #CFC8BA; --scenario-tint: #4E4A42;
     --cat-1: #D46E80; --cat-2: #9482DB; --cat-3: #AB9017; --cat-4: #C670AB; --cat-5: #889D37; --cat-6: #B078C9; --cat-7: #05AB86; --cat-other: #6E685E;
     --hist-1: #1C1B19; --hist-2: #34312C; --hist-3: #4E4A42; --hist-4: #6C665B; --hist-5: #8E877A; --hist-6: #B6AFA0; --hist-7: #E0D9CB;
     --fc-1: #2B1A10; --fc-2: #4A2A14; --fc-3: #74401A; --fc-4: #A3581E; --fc-5: #D0701F; --fc-6: #F28B3E; --fc-7: #FFB27A;
@@ -205,7 +206,7 @@
   --focus: #FF6A13; --link: #F2EDE3;
   --loss: #EE7B70; --loss-fill: rgba(238, 123, 112, 0.28);
   --good: #2FBF4F; --good-wash: #10230F; --warn: #E8C547; --warn-wash: #2A240E; --warn-mark: #E8C547;
-  --crit: #F06A5F; --crit-wash: #2A1310; --scenario: #9482DB;
+  --crit: #F06A5F; --crit-wash: #2A1310; --scenario: #CFC8BA; --scenario-tint: #4E4A42;
   --cat-1: #D46E80; --cat-2: #9482DB; --cat-3: #AB9017; --cat-4: #C670AB; --cat-5: #889D37; --cat-6: #B078C9; --cat-7: #05AB86; --cat-other: #6E685E;
   --hist-1: #1C1B19; --hist-2: #34312C; --hist-3: #4E4A42; --hist-4: #6C665B; --hist-5: #8E877A; --hist-6: #B6AFA0; --hist-7: #E0D9CB;
   --fc-1: #2B1A10; --fc-2: #4A2A14; --fc-3: #74401A; --fc-4: #A3581E; --fc-5: #D0701F; --fc-6: #F28B3E; --fc-7: #FFB27A;
