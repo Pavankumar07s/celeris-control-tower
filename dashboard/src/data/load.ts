@@ -2,12 +2,21 @@
 import { useEffect, useState } from "react";
 
 const cache = new Map<string, Promise<unknown>>();
+const modified = new Map<string, Date>();
+
+/** When the server says a bundle file was last written (HTTP Last-Modified), if it said so. */
+export function fileWrittenAt(name: string): Date | null {
+  return modified.get(name) ?? null;
+}
 
 export function fetchJson<T>(name: string): Promise<T> {
   let p = cache.get(name);
   if (!p) {
     p = fetch(`./data/${name}`).then((r) => {
       if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
+      const lm = r.headers.get("last-modified");
+      const d = lm ? new Date(lm) : null;
+      if (d && !Number.isNaN(d.getTime())) modified.set(name, d);
       return r.json();
     });
     p.catch(() => cache.delete(name));

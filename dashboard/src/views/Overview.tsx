@@ -1,257 +1,446 @@
-// R1 Executive overview (both parts): KPI tiles, one continuous timeline from history into the forecast, mix shift
-// by family / region / channel (last 12 actual vs next 12 forecast months) and the deterministic planner briefing.
-import { useMemo, type ReactNode } from "react";
+// R1 Executive overview (both parts): the reference implementation of the editorial design system.
+//  lede (computed headline + standfirst | hero: 19-month forecast with its range strip)
+//  -> the annotated timeline from history into the forecast (units or revenue, range presets)
+//  -> figure strip (revenue with sparkline, WAPE ladder, lost sales, history repaired)
+//  -> the brief | where the change comes from (mix by region / family / channel) + top exceptions
+//  -> outlook small multiples (moving annual total) -> colophon.
+import { useCallback, useMemo } from "react";
 import { useApp } from "../app/context";
-import { EChart } from "../charts/EChart";
-import { timelineOption } from "../charts/timeline";
-import { Card, Info, Kpi, TimelineLegend } from "../components/ui";
+import { useSelection } from "../app/hooks";
+import { TimelineChart } from "../charts/TimelineChart";
+import { rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec } from "../charts/timeline";
+import { RangePresets, RuleChip, Tabs } from "../components/controls";
+import { Delta, Figure, FigureStrip, HeroFigure, Ladder, Lede, RangeStrip, Rich, Sparkline } from "../components/Figure";
+import { Module, timelineKey } from "../components/Module";
+import { Notice } from "../components/states";
+import { BarTable } from "../components/tables";
+import { breakdown, sharesOf, type BreakdownDim } from "../data/breakdown";
 import { forecastAgg, forecastLatent, historyAgg, sum } from "../data/aggregate";
-import { compact, fmtInt, fmtMeasure, fmtPct, fmtPts, fmtSignedPct, fmtUsd, monthName } from "../data/format";
+import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtSigned, fmtSignedPct, fmtValue, monthLong, monthName } from "../data/format";
 import { useResource } from "../data/load";
-import { historyPrice, selectRuns, selectSegments, type Filters, type Measure, type Model } from "../data/model";
 import { lognormalQuantile, moments, Z10, Z90 } from "../data/quantiles";
 import type { ExceptionFile, ForecastDetail, StockoutFile } from "../data/types";
-import { briefing } from "../insights/briefing";
+import { briefing, exceptionRowsIn, readableMonths } from "../insights/briefing";
+import { countWord, render, selectionWords } from "../insights/headlines";
+import { CHANGE_TEMPLATES, OUTLOOK_TEMPLATES, OVERVIEW_TEMPLATES, TOP_TEMPLATES, changeDek, changeFacts, changeTitle, overviewFacts, timelineDek } from "../insights/overview";
+import "./Overview.css";
 
-type MixDim = "family" | "region" | "channel";
-
-function mixShares(m: Model, f: Filters, dim: MixDim, measure: Measure): { labels: string[]; last: number[]; next: number[] } {
-  const labels = dim === "family" ? m.dims.families.name : dim === "region" ? m.dims.regions : m.dims.channels;
-  const last = new Array(labels.length).fill(0);
-  const next = new Array(labels.length).fill(0);
-  const key = (s: number) => (dim === "family" ? m.sFamily[s] : dim === "region" ? m.sRegion[s] : m.sChannel[s]);
-  const usd = measure === "usd";
-  for (const g of selectSegments(m, f)) {
-    const s = m.gSeries[g];
-    for (let k = 0; k < m.gLen[g]; k++) {
-      const t = m.gStart[g] + k;
-      if (t < m.asOf - 11) continue;
-      last[key(s)] += m.d[m.gOff[g] + k] * (usd ? historyPrice(m, m.sSku[s], t) : 1);
-    }
-  }
-  for (const r of selectRuns(m, f)) {
-    const s = m.rSeries[r];
-    for (let k = 0; k < m.rLen[r]; k++) {
-      const t = m.rStart[r] + k;
-      if (t > m.asOf + 12) continue;
-      next[key(s)] += m.fc[m.rOff[r] + k] * (usd ? m.price[m.rOff[r] + k] : 1);
-    }
-  }
-  const tl = last.reduce((a, b) => a + b, 0) || 1;
-  const tn = next.reduce((a, b) => a + b, 0) || 1;
-  return { labels, last: last.map((x) => x / tl), next: next.map((x) => x / tn) };
-}
-
-function MixBar({ shares, colors, labels, onPick, title }: { shares: number[]; colors: string[]; labels: string[]; onPick: (i: number) => void; title: string }) {
-  return (
-    <div className="segbar" role="list" aria-label={title}>
-      {shares.map((s, i) =>
-        s > 0 ? (
-          <div
-            key={i}
-            role="listitem"
-            title={`${labels[i]}: ${fmtPct(s)}`}
-            style={{ width: `${s * 100}%`, background: colors[i % colors.length], color: i === 3 ? "#0b0b0b" : "#fff" }}
-            onClick={() => onPick(i)}
-          >
-            {s >= 0.115 ? fmtPct(s, 0) : ""}
-          </div>
-        ) : null,
-      )}
-    </div>
-  );
-}
+const DIMS: BreakdownDim[] = ["region", "family", "channel"];
+const DIM_LABEL: Record<BreakdownDim, string> = { region: "Region", family: "Family", channel: "Channel" };
 
 export default function Overview() {
-  const { m, theme, filters, measure, lens, setFilters, go } = useApp();
+  const { m, theme, filters, measure, lens, params, setParam, setFilters, go } = useApp();
   const latent = lens === "latent";
+  const usd = measure === "usd";
+  const { segs, runs, single, h, fc } = useSelection();
   const detail = useResource<ForecastDetail>(latent ? "forecast_detail.json" : null);
   const stock = useResource<StockoutFile>("stockouts.json");
   const exc = useResource<ExceptionFile>("exceptions.json");
 
-  const segs = useMemo(() => selectSegments(m, filters), [m, filters]);
-  const runs = useMemo(() => selectRuns(m, filters), [m, filters]);
-  const h = useMemo(() => historyAgg(m, segs, measure), [m, segs, measure]);
-  const fc = useMemo(() => forecastAgg(m, runs, measure), [m, runs, measure]);
+  // ---- aggregates in both measures (units for the brief and repairs, USD for the revenue figure)
   const hUnits = useMemo(() => (measure === "units" ? h : historyAgg(m, segs, "units")), [m, segs, measure, h]);
+  const fcUnits = useMemo(() => (measure === "units" ? fc : forecastAgg(m, runs, "units")), [m, runs, measure, fc]);
+  const hUsd = useMemo(() => (usd ? h : historyAgg(m, segs, "usd")), [m, segs, usd, h]);
+  const fcUsd = useMemo(() => (usd ? fc : forecastAgg(m, runs, "usd")), [m, runs, usd, fc]);
   const fLatent = useMemo(() => (latent && detail.data ? forecastLatent(m, runs, detail.data, measure) : null), [latent, detail.data, m, runs, measure]);
+  const mom = useMemo(() => moments(m, runs, () => true, usd), [m, runs, usd]);
+  const p10 = lognormalQuantile(mom.M, mom.V, Z10);
+  const p90 = lognormalQuantile(mom.M, mom.V, Z90);
 
-  const option = useMemo(
-    () =>
-      timelineOption({
-        m,
-        theme,
-        measure,
-        lens,
-        filters,
-        hist: { shipped: latent ? h.latent : h.shipped, demand: latent ? h.latent : h.demand, imputed: h.imputed, cells: h.cells },
-        fc: latent ? (fLatent ? { value: fLatent } : undefined) : { value: fc.fc, p10: fc.p10, p50: fc.p50, p90: fc.p90 },
-      }),
-    [m, theme, measure, lens, filters, h, fc, latent, fLatent],
+  // ---- the lede
+  const sel = useMemo(() => selectionWords(m, filters), [m, filters]);
+  const facts = useMemo(
+    () => overviewFacts({ m, sel, measure, latent, single: single !== null, demand: h.demand, fc: fc.fc, p10, p90 }),
+    [m, sel, measure, latent, single, h.demand, fc.fc, p10, p90],
   );
+  const headline = render(OVERVIEW_TEMPLATES.headline, facts).text;
+  const standfirst = render(OVERVIEW_TEMPLATES.standfirst, facts).text;
+  const fv = (v: number) => fmtValue(v, measure);
 
-  // KPI arithmetic: totals over the 19 window months vs the last 19 actual months (unconstrained demand)
-  const total19 = sum(fc.fc);
-  const last19 = sum(h.demand, m.asOf - 18, m.asOf + 1);
-  const mom = useMemo(() => moments(m, runs, () => true, measure === "usd"), [m, runs, measure]);
-  const lo = lognormalQuantile(mom.M, mom.V, Z10);
-  const hi = lognormalQuantile(mom.M, mom.V, Z90);
-  const revenue = useMemo(() => forecastAgg(m, runs, "usd"), [m, runs]);
-  const rev19 = sum(revenue.fc);
-  const ladder = m.meta.backtest.ladder;
-  const final = ladder.find((l) => l.model === m.meta.backtest.final);
-  const baselines = ladder.filter((l) => l.model !== m.meta.backtest.final);
-  const bestBase = baselines.length ? baselines.reduce((a, b) => (a.wape < b.wape ? a : b)) : null;
-  const seasonal = ladder.find((l) => l.model === "seasonal_naive") ?? bestBase;
+  // ---- the timeline
+  const range = (["recent", "window"].includes(params.get("tl") ?? "") ? params.get("tl") : single !== null ? "recent" : "all") as RangePreset;
+  const showEvents = params.get("ev") === "1";
+  const rangeText = `${monthName(m.months[rangeStart(m, range)])} – ${monthName(m.months[m.nMonths - 1])}`;
+  const spec = useMemo<Omit<TimelineSpec, "narrow" | "height">>(
+    () => ({
+      m,
+      theme,
+      measure,
+      lens,
+      filters,
+      hist: { shipped: latent ? h.latent : h.shipped, demand: latent ? h.latent : h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand },
+      fc: latent ? (fLatent ? { value: fLatent } : undefined) : { value: fc.fc, p10: fc.p10, p50: fc.p50, p90: fc.p90 },
+      range,
+      columns: single !== null,
+      showEvents,
+    }),
+    [m, theme, measure, lens, filters, h, fc, latent, fLatent, range, single, showEvents],
+  );
+  const excRows = useMemo(() => (exc.data ? exceptionRowsIn(m, filters, exc.data) : []), [exc.data, m, filters]);
+  const annotate = useCallback((tm: TimelineModel) => timelineAnnotations({ spec: { ...spec }, model: tm, exceptions: exc.data, exceptionRows: excRows }), [spec, exc.data, excRows]);
+  const timelineTitle = render(OVERVIEW_TEMPLATES.timelineTitle, facts).text;
+
+  // ---- figures.  The first strip figure shows the OTHER measure, so units and revenue are always both on
+  // screen: forecast revenue in the units lens, forecast units in the USD lens.
+  const alt = usd ? { h: hUnits, fc: fcUnits } : { h: hUsd, fc: fcUsd };
+  const alt19 = sum(alt.fc.fc);
+  const altLast19 = sum(alt.h.demand, m.asOf - 18, m.asOf + 1);
+  const altHist = useMemo(() => Array.from(alt.h.demand), [alt.h]);
+  const altFc = useMemo(() => {
+    const a: (number | null)[] = new Array(m.nMonths).fill(null);
+    a[m.asOf] = alt.h.demand[m.asOf];
+    for (let k = 0; k < m.nWin; k++) a[m.w0 + k] = alt.fc.fc[k];
+    return a;
+  }, [m, alt.h, alt.fc]);
+  const fullRange = `${monthName(m.months[0])} – ${monthName(m.months[m.nMonths - 1])}`;
+  const pa = m.meta.price_assumption.vs_2026_pct;
+  const priceYears = Object.entries(pa).filter(([, v]) => v !== 0);
+  const bt = m.meta.backtest;
+  const final = bt.ladder.find((l) => l.model === bt.final) ?? bt.ladder.find((l) => l.model === "final");
+  const naive = bt.ladder.find((l) => l.model === "naive");
+  const snaive = bt.ladder.find((l) => l.model === "seasonal_naive");
   const lost = useMemo(() => {
     if (!stock.data) return null;
     const c = stock.data.cells;
     const inSel = new Set(segs.map((g) => m.gSeries[g]));
     let u = 0;
-    let usd = 0;
+    let v = 0;
     for (let i = 0; i < c.series.length; i++) {
       if (!inSel.has(c.series[i])) continue;
       if (filters.customer !== null && !segs.some((g) => m.gSeries[g] === c.series[i] && c.month[i] >= m.gStart[g] && c.month[i] < m.gStart[g] + m.gLen[g])) continue;
       u += c.lost[i];
-      usd += c.lost_usd[i];
+      v += c.lost_usd[i];
     }
-    return { u, usd };
+    return { u, usd: v };
   }, [stock.data, segs, m, filters.customer]);
   const fixed = sum(hUnits.fixed);
   const rebuilt = sum(hUnits.missing);
-  const pa = m.meta.price_assumption.vs_2026_pct;
 
-  const mixes = useMemo(() => (["family", "region", "channel"] as MixDim[]).map((dim) => ({ dim, ...mixShares(m, filters, dim, measure) })), [m, filters, measure]);
+  // ---- breakdowns (mix by region / family / channel, both the brief and the change table)
+  const bds = useMemo(() => DIMS.map((dim) => sharesOf(m, breakdown(m, filters, dim, measure))), [m, filters, measure]);
+  const bdsUnits = useMemo(() => (measure === "units" ? bds : DIMS.map((dim) => sharesOf(m, breakdown(m, filters, dim, "units")))), [m, filters, measure, bds]);
+  const openDims = DIMS.filter((_, i) => bds[i].lastAbs.filter((x, k) => x > 0 || bds[i].nextAbs[k] > 0).length > 1);
+  const dimParam = params.get("by") as BreakdownDim | null;
+  const dim: BreakdownDim | null = dimParam && openDims.includes(dimParam) ? dimParam : (openDims[0] ?? null);
+  const change = useMemo(() => {
+    if (!dim) return null;
+    const b = bds[DIMS.indexOf(dim)];
+    return changeFacts(dim, measure, b.labels, b.lastAbs, b.nextAbs);
+  }, [dim, bds, measure]);
+
   const brief = useMemo(
-    () => briefing({ m, filters, measure, h: hUnits, fc: measure === "units" ? fc : forecastAgg(m, runs, "units"), runs, mixes, exc: exc.data, lost, go, setFilters }),
-    [m, filters, measure, hUnits, fc, runs, mixes, exc.data, lost, go, setFilters],
+    () => briefing({ m, filters, measure: "units", h: hUnits, fc: fcUnits, runs, mixes: bdsUnits, exc: exc.data, lost, go, setFilters }),
+    [m, filters, hUnits, fcUnits, runs, bdsUnits, exc.data, lost, go, setFilters],
   );
 
-  const unit = measure === "usd" ? "" : "units";
+  // ---- top exceptions
+  const top = useMemo(() => {
+    if (!exc.data) return null;
+    const X = exc.data;
+    const rows = [...excRows].sort((a, b) => X.revenue_at_risk[b] - X.revenue_at_risk[a]);
+    const shown = rows.slice(0, 5);
+    const total = rows.reduce((a, i) => a + X.revenue_at_risk[i], 0);
+    const topSum = shown.reduce((a, i) => a + X.revenue_at_risk[i], 0);
+    return { rows, shown, total, topSum, max: shown.length ? X.revenue_at_risk[shown[0]] : 1 };
+  }, [exc.data, excRows]);
+
+  // ---- outlook small multiples: moving annual total, indexed to the last 12 actual months = 100
+  const outlook = useMemo(() => {
+    const odim = (["family", "region", "channel"] as BreakdownDim[]).find((d) => openDims.includes(d));
+    if (!odim) return null;
+    const b = breakdown(m, filters, odim, measure);
+    const from = Math.max(0, m.months.indexOf(`${Number(m.months[m.asOf].slice(0, 4)) - 3}-01`));
+    const items = b.labels
+      .map((label, idx) => {
+        const full = [...Array.from(b.hist[idx]), ...Array.from(b.fc[idx])];
+        const ma = full.map((_, i) => (i < 11 ? null : full.slice(i - 11, i + 1).reduce((x, y) => x + y, 0)));
+        const l12 = ma[m.asOf] ?? 0;
+        const n12 = ma[m.asOf + 12] ?? 0;
+        return { label, idx, l12, n12, chg: l12 > 0 ? n12 / l12 - 1 : NaN, ix: ma.map((v) => (v === null || l12 <= 0 ? null : (v / l12) * 100)) };
+      })
+      .filter((x) => x.l12 > 0);
+    if (items.length < 2) return null;
+    const vals = items.flatMap((x) => x.ix.slice(from).filter((v): v is number => v !== null));
+    const yMin = Math.floor(Math.min(...vals, 100) / 5) * 5;
+    const yMax = Math.ceil(Math.max(...vals, 100) / 5) * 5;
+    return { dim: odim, items, from, yMin, yMax };
+  }, [m, filters, measure, openDims.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pick = (d: BreakdownDim, idx: number) => setFilters({ ...filters, [d]: idx, ...(d === "family" ? { sku: null } : {}) });
+  const presets = rangePresets(m);
+  const p50Note = (tm: TimelineModel) =>
+    tm.hasBand ? (
+      tm.p50Drawn ? (
+        <span>The dotted line is the P50 of the aggregate; it departs from the submitted forecast by up to {fmtPct(tm.p50MaxRel)} here.</span>
+      ) : (
+        <span>P50 sits within {fmtPct(Math.max(tm.p50MaxRel, 0.001), 1)} of the submitted forecast in every month and is listed in the tooltip.</span>
+      )
+    ) : latent ? (
+      <span>Latent lens: history and forecast both spread each order over the months it covers; the P10–P90 range applies to orders as booked.</span>
+    ) : null;
+
   return (
     <>
-      <div className="kpis">
-        <Kpi
-          label="Forecast, next 19 months"
-          value={fmtMeasure(total19, measure)}
-          unit={unit}
-          foot={
-            <>
-              P10–P90 {fmtMeasure(lo, measure, 2)} – {fmtMeasure(hi, measure, 2)} ·{" "}
-              <span className={total19 >= last19 ? "delta-up" : "delta-down"}>{fmtSignedPct(total19 / last19 - 1)}</span> vs last 19 months
-            </>
+      <Lede
+        headline={headline}
+        standfirst={standfirst}
+        figure={
+          <HeroFigure
+            label={`Forecast, next ${m.nWin} months`}
+            value={fv(facts.total19)}
+            unit={usd ? undefined : "units"}
+            visual={facts.total19 > 0 ? <RangeStrip p10={p10} p90={p90} mid={facts.total19} reference={facts.last19 > 0 ? facts.last19 : undefined} refLabel={`Last ${m.nWin} months`} format={fv} /> : undefined}
+            context={facts.last19 > 0 && facts.total19 > 0 ? <Delta value={facts.chg19} suffix={`vs the last ${m.nWin} months of demand`} /> : "No demand in the last 19 months to compare with."}
+            info={{
+              what: `Sum of the submitted forecast over ${monthName(m.months[m.w0])} – ${monthName(m.months[m.nMonths - 1])} for the selection, with the P10–P90 range of that ${m.nWin}-month total.`,
+              how: "The range comes from the contract's aggregate-quantile formula on the summed means, noise variances and shared level and family × region errors, never from summed row quantiles. The change is against the unconstrained demand of the last 19 actual months.",
+              source: "forecast.json",
+            }}
+          />
+        }
+      />
+
+      <Module
+        id="timeline"
+        title={timelineTitle}
+        dek={timelineDek(facts, rangeText)}
+        tools={
+          <>
+            <RangePresets value={range} options={presets} onChange={(v) => setParam({ tl: v === (single !== null ? "recent" : "all") ? null : v }, true)} />
+            <button type="button" className={`btn sm quiet ${showEvents ? "" : ""}`} aria-pressed={showEvents} onClick={() => setParam({ ev: showEvents ? null : "1" }, true)} title="Show every event as a rug under the axis (hover a tick for details)">
+              {showEvents ? "Hide events" : "All events"}
+            </button>
+          </>
+        }
+        info={{
+          what: `One continuous monthly timeline, ${monthName(m.months[0])} to ${monthName(m.months[m.nMonths - 1])}. Left of the rule is what happened; right of it is what the forecast says. Annotations are computed from the data: the deepest dip inside a disruption, the widest shipped-versus-demand gap, rebuilt-row clusters and the largest event inside the forecast window.`,
+          how: "Exact sums over the selected series. The forecast continues unconstrained demand (stock-outs added back); its first point is the last actual. The P10–P90 band uses the contract's aggregate-quantile formula.",
+          source: "history.json, forecast.json, dims.json (events), exceptions.json",
+        }}
+        keyItems={timelineKey({ latent, columns: single !== null, rebuilt: !latent, lost: !latent })}
+      >
+        {latent && detail.loading ? (
+          <Notice tone="info">Loading latent demand for the forecast window…</Notice>
+        ) : (
+          <TimelineChart spec={spec} annotate={annotate} height={single !== null ? 340 : 360} ariaLabel={`${timelineTitle}. ${timelineDek(facts, rangeText)}`} busy={latent && detail.loading} footnote={p50Note} />
+        )}
+      </Module>
+
+      <FigureStrip>
+        <Figure
+          label={usd ? `Forecast units, next ${m.nWin} months` : `Forecast revenue, next ${m.nWin} months`}
+          value={usd ? fmtNum(alt19) : fmtMoney(alt19)}
+          unit={usd ? "units" : undefined}
+          visual={<Sparkline history={altHist} forecast={altFc} divider={m.asOf} ariaLabel={`${usd ? "Units" : "Revenue"} per month, ${fullRange}, history in ink and forecast in cobalt`} />}
+          context={
+            altLast19 > 0
+              ? `**${fmtSignedPct(alt19 / altLast19 - 1)}** vs ${usd ? `${fmtNum(altLast19)} units` : fmtMoney(altLast19)} in the last ${m.nWin} months${!usd && priceYears.length ? `; list prices ${priceYears.map(([y, v]) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}% in ${y}`).join(", ")}` : ""}. Per month, ${fullRange}`
+              : `Per month, ${fullRange}`
           }
-          info={<Info what="Sum of the submitted forecast over Nov 2026 – May 2028 for the selection, with the P10–P90 range of that 19-month total." how="Range from the contract formula on the summed means, noise variances and shared level / family×region errors (never summed row quantiles). Change vs the unconstrained demand of the last 19 actual months." source="forecast.json" />}
+          info={{
+            what: usd ? "The submitted forecast in units over the window, against the unconstrained demand of the last 19 actual months; the sparkline shows units per month from history into the forecast." : "Submitted units × the forecast's assumed invoice price per row, summed over the window, against the last 19 months of demand at invoice prices; the sparkline shows revenue per month from history into the forecast.",
+            how: "Price assumption read from the forecast file; the median change against each SKU's 2026 invoice price is shown.",
+            source: "forecast.json (price), history.json",
+          }}
         />
-        <Kpi
-          label="Forecast revenue, 19 months"
-          value={fmtUsd(rev19)}
-          foot={`At forecast prices: ${Object.entries(pa)
-            .map(([y, p]) => `${y} ${p >= 0 ? "+" : ""}${p.toFixed(1)}%`)
-            .join(", ")} vs 2026 (median)`}
-          info={<Info what="Submitted units × the forecast's assumed invoice price per row." how="Price assumption read from the forecast file (median change vs each SKU's 2026 invoice price shown)." source="forecast.json (price_usd)" />}
-        />
-        <Kpi
-          label="Backtest WAPE · final model"
+        <Figure
+          label="Backtest error (WAPE)"
           value={final ? fmtPct(final.wape) : "–"}
-          foot={
-            final && seasonal ? (
-              <>
-                vs {fmtPct(seasonal.wape)} seasonal naive · bias {fmtSignedPct(final.bias)}
-              </>
-            ) : (
-              "no backtest"
-            )
+          context={final && snaive ? `**${((snaive.wape - final.wape) * 100).toFixed(1)} pts** ${snaive.wape >= final.wape ? "better" : "worse"} than seasonal naive; lower is better` : undefined}
+          visual={
+            final ? (
+              <Ladder
+                rows={[...(naive ? [{ label: "Naive", value: naive.wape }] : []), ...(snaive ? [{ label: "Seasonal naive", value: snaive.wape }] : []), { label: "Our model", value: final.wape, me: true }]}
+                format={(v) => (v * 100).toFixed(1)}
+                foot={`${bt.origins.length} origins${bt.noise_floor !== null ? `, noise floor ${fmtPct(bt.noise_floor)}` : ""}, all series`}
+              />
+            ) : undefined
           }
-          info={<Info what="Rolling-origin backtest, 19-month horizon, every SKU × region × month, pooled over all origins (all series)." how="WAPE = Σ|actual − forecast| / Σ actual on unconstrained demand; bias = Σ(forecast − actual) / Σ actual. See Forecast & accuracy for any filter." source="backtest.json / meta.json" />}
+          link={{ label: "Forecast & accuracy", onClick: () => go("forecast") }}
+          info={{ what: "Rolling-origin backtest at a 19-month horizon over every SKU × region × month, pooled over all origins (all series, not the filter).", how: "WAPE = Σ|actual − forecast| / Σ actual on unconstrained demand. Lower is better; the noise floor is the error a perfect model of the level would still make.", source: "meta.json (backtest ladder)" }}
         />
-        <Kpi
-          label="Lost sales in history"
+        <Figure
+          label={`Lost sales, ${m.months[0].slice(0, 4)}–${m.months[m.asOf].slice(0, 4)}`}
           value={lost ? fmtInt(lost.u) : "…"}
           unit="units"
-          foot={lost ? `${fmtUsd(lost.usd)} never shipped (stock-outs)` : "loading stock-outs…"}
-          info={<Info what="Units customers requested but Celeris never shipped, 2019-2026, for the selection: listed stock-outs plus imputed unlisted semiconductor months and detected hidden stock-outs." how="Lost units × invoice price of the month." source="stockouts.json (cells.lost)" />}
+          context={lost ? `**${fmtMoney(lost.usd, 1)}** never shipped, ${fmtPct(lost.u / Math.max(1, sum(hUnits.demand)), 2)} of unconstrained demand` : "Reading stock-outs…"}
+          link={{ label: "Stock-outs & lost sales", onClick: () => go("stockouts") }}
+          info={{ what: "Units customers requested but Celeris never shipped: listed stock-outs, imputed unlisted semiconductor months and detected hidden stock-outs.", how: "Lost units × the invoice price of the month.", source: "stockouts.json (cells.lost)" }}
         />
-        <Kpi
+        <Figure
           label="History repaired"
           value={fmtInt(fixed)}
           unit="cells"
-          foot={`numeric fixes · ${fmtInt(rebuilt)} missing rows rebuilt (not zeros)`}
-          info={<Info what="Cells of the selection whose units, price or revenue were corrected (units ×10, cents, EUR, pack-of-10, sign…) and rows deleted from the extract that were rebuilt from the Record_ID grid." how="Flags on every history cell. Missing rows are never treated as zero demand." source="history.json (flags)" />}
+          context={`**${fmtPct(fixed / Math.max(1, sum(hUnits.cells)))}** of ${fmtInt(sum(hUnits.cells))} history cells fixed, plus **${fmtInt(rebuilt)}** missing rows rebuilt, not zero-filled`}
+          link={{ label: "Data health", onClick: () => go("health") }}
+          info={{ what: "History cells whose units, price or revenue were corrected (units × 10, cents, EUR, pack of 10, sign …), and rows missing from the extract that were rebuilt from the Record_ID grid.", how: "Flags on every history cell. Missing rows are never treated as zero demand.", source: "history.json (flags)" }}
         />
-      </div>
+      </FigureStrip>
 
-      <Card
-        title={`${latent ? "Latent monthly demand" : "Demand"} from history into the forecast · ${measure === "usd" ? "USD" : "units"} per month`}
-        sub={latent ? "Each order spread over the months it carries: ordering-cycle zeros disappear, so history and forecast read as one smooth demand signal." : "Shipped history (cleaned), unconstrained demand where stock-outs censored it, and the submitted forecast with its P10–P90 range."}
-        tools={<TimelineLegend latent={latent} />}
-        info={<Info what="One continuous monthly timeline, 2019-01 to 2028-05. Left of the rule: what happened; right: what the forecast says. Event lane above the plot (hover for details; holidays appear when a region is selected)." how="Exact sums over the selected series. The P10–P90 band uses the contract's aggregate-quantile formula. Drag the slider to zoom." source="history.json, forecast.json, dims.json (events)" />}
-      >
-        {latent && detail.loading ? <div className="state">Loading latent demand…</div> : <EChart option={option} height={360} ariaLabel="Timeline of demand and forecast" />}
-      </Card>
-
-      <div className="grid g-2-1">
-        <Card
-          title="Planner briefing"
-          sub="Generated from the bundle for the current selection — no hand-typed numbers, no language model."
-          info={<Info what="Templated sentences over computed facts: forecast change, peak month, mix shift, window risks, exceptions, ordering-cycle zeros, lost sales and backtest accuracy." how="Every number is computed in the browser from the pipeline bundle for the active filters; links apply filters or open the relevant view." />}
+      <div className="cols-7-5">
+        <Module
+          className="brief"
+          title="The brief"
+          dek={`${countWord(brief.length, true)} facts computed from the bundle for this selection; each links to its evidence.`}
+          info={{ what: "Templated sentences over computed facts: forecast change, peak and low month, mix shift, the largest window event, exceptions, ordering-cycle zeros, lost sales and backtest accuracy.", how: "Every number is computed in the browser from the pipeline bundle for the active filters; links apply a filter or open the view with the evidence.", source: "history.json, forecast.json, exceptions.json, stockouts.json, meta.json" }}
         >
-          <ul className="brief">
-            {brief.map((b, i) => (
-              <li key={i}>
-                <span className="ic" aria-hidden="true">
-                  {b.icon}
+          <ol>
+            {brief.map((b) => (
+              <li key={b.tag}>
+                <span className="tag">
+                  {b.tone && <i className={b.tone} aria-hidden="true" />}
+                  {b.tag}
+                  {b.tone && <span className="visually-hidden"> ({b.tone === "crit" ? "act now" : "risk"})</span>}
                 </span>
-                <span>{b.text as ReactNode}</span>
+                <p>{b.body}</p>
               </li>
             ))}
-          </ul>
-        </Card>
-        <Card
-          title="Mix shift"
-          sub={`Share of ${measure === "usd" ? "revenue" : "units"}: last 12 actual months (top) vs next 12 forecast months (bottom). Click to filter.`}
-          info={<Info what="100 % bars by family, region and channel: unconstrained demand Nov 2025 – Oct 2026 vs submitted forecast Nov 2026 – Oct 2027." how="Shares of the selection's total; the largest change is named in percentage points." source="history.json, forecast.json" />}
+          </ol>
+        </Module>
+
+        <div className="stack">
+          {change && dim ? (
+            <Module
+              title={changeTitle(change)}
+              dek={changeDek(change)}
+              info={{ what: "Where the 12-month change comes from: next 12 forecast months against the last 12 months of unconstrained demand, by region, family or channel. Click a row to filter the page.", how: "Exact sums over the selection; share is the entity's share of the next 12 months; the bar is the absolute change, the leader in cobalt.", source: "history.json, forecast.json" }}
+            >
+              <Tabs ariaLabel="Break down by" value={dim} options={openDims.map((d) => ({ value: d, label: DIM_LABEL[d] }))} onChange={(v) => setParam({ by: v === openDims[0] ? null : v }, true)} />
+              <BarTable
+                ariaLabel={`Change by ${dim}`}
+                rows={change.rows}
+                rowKey={(r) => r.label}
+                onRow={(r) => pick(dim, r.idx)}
+                bar={{ value: (r) => r.d, tone: "forecast", leader: (r) => r === change.leader }}
+                cols={[
+                  { key: "l", label: DIM_LABEL[dim], kind: "label", value: (r) => r.label, width: "30%" },
+                  { key: "s", label: "Share next 12", kind: "num", value: (r) => `${(r.share * 100).toFixed(1)}%`, width: "18%", hideNarrow: true },
+                  { key: "b", label: "Change", kind: "bar" },
+                  { key: "d", label: usd ? "USD" : "Units", kind: "num", value: (r) => fmtSigned(r.d, measure, 1), width: "15%" },
+                  { key: "p", label: "%", kind: "num", value: (r) => fmtSignedPct(r.pct), width: "14%" },
+                ]}
+              />
+              {render(CHANGE_TEMPLATES.note, change).text && <p className="bt-note">{render(CHANGE_TEMPLATES.note, change).text}</p>}
+            </Module>
+          ) : (
+            <Module title="The filters fix family, region and channel" dek="There is no mix to compare inside one series. Widen a filter to see where the change comes from." />
+          )}
+
+          {top && (
+            <Module
+              title={render(TOP_TEMPLATES.title, { n: top.rows.length, shown: top.shown.length, topSum: top.topSum, total: top.total }).text}
+              dek={top.rows.length ? "Exceptions ranked by forecast-window revenue at risk. Each opens its case in the inbox." : `None of the ${Object.keys((exc.data as ExceptionFile).rules).length} exception rules flags a series in this selection.`}
+              info={{ what: "The exception rows inside the selection with the largest revenue at risk.", how: "Each rule defines its own at-risk amount (for a lost account: the pre-loss level × window months × price, the revenue missed if it returns).", source: "exceptions.json" }}
+            >
+              {top.shown.length > 0 && (
+                <ol className="ranklist">
+                  {top.shown.map((i, k) => {
+                    const X = exc.data as ExceptionFile;
+                    const s = X.series[i];
+                    return (
+                      <li key={i}>
+                        <button type="button" className="row" onClick={() => go("exceptions", { case: String(i) })} title={readableMonths(X.cause[i])}>
+                          <span className="rk">{k + 1}</span>
+                          <span className="who">
+                            <span className="id">{s >= 0 ? m.dims.skus.id[m.sSku[s]] : m.dims.families.code[X.family[i]]}</span> · {s >= 0 ? m.dims.regions[m.sRegion[s]] : m.dims.regions[X.region[i]]}
+                          </span>
+                          <span className="amt">
+                            {fmtMoney(X.revenue_at_risk[i])}
+                            <i style={{ width: `${(X.revenue_at_risk[i] / top.max) * 92}px` }} aria-hidden="true" />
+                          </span>
+                          <span className="why">
+                            <RuleChip>{X.rules[X.rule[i]]?.title ?? X.rule[i]}</RuleChip>
+                            {readableMonths(X.cause[i].split(";")[0].split(". ")[0])}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+              {top.rows.length > 0 && (
+                <p style={{ marginTop: 10 }}>
+                  <button type="button" className="more-link" onClick={() => go("exceptions")}>
+                    All {fmtInt(top.rows.length)} exceptions in the inbox →
+                  </button>
+                </p>
+              )}
+            </Module>
+          )}
+        </div>
+      </div>
+
+      {outlook && (
+        <Module
+          title={render(OUTLOOK_TEMPLATES.title, { unit: outlook.dim, units: outlook.dim === "family" ? "families" : `${outlook.dim}s`, items: outlook.items.map((x) => ({ label: x.label, chg: x.chg })) }).text}
+          dek={`Moving annual total (rolling 12-month sum) of unconstrained demand${usd ? " in USD" : ""}, continued by the forecast, indexed to the year to ${monthLong(m.months[m.asOf])} = 100. The dot is the year to ${monthLong(m.months[Math.min(m.nMonths - 1, m.asOf + 12)])}, the change beside each name. Click one to filter the page.`}
+          info={{ what: `One small multiple per ${outlook.dim}, on a shared scale, history in ink and the forecast in cobalt.`, how: "Rolling 12-month sums remove the ordering-cycle noise, so the trend reads as the planner's own measure.", source: "history.json, forecast.json" }}
         >
-          {mixes.every(({ dim }) => filters[dim] !== null) && <p className="small muted">Family, region and channel are all fixed by the filters: no mix to compare.</p>}
-          {mixes.filter(({ dim }) => filters[dim] === null).map(({ dim, labels, last, next }) => {
-            const delta = next.map((x, i) => x - last[i]);
-            const k = delta.reduce((a, _, i) => (Math.abs(delta[i]) > Math.abs(delta[a]) ? i : a), 0);
-            const colors = theme.cat;
-            const pick = (i: number) => setFilters({ ...filters, [dim]: i, ...(dim === "family" ? { sku: null } : {}) });
-            return (
-              <div key={dim} style={{ marginBottom: 14 }}>
-                <div className="toolbar small" style={{ justifyContent: "space-between", marginBottom: 4 }}>
-                  <b style={{ textTransform: "capitalize" }}>{dim}</b>
-                  <span className="muted">
-                    largest shift: {labels[k]} {fmtPts(delta[k])}
+          <div className="multiples" style={{ ["--sm-cols" as string]: Math.min(7, outlook.items.length) }}>
+            {outlook.items.map((x) => (
+              <button type="button" key={x.label} className="multiple" onClick={() => pick(outlook.dim, x.idx)} aria-label={`${x.label}: ${fmtSignedPct(x.chg)} next 12 months; filter the page`}>
+                <h4>{x.label}</h4>
+                <div className="stat">
+                  <b>{fmtSignedPct(x.chg)}</b>
+                  <span>
+                    {usd ? fmtMoney(x.n12, 1) : fmtNum(x.n12)} next 12
                   </span>
                 </div>
-                <div className="mixrow">
-                  <span>Last 12 m</span>
-                  <MixBar shares={last} colors={colors} labels={labels} onPick={pick} title={`${dim} share, last 12 months`} />
-                </div>
-                <div className="mixrow">
-                  <span>Next 12 m</span>
-                  <MixBar shares={next} colors={colors} labels={labels} onPick={pick} title={`${dim} share, next 12 months`} />
-                </div>
-                <div className="legend" style={{ marginTop: 2 }}>
-                  {labels.map((l, i) =>
-                    last[i] > 0 || next[i] > 0 ? (
-                      <span key={l}>
-                        <i className="sw" style={{ background: colors[i % colors.length] }} />
-                        {l} <span className="muted">{fmtPct(next[i], 0)}</span>
-                      </span>
-                    ) : null,
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </Card>
-      </div>
-      <p className="muted tiny">
-        Peak forecast month for this selection: {monthName(m.months[m.w0 + fc.fc.indexOf(Math.max(...fc.fc))])} ({compact(Math.max(...fc.fc))} {measure === "usd" ? "USD" : "units"}). Structural-zero rows in the window: {fmtInt(sum(fc.zeros))} of {fmtInt(sum(fc.rows))}.
-      </p>
+                <MiniMat ix={x.ix} from={outlook.from} asOf={m.asOf} dotAt={Math.min(m.nMonths - 1, m.asOf + 12)} yMin={outlook.yMin} yMax={outlook.yMax} />
+              </button>
+            ))}
+            <div className="multiples-axis">
+              <span>{monthName(m.months[outlook.from])}</span>
+              <span>
+                Shared scale {outlook.yMin}–{outlook.yMax}; hairline = 100
+              </span>
+              <span>{monthName(m.months[m.nMonths - 1])}</span>
+            </div>
+          </div>
+        </Module>
+      )}
+
+      <aside className="colophon" aria-label="Method">
+        <span>
+          <b>Quantiles</b> the lognormal aggregate of the contract formula, never summed row quantiles
+        </span>
+        <span>
+          <b>WAPE</b> Σ|actual − forecast| / Σ actual over scored cells
+        </span>
+        <span>
+          <b>Submission</b> <Rich text={`**${fmtInt(m.meta.submission.total_units)}** units in ${fmtInt(m.meta.submission.rows)} rows${m.meta.submission.matches_forecast ? ", identical to the bundle" : ""}`} />
+        </span>
+      </aside>
     </>
+  );
+}
+
+/** One moving-annual-total small multiple (inline SVG; the dot is an HTML element so it stays round). */
+function MiniMat({ ix, from, asOf, dotAt, yMin, yMax }: { ix: (number | null)[]; from: number; asOf: number; dotAt: number; yMin: number; yMax: number }) {
+  const n = ix.length - from;
+  const W = 200;
+  const H = 92;
+  const x = (i: number) => ((i - from) / (n - 1)) * W;
+  const y = (v: number) => H - 2 - ((v - yMin) / (yMax - yMin || 1)) * (H - 4);
+  const path = (a: number, b: number) => {
+    let d = "";
+    for (let i = a; i <= b; i++) {
+      const v = ix[i];
+      if (v === null) continue;
+      d += `${d ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+    }
+    return d;
+  };
+  const dv = ix[dotAt];
+  return (
+    <span className="mini">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+        <rect x={x(asOf)} y={0} width={W - x(asOf)} height={H} fill="var(--accent-wash)" />
+        <line x1={0} x2={W} y1={y(100)} y2={y(100)} stroke="var(--rule-strong)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <path d={path(from, asOf)} fill="none" stroke="var(--ink)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        <path d={path(asOf, ix.length - 1)} fill="none" stroke="var(--accent)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      </svg>
+      {dv !== null && <i className="mini-dot" style={{ left: `${(x(dotAt) / W) * 100}%`, top: `${(y(dv) / H) * 100}%` }} />}
+    </span>
   );
 }

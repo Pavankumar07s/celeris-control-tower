@@ -18,6 +18,7 @@ export interface HistoryAgg {
   zeros: Int32Array; // cells with zero demand
   structZeros: Int32Array; // of which scheduled (off-phase or lost-account tail)
   shippedKnown: Int32Array; // cells with known shipments
+  unknownDemand: Float64Array; // Σ demand on cells whose shipments are unknown (ERP blanks): not lost sales
 }
 
 export function historyAgg(m: Model, segs: number[], measure: Measure): HistoryAgg {
@@ -35,6 +36,7 @@ export function historyAgg(m: Model, segs: number[], measure: Measure): HistoryA
     zeros: new Int32Array(n),
     structZeros: new Int32Array(n),
     shippedKnown: new Int32Array(n),
+    unknownDemand: new Float64Array(n),
   };
   const b = m.bit;
   const so = b.stockout_listed | b.stockout_inferred;
@@ -52,7 +54,7 @@ export function historyAgg(m: Model, segs: number[], measure: Measure): HistoryA
       if (u === u) {
         out.shipped[t] += w * u;
         out.shippedKnown[t]++;
-      }
+      } else out.unknownDemand[t] += w * m.d[i];
       out.demand[t] += w * m.d[i];
       out.latent[t] += w * m.latent[i];
       out.cells[t]++;

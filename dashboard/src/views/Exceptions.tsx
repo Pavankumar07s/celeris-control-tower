@@ -50,12 +50,13 @@ function SeriesPanel({ s, onClose, children }: { s: number; onClose: () => void;
 }
 
 export default function Exceptions() {
-  const { m, filters, go } = useApp();
+  const { m, filters, go, params } = useApp();
   const ex = useResource<ExceptionFile>("exceptions.json");
   const [rule, setRule] = useState<string>("");
   const [grouped, setGrouped] = useState(false);
   const [store, setStore] = useState(loadStore);
-  const [open, setOpen] = useState<number | null>(null);
+  // `#/exceptions?case=<row>` (from the overview's top exceptions) opens that case directly
+  const [open, setOpen] = useState<number | null>(() => (params.get("case") !== null && Number.isFinite(Number(params.get("case"))) ? Number(params.get("case")) : null));
   const [statusFilter, setStatusFilter] = useState<"open" | "all">("open");
   const rows = useMemo(() => (ex.data ? exceptionRowsIn(m, filters, ex.data) : []), [ex.data, m, filters]);
   if (ex.loading) return <Loading what="the exception inbox" />;

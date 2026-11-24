@@ -12,13 +12,20 @@ One app, two parts with the same filters (family → SKU, region, channel, custo
 - **Act**: exception inbox, procurement plan, data download.
 - The **Executive overview** spans both parts.
 
-History and forecast always share **one continuous timeline**. It shows:
+History and forecast always share **one continuous timeline**, drawn by one rule: **ink is the past, cobalt is the
+future**. It shows:
 
-- shipped history as a solid line, with unconstrained demand dashed where it differs;
-- a "last actual" rule at 2026-10;
-- a tinted forecast window;
-- the submitted forecast with its P10–P90 band and the P50;
-- an event lane, and imputed months as hollow markers.
+- unconstrained demand as the ink line, with shipments as a hairline only where they were lower and the gap shaded as
+  lost sales;
+- a "last actual" rule at Oct 2026 and a washed forecast window;
+- the submitted forecast in cobalt, starting from the last actual, with its P10–P90 band (the P50 is drawn when it
+  departs visibly from the forecast and is always in the tooltip);
+- rings on months where rebuilt cells cluster, and annotations computed from the data (the COVID trough, the
+  semiconductor gap, the ERP rebuild, the largest event inside the window, the end value with its range);
+- range presets instead of a zoom slider; one selected series switches to columns with P10–P90 whiskers.
+
+The visual system (tokens, components, chart conventions, headline templates) is documented in
+[`docs/design_system.md`](design_system.md).
 
 ## Run it locally
 
@@ -70,8 +77,8 @@ The export needs these pipeline outputs:
 - one dossier driver per family for the sensitivities.
 
 `celeris export` resolves the files one by one: it takes the real file when it exists and the stand-in otherwise. It
-records the choice for each file in `meta.json` (`provisional`, `sources`). The app then shows a "Provisional forecast"
-badge, and a banner that names every provisional input. **When the real files land, re-run `python -m celeris export`
+records the choice for each file in `meta.json` (`provisional`, `sources`). The app then shows a compact "Provisional
+forecast" status pill in the masthead, whose popover names every provisional input; with the final files it disappears. **When the real files land, re-run `python -m celeris export`
 and `npm run build`; nothing else changes.**
 
 ## How data flows
@@ -115,7 +122,8 @@ Start-up loads about 0.57 MB of gzipped data, plus about 0.31 MB of JavaScript (
   them and shows "Quantile engine 7/7 checks match the pipeline" in the sidebar. Row quantiles are never summed.
 - **WAPE** = Σ|actual − forecast| / Σ actual. **Bias** = Σ(forecast − actual) / Σ actual. Both are computed over the
   scored cells of the selection, never as an average of series WAPEs. Actuals are unconstrained demand.
-- **Missing rows are not zeros.** They appear as hollow "imputed" markers, and their demand is the pipeline's fill.
+- **Missing rows are not zeros.** Months where rebuilt cells cluster carry hollow rings, and their demand is the
+  pipeline's fill. Cells whose shipments are unknown (ERP blanks) are kept out of the lost-sales gap.
 - **Forecast totals equal `submission.csv`.** The export refuses to write a bundle that disagrees, and a test checks it.
 - **Customer at the time.** History is stored per series × customer run, so the customer filter follows the 23 customer
   switches.
@@ -124,7 +132,7 @@ Start-up loads about 0.57 MB of gzipped data, plus about 0.31 MB of JavaScript (
 
 | View | What it shows | The question it answers |
 |---|---|---|
-| **Executive overview** (both) | KPI tiles: 19-month forecast with the P10–P90 of its total and its change vs the last 19 months; forecast revenue at the forecast's prices; backtest WAPE vs seasonal naive; lost sales; cells repaired. One timeline from 2019 to 2028 in units or USD. Mix shift by family, region and channel (last 12 actual months vs next 12 forecast months; click to filter). The **planner briefing**. | Where are volume and revenue going, what changes in the mix, and what should I look at first? |
+| **Executive overview** (both) | A computed serif headline and standfirst; the hero figure (19-month forecast with the range strip of its P10–P90 against the last 19 months). The annotated timeline from 2019 to 2028 in units or USD. A figure strip: forecast revenue with its sparkline, backtest WAPE on a benchmark ladder, lost sales, cells repaired. **The brief** (seven facts, each linked to its evidence); where the 12-month change comes from by region, family or channel (a bar table with shares, click to filter); the five exceptions with the most revenue at risk; outlook small multiples (moving annual total). | Where are volume and revenue going, what changes in the mix, and what should I look at first? |
 | **Data health** (history) | Checks run and failing before vs after; row waterfall from 248,248 raw rows to 245,548 grid cells; rows affected by every cleaning rule, coloured by recovery method; issue × month heat-strip; every check with its before and after metric; duplicates and restatements; the numeric-state census. | Is the cleaning complete, exact and auditable? What kind of errors were there, and where? |
 | **Demand explorer** (history) | A navigator that drills family → SKU → region → customer, with a breadcrumb. The series timeline, as orders as booked or as latent monthly demand, optionally continued into the forecast. Seasonality index by year; zero-month calendar with the reason for every zero; series card (ordering cycle and changes, customers over time, demand class, stock-outs, fixes). Clicking a month of a single series opens the **cell lineage drawer**. | Why does this series look the way it does? Are its zeros scheduled, missing or lost? |
 | **Anomaly monitor** (history) | Flagged points on the timeline: diamonds for data errors fixed, triangles for real events. Counts by type; the full register with reason, action, confidence and impact; group by cause; CSV export. A row opens the series and its lineage. | Which unusual numbers were mistakes and which were real business, and what was done with each? |
@@ -150,8 +158,10 @@ Every chart has an "i" popover that states what it shows, how it is computed and
 
 - **Ordering-cycle lens.** The latent-demand toggle in the header; the zero-month calendar explains every zero; the
   briefing states the share of zero months that are scheduled.
-- **Deterministic planner briefing.** Templated sentences over facts computed for the current filters
-  (`dashboard/src/insights/briefing.tsx`). There is no language model, and each sentence links to a filter or a view.
+- **Headlines that write themselves.** Every view headline, standfirst and module title is a deterministic template
+  over facts computed for the current filters, with a descriptive fallback (`dashboard/src/insights/headlines.ts`,
+  `overview.ts`). The brief (`briefing.tsx`) works the same way. There is no language model, and each brief item links
+  to a filter or a view.
 - **Backtest time machine and forecast-value-added stairstep** in Forecast & accuracy.
 - **Forecast X-ray.** The waterfall of base level × season × holiday × macro × EV × lifecycle × event = latent demand,
   then cycle placement and rounding, for any selection and month.
@@ -178,11 +188,14 @@ src/celeris/export/      stage.py (run_export), sources.py (real vs provisional)
 tests/test_export_*.py   bundle schema, totals equal the pipeline files and submission.csv, determinism,
                          quantile formula vs the reference implementation
 dashboard/src/
-  App.tsx                shell: navigation, header toggles, filter bar, lazy views
-  data/                  bundle types, loader, in-memory model, aggregations, quantile engine, formatting
-  charts/                ECharts wrapper (tree-shaken), theme tokens (light / dark), the shared timeline
-  components/            filter bar, cards, KPI tiles, tables, drawer, lineage drawer
-  insights/briefing.tsx  the planner briefing
-  views/                 one file per view
+  App.tsx                shell: rail, masthead, filter bar, lazy views
+  styles/                tokens.css (light / dark), base, shell, components, legacy (transitional re-skin)
+  assets/fonts/          self-hosted Source Serif 4, IBM Plex Sans and Mono (OFL)
+  data/                  bundle types, loader, in-memory model, aggregations, breakdowns, quantile engine, formatting
+  charts/                ECharts wrapper, theme read from the CSS tokens, the shared timeline, annotation overlay
+  components/            shell (rail, masthead), filter bar, Lede / Figure, Module / Key, controls, tables,
+                         overlays (popover, info, drawer, toast), states, lineage drawer; ui.tsx is the legacy barrel
+  insights/              headline engine, overview templates, the brief
+  views/                 one file per view (plus an optional <View>.css)
 dashboard/dev/           make_provisional_forecast.py (dev only)
 ```
