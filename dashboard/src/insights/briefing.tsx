@@ -9,6 +9,22 @@ import { seriesMatches, type Filters, type Measure, type Model } from "../data/m
 import type { ExceptionFile } from "../data/types";
 import { LinkButton, MoreLink } from "../components/controls";
 
+/** The backtest ladder as every view cites it: pooled over the scored origins on the cells every model forecast.
+ *  The noise floor is the in-hindsight oracle on those same cells (one variable for the Overview, the brief and
+ *  Forecast & accuracy), falling back to the summary's figure for a bundle without an oracle row. */
+export function ladderFacts(m: Model) {
+  const bt = m.meta.backtest;
+  const find = (md: string) => bt.ladder.find((l) => l.model === md);
+  const oracle = find("oracle");
+  return {
+    final: find(bt.final) ?? find("final"),
+    naive: find("naive"),
+    snaive: find("seasonal_naive"),
+    floor: oracle ? oracle.wape : bt.noise_floor,
+    origins: (bt.scored_origins ?? bt.origins).length,
+  };
+}
+
 export interface BriefItem {
   /** Lead-in label (rendered UPPERCASE): Volume, Mix, Risk, Act, Zeros, Lost sales, Accuracy. */
   tag: string;
@@ -57,8 +73,16 @@ export function exceptionRowsIn(m: Model, f: Filters, e: ExceptionFile): number[
 }
 
 /** Replace ISO months in pipeline prose with reading months: "since 2025-06" -> "since Jun 2025". */
+/** Pipeline prose made readable: ISO months as "Oct 2026", "a..b" month ranges as "a – b", "->" as "to",
+ *  "x1.71" as "×1.71" and a hyphen-minus before a number as a true minus. */
 export function readableMonths(s: string, long = false): string {
-  return s.replace(/\b(\d{4})-(\d{2})\b/g, (_, y: string, mo: string) => (long ? monthLong(`${y}-${mo}`) : monthName(`${y}-${mo}`)));
+  return s
+    .replace(/\b(\d{4})-(\d{2})\b/g, (_, y: string, mo: string) => (long ? monthLong(`${y}-${mo}`) : monthName(`${y}-${mo}`)))
+    .replace(/\s*->\s*/g, " to ")
+    .replace(/\bx(?=\d)/g, "×")
+    .replace(/([A-Z][a-z]{2,8} \d{4})\.\.([A-Z][a-z]{2,8} \d{4})/g, "$1 – $2")
+    .replace(/(^|[\s(])-(?=\d)/g, "$1\u2212")
+    .replace(/(\d) %/g, "$1%");
 }
 
 /** Largest share shift (next 12 vs last 12) across the dimensions the filters leave open. */
@@ -207,19 +231,16 @@ export function briefing(c: Ctx): BriefItem[] {
   }
 
   // ACCURACY
-  const bt = m.meta.backtest;
-  const final = bt.ladder.find((l) => l.model === bt.final) ?? bt.ladder.find((l) => l.model === "final");
-  const naive = bt.ladder.find((l) => l.model === "naive");
-  const snaive = bt.ladder.find((l) => l.model === "seasonal_naive");
+  const { final, naive, snaive, floor, origins } = ladderFacts(m);
   if (final && (naive || snaive)) {
     out.push({
       tag: "Accuracy",
       body: (
         <>
-          Across {bt.origins.length} backtest origins at a 19-month horizon, WAPE is <b>{fmtPct(final.wape)}</b>
+          Across {origins} backtest origins at a 19-month horizon, WAPE is <b>{fmtPct(final.wape)}</b>
           {snaive && <>, against {fmtPct(snaive.wape)} for seasonal naive</>}
           {naive && <> and {fmtPct(naive.wape)} for naive</>}
-          {bt.noise_floor !== null && <>; the noise floor is about {fmtPct(bt.noise_floor)}</>}. <MoreLink onClick={() => c.go("forecast")}>Accuracy by segment</MoreLink>
+          {floor !== null && <>; the noise floor is about {fmtPct(floor)}</>}. <MoreLink onClick={() => c.go("forecast")}>Accuracy by segment</MoreLink>
         </>
       ),
     });

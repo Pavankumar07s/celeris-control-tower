@@ -31,14 +31,21 @@ const VIEW_COMPONENTS: Record<string, ComponentType> = {
   downloads: lazy(() => import("./views/Downloads")),
 };
 
+/** `theme=dark|light` in the hash wins (a shared link opens in the sender's theme), then the saved choice, then the system. */
+function themeFromHash(): ThemeName | null {
+  const q = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("theme");
+  return q === "dark" || q === "light" ? q : null;
+}
+
 function initialTheme(): ThemeName {
-  let t: ThemeName | null = null;
-  try {
-    const saved = window.localStorage.getItem("celeris-theme");
-    if (saved === "light" || saved === "dark") t = saved;
-  } catch {
-    /* storage unavailable: fall back to the system setting */
-  }
+  let t: ThemeName | null = themeFromHash();
+  if (!t)
+    try {
+      const saved = window.localStorage.getItem("celeris-theme");
+      if (saved === "light" || saved === "dark") t = saved;
+    } catch {
+      /* storage unavailable: fall back to the system setting */
+    }
   t ??= window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   // set before the first render so the chart theme reads the right CSS variables
   document.documentElement.dataset.theme = t;
@@ -96,7 +103,9 @@ export default function App() {
       }
       return next;
     });
-  }, []);
+    // an explicit choice replaces a theme carried in by a shared link
+    if (themeFromHash()) navigate(null, { theme: null }, true);
+  }, [navigate]);
   // keep <html data-theme> in step (also after a StrictMode double render)
   useEffect(() => {
     document.documentElement.dataset.theme = themeName;

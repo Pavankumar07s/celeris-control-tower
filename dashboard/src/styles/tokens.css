@@ -154,26 +154,6 @@
   --ease: cubic-bezier(.2, .7, .2, 1);
   --dur: 180ms;
   --dur-fast: 150ms;
-
-  /* ---- DEPRECATED aliases: only for views not yet restyled.  Do not use in new code. ---- */
-  --slate-1: var(--hist-1); --slate-2: var(--hist-2); --slate-3: var(--hist-3); --slate-4: var(--hist-4); --slate-5: var(--hist-5); --slate-6: var(--hist-6); --slate-7: var(--hist-7);
-  --cobalt-1: var(--fc-1); --cobalt-2: var(--fc-2); --cobalt-3: var(--fc-3); --cobalt-4: var(--fc-4); --cobalt-5: var(--fc-5); --cobalt-6: var(--fc-6); --cobalt-7: var(--fc-7);
-  --page: var(--paper);
-  --surface: var(--paper);
-  --surface-2: var(--hover);
-  --hair: var(--rule);
-  --muted: var(--ink-3);
-  --history: var(--ink);
-  --demand: var(--ink);
-  --accent-ink: var(--accent-text);
-  --good-ink: var(--good);
-  --warning: var(--warn-mark);
-  --serious: var(--loss);
-  --critical: var(--crit);
-  --critical-ink: var(--crit);
-  --shadow: none;
-  --radius: var(--r-3);
-  --font: var(--font-sans);
 }
 
 /* ---- Dark: night (#0A0A0A) with chalk text and the same orange.  Same block twice: system preference

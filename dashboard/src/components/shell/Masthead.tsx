@@ -26,7 +26,7 @@ export function Masthead({ themeName, onToggleTheme }: { themeName: ThemeName; o
         <span className="view">{def.title}</span>
         <span className="sep" aria-hidden="true" />
         <span className="section">{group?.eyebrow}</span>
-        <Info what={def.blurb} how="Every figure on this page is computed in the browser from the pipeline's data bundle for the filters below; headlines and titles are deterministic templates over those figures." align="left" size="sm" />
+        <Info what={def.blurb} how="Every figure on this page is computed in the browser from the pipeline's data bundle for the filters below; headlines and titles are deterministic templates over those figures." align="left" size="sm" label="About this view" />
         {m.meta.provisional && (
           <Popover
             trigger={

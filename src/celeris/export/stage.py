@@ -136,7 +136,8 @@ def run_export(paths: Paths, bundle_dir: Path | None = None) -> dict[str, Any]:
         "price_assumption": price_assumption(rows, frames.cells),
         "uncertainty": uncertainty,
         "backtest": {"models": backtest["models"], "final": backtest["final"], "origins": backtest["origins"],
-                     "ladder": backtest["ladder"], "noise_floor": backtest["noise_floor"]},
+                     "scored_origins": backtest["scored_origins"], "ladder": backtest["ladder"],
+                     "noise_floor": backtest["noise_floor"]},
         "members": [m.removeprefix("pred_") for m in rows.members],
         "quantile_selfcheck": self_check(rows, index),
     }

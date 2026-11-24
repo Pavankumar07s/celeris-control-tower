@@ -32,7 +32,6 @@ html { scrollbar-color: var(--rule-strong) transparent; caret-color: var(--ink);
 
 /* ---- typography utilities ---- */
 .num, .tabular { font-variant-numeric: tabular-nums; }
-.prop { font-variant-numeric: proportional-nums; }
 .mono, .id { font-family: var(--font-mono); font-size: 0.93em; letter-spacing: -0.01em; }
 .id { font-weight: 500; }
 .serif { font-family: var(--font-serif); }
@@ -43,12 +42,14 @@ html { scrollbar-color: var(--rule-strong) transparent; caret-color: var(--ink);
 .muted, .ink-3 { color: var(--ink-3); }
 .small { font-size: 12.5px; }
 .tiny { font-size: 11.5px; }
-.loss-text { color: var(--loss); }
-.forecast-text { color: var(--accent-text); }
 .visually-hidden {
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* ---- native inputs: ink accents (orange is reserved for the forecast and the primary action) ---- */
+input[type="range"] { accent-color: var(--ink); width: 100%; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--ink); }
 
 /* ---- motion: quiet and functional; nothing when the user asks for reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
@@ -63,6 +64,6 @@ html { scrollbar-color: var(--rule-strong) transparent; caret-color: var(--ink);
   .rail, .masthead, .filterbar, .toast-host, .mod-tools, .no-print { display: none !important; }
   .shell { display: block !important; }
   .page { max-width: none !important; padding: 0 !important; }
-  .module, .figures, .lede, .card, .kpis { break-inside: avoid; }
+  .module, .figures, .lede { break-inside: avoid; }
   a { color: inherit; text-decoration: none; }
 }

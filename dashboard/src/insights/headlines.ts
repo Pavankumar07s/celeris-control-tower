@@ -46,13 +46,6 @@ export function renderFirst<F>(ts: Template<F>[], f: F): Rendered {
   return { id: last.id, text: last.fallback(f), fallback: true };
 }
 
-/** Render a record of templates against the same facts: { headline: "...", standfirst: "..." }. */
-export function renderAll<F, K extends string>(ts: Record<K, Template<F>>, f: F): Record<K, string> {
-  const out = {} as Record<K, string>;
-  for (const k of Object.keys(ts) as K[]) out[k] = render(ts[k], f).text;
-  return out;
-}
-
 // ---- vocabulary -----------------------------------------------------------------------------------------
 /** Verb for a relative change (thresholds: <1 % holds steady, 1-5 % eases / edges up, 5-15 % falls /
  *  grows, >15 % drops sharply / surges). */

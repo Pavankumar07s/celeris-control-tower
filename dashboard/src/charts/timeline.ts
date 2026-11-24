@@ -235,14 +235,16 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
     if (b > 0) p50MaxRel = Math.max(p50MaxRel, Math.abs(a - b) / b);
   }
   const p50Drawn = p50MaxPx > 1 && !columns;
-  const divider = asOf >= start && asOf <= end ? rel(asOf) : -1;
+  // a history-only chart (no forecast, no extra line) ends at the last actual: no divider, no wash
+  const future = !!s.fc || !!s.lines?.length;
+  const divider = future && asOf >= start && asOf <= end ? rel(asOf) : -1;
 
   const series: Record<string, unknown>[] = [];
   const wash = {
     silent: true,
     itemStyle: { color: t.accentWash },
     // columns: category bands, so the wash starts at the first forecast month's band edge
-    data: s.fc || s.lines?.length ? [[{ xAxis: labels[Math.max(0, rel(columns ? m.w0 : asOf))] }, { xAxis: labels[n - 1] }]] : [],
+    data: future ? [[{ xAxis: labels[Math.max(0, rel(columns ? m.w0 : asOf))] }, { xAxis: labels[n - 1] }]] : [],
   };
   const rule = {
     silent: true,
@@ -401,7 +403,8 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
         data: pts.map((a) => ({ value: [rel(a.month), a.value], text: a.text })),
         symbol: cls === "data_error" ? "diamond" : "triangle",
         symbolSize: 9,
-        itemStyle: cls === "data_error" ? { color: t.paper, borderColor: t.cat[1], borderWidth: 1.75 } : { color: t.cat[0], borderColor: t.paper, borderWidth: 1.5 },
+        // design system 2.4: data error fixed = hollow rose diamond (cat-1); real event kept = filled jade triangle (cat-7)
+        itemStyle: cls === "data_error" ? { color: t.paper, borderColor: t.cat[0], borderWidth: 1.75 } : { color: t.cat[6], borderColor: t.paper, borderWidth: 1.5 },
         symbolOffset: cls === "data_error" ? [0, -10] : [0, 0],
         z: cls === "data_error" ? 9 : 8,
         tooltip: { trigger: "item", formatter: (p: { data: { text: string } }) => `<div class="tt" style="max-width:300px">${esc(p.data.text)}</div>` },
@@ -411,7 +414,9 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
 
   const ev = s.showEvents ? laneEvents(m, s.filters).filter((e) => e.end >= start && e.start <= end) : [];
   const rugH = ev.length ? 16 : 0;
-  const grid = s.narrow ? { left: 34, right: 58, top: 30, bottom: 30 + rugH } : { left: 46, right: 92, top: 30, bottom: 30 + rugH };
+  // the right margin holds the end label; columns (one series) and history-only charts carry none, so they get the width back
+  const right = columns || !future ? (s.narrow ? 12 : 24) : s.narrow ? 58 : 92;
+  const grid = s.narrow ? { left: 34, right, top: 30, bottom: 30 + rugH } : { left: 46, right, top: 30, bottom: 30 + rugH };
   if (ev.length) {
     series.push({
       name: "Events",
@@ -440,6 +445,10 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
 
   const ax = (v: string) => v.endsWith("-01");
   const showYear = n > 30;
+  // phones: a label every second or third January (ticks stay yearly), so the years never run together
+  const yearStep = s.narrow ? (n > 72 ? 3 : n > 36 ? 2 : 1) : 1;
+  const firstJan = labels.find(ax);
+  const axLabel = (v: string) => ax(v) && (Number(v.slice(0, 4)) - Number((firstJan ?? v).slice(0, 4))) % yearStep === 0;
   const option: EChartsCoreOption = {
     ...baseOption(t),
     grid,
@@ -450,7 +459,7 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
       axisLine: { lineStyle: { color: t.ruleStrong } },
       axisTick: showYear ? { interval: (_: number, v: string) => ax(v), length: 5, lineStyle: { color: t.ruleStrong }, alignWithLabel: true } : { show: false },
       axisLabel: showYear
-        ? { interval: (_: number, v: string) => ax(v), formatter: (v: string) => v.slice(0, 4), color: t.ink3, fontSize: 11.5, margin: 9, fontFamily: FONT }
+        ? { interval: (_: number, v: string) => axLabel(v), formatter: (v: string) => v.slice(0, 4), color: t.ink3, fontSize: 11.5, margin: 9, fontFamily: FONT }
         : { interval: (i: number) => i % 3 === 0, formatter: (v: string) => monthName(v).replace(" 20", " ’"), color: t.ink3, fontSize: 11.5, margin: 9, fontFamily: FONT },
       splitLine: { show: false },
       axisPointer: { label: { show: false } },
@@ -527,11 +536,6 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
     hasBand,
     latent,
   };
-}
-
-/** Legacy entry point: the option only (views not yet restyled). */
-export function timelineOption(s: TimelineSpec): EChartsCoreOption {
-  return buildTimeline(s).option;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -669,12 +673,13 @@ export function timelineAnnotations(c: AnnotationContext): Annotation[] {
   // 4. In-window event from exceptions.json (window_event rows in the selection), anchored on the forecast
   if (inc.has("window") && c.exceptions && c.exceptionRows && s.fc) {
     const X = c.exceptions;
-    const groups = new Map<string, { rows: number[]; start: number; end: number; units: number }>();
+    const groups = new Map<string, { rows: number[]; start: number; end: number; units: number; usd: number }>();
     for (const r of c.exceptionRows) {
       if (X.rule[r] !== "window_event") continue;
-      const g = groups.get(X.group[r]) ?? { rows: [], start: X.start[r], end: X.end[r], units: 0 };
+      const g = groups.get(X.group[r]) ?? { rows: [], start: X.start[r], end: X.end[r], units: 0, usd: 0 };
       g.rows.push(r);
       g.units += X.impact_units[r];
+      g.usd += X.revenue_at_risk[r];
       g.start = Math.min(g.start, X.start[r]);
       g.end = Math.max(g.end, X.end[r]);
       groups.set(X.group[r], g);
@@ -690,13 +695,15 @@ export function timelineAnnotations(c: AnnotationContext): Annotation[] {
       let at = g.start;
       for (let i = g.start; i <= Math.min(g.end, m.nMonths - 1); i++) if ((tm.fc[i] ?? Infinity) < (tm.fc[at] ?? Infinity)) at = i;
       if (vis(at) && tm.fc[at] !== null) {
-        const units = g.units;
+        // the impact in the active measure: units removed, or the revenue they carry (removed units x price)
+        const removed = s.measure === "usd" ? g.usd : g.units;
+        const amount = s.measure === "usd" ? `${fmtMoney(Math.abs(removed), 2)} of revenue` : `${fmtInt(Math.abs(removed))} units`;
         out.push({
           id: `win-${label}`,
           at: rel(at),
           value: tm.fc[at] as number,
           title: `${who} ${noun}`,
-          text: `${units >= 0 ? "−" : "+"}${fmtInt(Math.abs(units))} units, ${monthSpan(months[g.start], months[Math.min(g.end, m.nMonths - 1)])}`,
+          text: `${removed >= 0 ? "−" : "+"}${amount}, ${monthSpan(months[g.start], months[Math.min(g.end, m.nMonths - 1)])}`,
           anchor: "below",
           tone: "future",
           align: "left",

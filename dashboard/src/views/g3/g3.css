@@ -1,0 +1,16 @@
+/* Data download (views/g3/ui.tsx): the SHA-256 cell with its copy button and the verification mark.
+   Status colour always ships with an icon and a word. */
+.g3-hash { display: inline-flex; align-items: center; gap: 4px; }
+.g3-hash code { font: 500 12px/1 var(--font-mono); color: var(--ink-2); letter-spacing: -0.01em; }
+.g3-copy {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-1);
+  background: none; color: var(--ink-3); transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.g3-copy:hover { background: var(--hover); color: var(--ink); }
+.g3-check { display: inline-flex; align-items: center; gap: 5px; font: 500 12px/1.2 var(--font-sans); color: var(--ink-3); white-space: nowrap; }
+.g3-check svg { flex: none; }
+.g3-check.ok { color: var(--ink-2); }
+.g3-check.bad { color: var(--crit); }
+@media (max-width: 700px) {
+  .g3-copy { width: 44px; height: 44px; }
+}

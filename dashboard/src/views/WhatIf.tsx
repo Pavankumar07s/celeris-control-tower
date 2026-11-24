@@ -1,245 +1,381 @@
-// O2 What-if: shift a macro indicator (e.g. PMI −3) over a period of the window and recompute the plan with the
-// model's own per-SKU sensitivities and lags, then push the change in latent demand through each series' ordering
-// cycle (order(t) = Σ weight × latent of the months it carries). Optionally remove the window's customer events.
-import { useMemo, useState } from "react";
+// O2 What-if (prediction).  Question: what happens to the plan if the economy turns, and where does it land?
+//  lede (computed headline + standfirst | hero: the scenario change with the base forecast's P10-P90 strip)
+//  -> scenario builder (presets, indicator, shift, period, events; one orange Apply) | the shared timeline with the
+//     base forecast (orange, banded) and the scenario (violet, solid)
+//  -> P90 cover, peak month, rows changed  -> impact by family (diverging bar table) | effect by month
+// The applied scenario lives in the URL hash (wi, ws, wf, wn, we), so every scenario is a link.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { EChartsCoreOption } from "echarts/core";
 import { useApp } from "../app/context";
-import { useSelection } from "../app/hooks";
+import { useSelection, useElementWidth } from "../app/hooks";
 import { EChart } from "../charts/EChart";
-import { timelineOption } from "../charts/timeline";
-import { Card, DataTable, ErrorState, Info, Kpi, Loading, TimelineLegend, type Column } from "../components/ui";
+import { TimelineChart } from "../charts/TimelineChart";
+import { eventTitle, rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec } from "../charts/timeline";
+import { BAR_MAX, FONT, axisTooltip, barStyle, baseOption, categoryAxis, niceMax, ttEnd, ttHead, ttRow, valueAxis, type TooltipItem } from "../charts/theme";
+import type { Annotation } from "../charts/Annotations";
+import { Button, RangePresets, Select } from "../components/controls";
+import { Figure, FigureStrip, HeroFigure, Lede } from "../components/Figure";
+import { Module, timelineKey } from "../components/Module";
+import { Empty, ErrorState, Loading, Notice } from "../components/states";
+import { BarTable } from "../components/tables";
 import { sum } from "../data/aggregate";
-import { compact, fmtInt, fmtMeasure, fmtSignedPct, fmtUsd, monthName } from "../data/format";
+import { fmtInt, fmtMoney, fmtNum, fmtOnScale, fmtPct, fmtPctAbs, fmtSigned, fmtSignedPct, fmtValue, fmtValueUnit, monthLong, monthName } from "../data/format";
 import { useResources } from "../data/load";
-import type { Model } from "../data/model";
-import { lognormalQuantile, moments, Z90 } from "../data/quantiles";
+import { lognormalQuantile, moments, Z10, Z90 } from "../data/quantiles";
 import type { ForecastDetail, MacroFile } from "../data/types";
-
-interface Scenario {
-  indicator: number;
-  shift: number;
-  start: number; // month index
-  months: number; // 0 = to the end of the window
-  removeEvents: boolean;
-}
-
-const PRESETS: { label: string; ind: string; shift: number; start: string; months: number }[] = [
-  { label: "PMI −3 from Jan 2027", ind: "ism_manufacturing_pmi", shift: -3, start: "2027-01", months: 0 },
-  { label: "Auto production −5 pts for 6 months", ind: "auto_production_yoy_pct", shift: -5, start: "2027-01", months: 6 },
-  { label: "Vehicle orders −10", ind: "new_vehicle_orders_index", shift: -10, start: "2026-11", months: 0 },
-  { label: "Utilisation −3 pts", ind: "industrial_util_rate_pct", shift: -3, start: "2027-01", months: 0 },
-];
-
-/** Scenario order means for every forecast row (same layout as the model's flat forecast arrays). */
-function runScenario(m: Model, runs: number[], d: ForecastDetail, mf: MacroFile, sc: Scenario): { mean: Float64Array; changed: number } {
-  const out = Float64Array.from(m.mean);
-  const S = mf.sensitivity;
-  const bySku = new Map<string, { lag: number; beta: number }[]>();
-  for (let i = 0; i < S.sku.length; i++) {
-    if (S.indicator[i] !== sc.indicator) continue;
-    const key = `${S.sku[i]}|${S.channel_group[i]}`;
-    const list = bySku.get(key) ?? [];
-    list.push({ lag: S.lag[i], beta: S.beta[i] });
-    bySku.set(key, list);
-  }
-  const end = sc.months > 0 ? sc.start + sc.months - 1 : m.nMonths - 1;
-  const shock = (month: number) => (month >= sc.start && month <= end ? sc.shift : 0);
-  const aftermarket = m.dims.channels.indexOf("Aftermarket");
-  let changed = 0;
-  for (const r of runs) {
-    const s = m.rSeries[r];
-    const sens = bySku.get(`${m.sSku[s]}|${m.sChannel[s] === aftermarket ? "aftermarket" : "other"}`) ?? [];
-    const o = m.rOff[r];
-    const n = m.rLen[r];
-    const dLat = new Float64Array(n);
-    let any = false;
-    for (let k = 0; k < n; k++) {
-      const month = m.rStart[r] + k;
-      let logm = 0;
-      for (const x of sens) logm += x.beta * shock(month - x.lag);
-      let mult = Math.exp(logm);
-      const fe = d.factors.f_event[o + k];
-      if (sc.removeEvents && fe > 0 && fe !== 1) mult /= fe;
-      dLat[k] = d.latent_mean[o + k] * (mult - 1);
-      if (dLat[k] !== 0) any = true;
-    }
-    if (!any) continue;
-    for (let k = 0; k < n; k++) {
-      if (m.mean[o + k] <= 0) continue; // structural zeros (off-phase, lost account, after EOL) stay zero
-      const span = d.accum[o + k] & 3;
-      const w = d.accum[o + k] & 4 ? 0.5 : 1;
-      let delta = 0;
-      for (let j = 0; j < span && k - j >= 0; j++) delta += (j === 0 ? 1 : w) * dLat[k - j];
-      if (delta !== 0) {
-        out[o + k] = Math.max(0, m.mean[o + k] + delta);
-        changed++;
-      }
-    }
-  }
-  return { mean: out, changed };
-}
+import { render } from "../insights/headlines";
+import { IND, indName } from "../insights/indicators";
+import { ScenarioStrip } from "./g2/parts";
+import { BYMONTH_TEMPLATES, FAM_TEMPLATES, PRESETS, WHATIF_TEMPLATES, presetScenario, runScenario, sameScenario, scenarioFrom, scenarioName, scenarioPatch, scenarioSums, type Scenario } from "../insights/whatif";
+import "./g2/g2.css";
+import { ladderFacts } from "../insights/briefing";
 
 export default function WhatIf() {
-  const { m, theme, filters, measure } = useApp();
-  const { h, fc, runs } = useSelection();
+  const { m, theme, filters, measure, lens, params, setParam, go } = useApp();
+  const { h, fc, runs, single } = useSelection();
   const res = useResources<[ForecastDetail, MacroFile]>(["forecast_detail.json", "macro.json"]);
-  const [sc, setSc] = useState<Scenario>({ indicator: 0, shift: -3, start: m.w0 + 2, months: 0, removeEvents: false });
   const usd = measure === "usd";
-  const result = useMemo(() => (res.data ? runScenario(m, runs, res.data[0], res.data[1], sc) : null), [res.data, m, runs, sc]);
-  const sums = useMemo(() => {
-    if (!result) return null;
-    const base = new Float64Array(m.nWin);
-    const scen = new Float64Array(m.nWin);
-    const byFam = new Map<number, { b: number; s: number; bu: number; su: number }>();
-    for (const r of runs) {
-      const o = m.rOff[r];
-      const fam = m.sFamily[m.rSeries[r]];
-      const cur = byFam.get(fam) ?? { b: 0, s: 0, bu: 0, su: 0 };
-      for (let k = 0; k < m.rLen[r]; k++) {
-        const t = m.rStart[r] + k - m.w0;
-        const p = m.price[o + k];
-        const w = usd ? p : 1;
-        base[t] += w * m.mean[o + k];
-        scen[t] += w * result.mean[o + k];
-        cur.b += m.mean[o + k];
-        cur.s += result.mean[o + k];
-        cur.bu += p * m.mean[o + k];
-        cur.su += p * result.mean[o + k];
-      }
-      byFam.set(fam, cur);
-    }
-    return { base, scen, byFam };
-  }, [result, m, runs, usd]);
-  const p90 = useMemo(() => {
+  const [famRef, famW] = useElementWidth();
+  const narrow = famW > 0 && famW < 480;
+  const mf = res.data?.[1] ?? null;
+  const indicators = mf?.indicators ?? Object.keys(IND);
+  const applied = useMemo(() => scenarioFrom(m, params, indicators), [m, params, indicators.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [draft, setDraft] = useState<Scenario>(applied);
+  useEffect(() => setDraft(applied), [applied]);
+  const dirty = !sameScenario(draft, applied);
+  const apply = (s: Scenario) => setParam(scenarioPatch(m, s), true);
+
+  // ---- the scenario over the selection --------------------------------------------------------------------
+  const result = useMemo(() => (res.data ? runScenario(m, runs, res.data[0], res.data[1], applied) : null), [res.data, m, runs, applied]);
+  const sums = useMemo(() => (result ? scenarioSums(m, runs, result.mean, usd) : null), [result, m, runs, usd]);
+  const q = useMemo(() => {
     if (!result) return null;
     const b = moments(m, runs, () => true, usd);
     const s = moments(m, runs, () => true, usd, result.mean);
-    return { base: lognormalQuantile(b.M, b.V, Z90), scen: lognormalQuantile(s.M, s.V, Z90) };
+    return { p10: lognormalQuantile(b.M, b.V, Z10), p90: lognormalQuantile(b.M, b.V, Z90), scen90: lognormalQuantile(s.M, s.V, Z90) };
   }, [result, m, runs, usd]);
-  const option = useMemo(() => {
+  const baseT = sums ? sum(sums.base) : 0;
+  const scenT = sums ? sum(sums.scen) : 0;
+  const diff = useMemo(() => (sums ? Array.from(sums.scen, (v, k) => v - sums.base[k]) : []), [sums]);
+  const firstK = diff.findIndex((d) => Math.abs(d) > 0.5);
+  const peakK = diff.length ? diff.reduce((a, d, k) => (Math.abs(d) > Math.abs(diff[a]) ? k : a), 0) : -1;
+  const famRows = useMemo(
+    () =>
+      (sums?.byFam ?? [])
+        .map((r) => ({ label: m.dims.families.name[r.f], idx: r.f, d: r.s - r.b, pct: r.b > 0 ? r.s / r.b - 1 : 0, du: r.su - r.bu, base: r.b }))
+        .sort((a, b) => a.pct - b.pct),
+    [sums, m],
+  );
+  const topFam = famRows.length ? famRows.reduce((a, b) => (Math.abs(b.pct) > Math.abs(a.pct) ? b : a)) : null;
+  // one scale per column (the selection total sets it, so the total row reads on the same scale)
+  const dMax = Math.max(Math.abs(sum(famRows.map((r) => r.d))), ...famRows.map((r) => Math.abs(r.d)));
+  const duMax = Math.max(Math.abs(sum(famRows.map((r) => r.du))), ...famRows.map((r) => Math.abs(r.du)));
+  const ladder = ladderFacts(m);
+  const name = scenarioName(m, applied);
+  const facts = {
+    name,
+    measure,
+    base: baseT,
+    scen: scenT,
+    p10: q?.p10 ?? NaN,
+    p90: q?.p90 ?? NaN,
+    topFam: famRows.length > 1 && topFam && Math.abs(topFam.pct) >= 0.0005 ? topFam.label : null,
+    topFamPct: topFam?.pct ?? 0,
+    firstMonth: firstK >= 0 ? m.months[m.w0 + firstK] : null,
+    peakMonth: peakK >= 0 && Math.abs(diff[peakK]) > 0.5 ? m.months[m.w0 + peakK] : null,
+    peak: peakK >= 0 ? diff[peakK] : 0,
+    peakPct: peakK >= 0 && sums && sums.base[peakK] > 0 ? diff[peakK] / sums.base[peakK] : NaN,
+    nonZero: Math.abs(scenT - baseT) > 0.5,
+  };
+  const headline = res.data ? render(WHATIF_TEMPLATES.headline, facts).text : "Loading the model's sensitivities…";
+  const standfirst = res.data ? render(WHATIF_TEMPLATES.standfirst, facts).text : undefined;
+
+  // ---- timeline: base forecast (orange, banded) and the scenario (violet, solid) --------------------------------
+  const range = (["all", "recent"].includes(params.get("tl") ?? "") ? params.get("tl") : "window") as RangePreset;
+  const scenLine = useMemo(() => {
     const line = new Array(m.nMonths).fill(null) as (number | null)[];
     if (sums) {
       line[m.asOf] = h.demand[m.asOf];
       for (let k = 0; k < m.nWin; k++) line[m.w0 + k] = sums.scen[k];
     }
-    return timelineOption({
-      m, theme, measure, lens: "orders", filters,
-      hist: { shipped: h.shipped, demand: h.demand, imputed: h.imputed, cells: h.cells },
+    return line;
+  }, [sums, m, h.demand]);
+  const spec = useMemo<Omit<TimelineSpec, "narrow" | "height">>(
+    () => ({
+      m,
+      theme,
+      measure,
+      lens: "orders",
+      filters,
+      hist: { shipped: h.shipped, demand: h.demand, imputed: h.imputed, cells: h.cells, missing: h.missing, unknownDemand: h.unknownDemand },
       fc: { value: fc.fc, p10: fc.p10, p50: fc.p50, p90: fc.p90 },
-      lines: sums ? [{ name: "Scenario (order mean)", data: line, color: theme.scenario, dashed: true }] : [],
-      zoom: [m.asOf - 23, m.nMonths - 1],
-    });
-  }, [m, theme, measure, filters, h, fc, sums]);
+      lines: sums ? [{ name: "Scenario (order mean)", data: scenLine, color: theme.scenario, width: 2 }] : [],
+      range,
+      columns: single !== null,
+    }),
+    [m, theme, measure, filters, h, fc, sums, scenLine, range, single],
+  );
+  const annotate = useCallback(
+    (tm: TimelineModel): Annotation[] => {
+      const out = timelineAnnotations({ spec: { ...spec }, model: tm, include: ["divider", "end"] });
+      if (peakK >= 0 && Math.abs(diff[peakK]) > 0.5 && sums) {
+        const i = m.w0 + peakK;
+        if (i >= tm.start && i < tm.start + tm.labels.length)
+          out.push({ id: "scen-peak", at: i - tm.start, value: sums.scen[peakK], title: `Scenario, ${monthName(m.months[i])}`, text: `${fmtSigned(diff[peakK], measure, 1)}${usd ? "" : " units"}, ${fmtSignedPct(sums.base[peakK] > 0 ? diff[peakK] / sums.base[peakK] : 0)} vs base`, anchor: diff[peakK] < 0 ? "below" : "above", tone: "future", priority: 1 });
+      }
+      return out;
+    },
+    [spec, peakK, diff, sums, m, measure, usd],
+  );
+  const rangeText = `${monthName(m.months[rangeStart(m, range)])} – ${monthName(m.months[m.nMonths - 1])}`;
+  const endGap = sums && sums.base[m.nWin - 1] > 0 ? sums.scen[m.nWin - 1] / sums.base[m.nWin - 1] - 1 : 0;
+  const tlTitle =
+    facts.nonZero && sums && Math.abs(endGap) >= 0.0005
+      ? `By ${monthName(m.months[m.nMonths - 1])} the scenario runs ${fmtPctAbs(endGap)} ${endGap < 0 ? "below" : "above"} the base forecast`
+      : "Base forecast and scenario on one timeline";
+  // the month the effect first reaches 80 % of its peak (lags and cycles make it build up)
+  const fullK = peakK >= 0 ? diff.findIndex((d) => Math.abs(d) >= 0.8 * Math.abs(diff[peakK]) && Math.abs(d) > 0.5) : -1;
 
-  if (res.loading && !res.data) return <Loading what="forecast components and sensitivities" />;
-  if (res.error || !res.data) return <ErrorState message={res.error ?? "missing"} />;
-  const mf = res.data[1];
-  const hist = mf.values[mf.indicators[sc.indicator]].slice(0, m.asOf + 1).filter((v): v is number => v !== null);
-  const mu = hist.reduce((a, b) => a + b, 0) / hist.length;
-  const sd = Math.sqrt(hist.reduce((a, b) => a + (b - mu) ** 2, 0) / hist.length);
-  const range = Math.max(1, Math.ceil(sd * 3));
-  const baseT = sums ? sum(sums.base) : 0;
-  const scenT = sums ? sum(sums.scen) : 0;
-  const famRows = sums ? [...sums.byFam.entries()].map(([f, v]) => ({ f, ...v })) : [];
-  type F = (typeof famRows)[number];
-  const cols: Column<F>[] = [
-    { key: "f", label: "Family", value: (r) => m.dims.families.name[r.f] },
-    { key: "b", label: "Base (units)", value: (r) => Math.round(r.b), render: (r) => fmtInt(r.b), num: true },
-    { key: "s", label: "Scenario (units)", value: (r) => Math.round(r.s), render: (r) => fmtInt(r.s), num: true },
-    { key: "d", label: "Δ units", value: (r) => Math.round(r.s - r.b), render: (r) => `${r.s - r.b >= 0 ? "+" : ""}${fmtInt(r.s - r.b)}`, num: true },
-    { key: "p", label: "Δ %", value: (r) => (r.b ? r.s / r.b - 1 : 0), render: (r) => (r.b ? fmtSignedPct(r.s / r.b - 1, 2) : "–"), num: true },
-    { key: "u", label: "Δ USD", value: (r) => Math.round(r.su - r.bu), render: (r) => `${r.su - r.bu >= 0 ? "+" : "−"}${fmtUsd(Math.abs(r.su - r.bu))}`, num: true },
-  ];
-  const windowMonths = Array.from({ length: m.nWin }, (_, k) => m.w0 + k);
-  const applyPreset = (p: (typeof PRESETS)[number]) => {
-    const [y, mo] = p.start.split("-").map(Number);
-    setSc({ ...sc, indicator: mf.indicators.indexOf(p.ind), shift: p.shift, start: (y - 2019) * 12 + mo - 1, months: p.months });
-  };
-  const provisional = m.meta.sources.macro_sensitivity?.provisional;
-  const nSens = mf.sensitivity.indicator.filter((k) => k === sc.indicator).length;
+  // ---- month-by-month effect ---------------------------------------------------------------------------------------
+  const byMonth = useMemo<EChartsCoreOption | null>(() => {
+    if (!sums) return null;
+    const labs = Array.from({ length: m.nWin }, (_, k) => m.months[m.w0 + k]);
+    const lo = Math.min(0, ...diff);
+    const hi = Math.max(0, ...diff);
+    const span = niceMax(Math.max(Math.abs(lo), Math.abs(hi), 1) * 1.15);
+    const both = lo < 0 && hi > 0;
+    return {
+      ...baseOption(theme),
+      grid: { left: 46, right: 16, top: 24, bottom: 30 },
+      xAxis: categoryAxis(theme, labs, { axisLabel: { color: theme.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9, interval: (i: number) => i % 3 === 0, formatter: (v: string) => monthName(v).replace(" 20", " ’") } }),
+      yAxis: valueAxis(theme, { min: lo < 0 ? -span : 0, max: hi > 0 ? span : 0, usd }),
+      tooltip: axisTooltip(theme, (items: TooltipItem[]) => {
+        const k = items[0]?.dataIndex ?? 0;
+        return `${ttHead(monthLong(labs[k]), "forecast")}${ttRow(theme.scenario, "scenario − base", fmtSigned(diff[k], measure, 2), "box")}${ttRow(theme.accent, "base forecast mean", fmtValue(sums.base[k], measure))}${ttRow(theme.scenario, "scenario mean", fmtValue(sums.scen[k], measure))}${ttEnd()}`;
+      }),
+      series: [
+        {
+          type: "bar",
+          data: diff.map((d, k) => ({ value: d, label: { show: k === peakK && Math.abs(d) > 0.5, position: d < 0 ? "bottom" : "top", distance: 4, color: theme.ink2, fontFamily: FONT, fontSize: 11.5, formatter: () => fmtSigned(d, measure, 1) } })),
+          barMaxWidth: BAR_MAX,
+          itemStyle: { ...barStyle(theme.scenario), borderRadius: both ? 2 : lo < 0 ? [0, 0, 2, 2] : [2, 2, 0, 0] },
+        },
+      ],
+    } as EChartsCoreOption;
+  }, [sums, diff, m, theme, measure, usd, peakK]);
+
+  if (res.loading && !res.data) return <Loading what="the model's sensitivities and forecast components" height={360} />;
+  if (res.error || !res.data || !mf) return <ErrorState message={res.error ?? "macro.json or forecast_detail.json missing"} />;
+
+  // ---- builder data ----------------------------------------------------------------------------------------------------
+  const kd = mf.indicators.indexOf(draft.ind);
+  const histVals = (mf.values[draft.ind] ?? []).slice(0, m.asOf + 1).filter((v): v is number => v !== null);
+  const mu = histVals.reduce((a, b) => a + b, 0) / Math.max(1, histVals.length);
+  const sd = Math.sqrt(histVals.reduce((a, b) => a + (b - mu) ** 2, 0) / Math.max(1, histVals.length));
+  const lim = Math.max(1, Math.ceil(sd * 3));
+  const step = lim > 10 ? 1 : 0.5;
+  const linksBy = new Map<number, number>();
+  for (const k of mf.sensitivity.indicator) linksBy.set(k, (linksBy.get(k) ?? 0) + 1);
+  const winMonths = Array.from({ length: m.nWin }, (_, k) => m.w0 + k);
+  const custEvents = m.dims.events.id
+    .map((_, i) => i)
+    .filter((i) => m.dims.events.type[i] === "Customer Event" && m.dims.events.end[i] >= m.w0)
+    .map((i) => m.dims.events.customer[i] ?? eventTitle(m.dims.events.description[i]));
+  const fv = (v: number) => fmtValue(v, measure);
+  const chgT = baseT > 0 ? scenT / baseT - 1 : NaN;
+  const altB = sums ? sums.byFam.reduce((a, r) => a + (usd ? r.b : r.bu), 0) : 0;
+  const altD = sums ? sums.byFam.reduce((a, r) => a + (usd ? r.s - r.b : r.su - r.bu), 0) : 0;
+
   return (
     <>
-      {provisional && <div className="callout warn">Sensitivities are provisional stand-ins (one dossier driver per family) until forecast/macro_sensitivity.csv is written by the modelling stage; the engine is final.</div>}
-      <Card
-        title="Scenario"
-        sub="Shift an indicator by a fixed amount for a period of the forecast window; the effect reaches demand after each SKU's own lag."
-        info={<Info what="A model-consistent what-if: latent demand × exp(Σ β × Δindicator(t − lag)) per SKU and channel group, then re-accumulated through each series' ordering cycle; off-phase, lost-account and post-EOL months stay zero." how="β and lag from the model's sensitivity table; ordering-cycle spans and carry weights from the forecast file." source="forecast_detail.json (latent_mean, accum, f_event), macro.json (sensitivity)" />}
-      >
-        <div className="grid g3" style={{ alignItems: "end" }}>
-          <label className="small">
-            Indicator
-            <select className="plain" style={{ width: "100%" }} value={sc.indicator} onChange={(e) => setSc({ ...sc, indicator: Number(e.target.value) })}>
-              {mf.labels.map((l, i) => (
-                <option key={l} value={i}>
-                  {l.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="small">
-            Shift: <b>{sc.shift > 0 ? "+" : ""}{sc.shift}</b> (history sd {sd.toFixed(1)})
-            <input type="range" min={-range} max={range} step={range > 10 ? 1 : 0.5} value={sc.shift} onChange={(e) => setSc({ ...sc, shift: Number(e.target.value) })} />
-          </label>
-          <div className="toolbar">
-            <label className="small">
-              From
-              <select className="plain" value={sc.start} onChange={(e) => setSc({ ...sc, start: Number(e.target.value) })}>
-                {windowMonths.map((mm) => (
-                  <option key={mm} value={mm}>
-                    {monthName(m.months[mm])}
-                  </option>
-                ))}
-              </select>
+      <Lede
+        headline={headline}
+        standfirst={standfirst}
+        figure={
+          <HeroFigure
+            label={`Scenario change, next ${m.nWin} months`}
+            value={sums ? fmtSigned(scenT - baseT, measure, 2) : "–"}
+            unit={usd ? undefined : "units"}
+            visual={q && baseT > 0 ? <ScenarioStrip p10={q.p10} p90={q.p90} base={baseT} scen={scenT} format={fv} /> : undefined}
+            context={baseT > 0 ? `**${fmtSignedPct(chgT)}** vs the base plan of ${fmtValueUnit(baseT, measure)} (forecast means)` : "No forecast rows in this selection."}
+            info={{
+              what: "Scenario minus base, summed over the 19 forecast months for the selection, on the forecast means (before rounding).",
+              how: "Latent demand × exp(Σ β × Δindicator(t − lag)) per SKU and channel group, re-accumulated through each series' ordering cycle. The strip shows the base forecast's P10–P90 range for the 19-month total (orange band), the base (orange tick) and the scenario (violet tick).",
+              source: "forecast_detail.json (latent_mean, accum, f_event), macro.json (sensitivity)",
+            }}
+          />
+        }
+      />
+
+      <div className="cols-4-8">
+        <Module
+          title="Build a scenario"
+          dek="Shift one indicator for a period of the window; each SKU responds after its own lag."
+          info={{
+            what: "A model-consistent what-if: the shift moves latent demand through the model's own per-SKU sensitivities and lags, then each series' ordering cycle turns it into orders. Off-phase, lost-account and post-EOL months stay zero.",
+            how: "β and lag from the model's sensitivity table (one per SKU, channel group, indicator and lag); ordering-cycle spans and carry weights from the forecast file.",
+            source: "macro.json (sensitivity), forecast_detail.json",
+          }}
+        >
+          <div className="g2-builder">
+            <div>
+              <span className="caption" id="wi-presets">
+                Presets
+              </span>
+              <div className="presets-list" role="group" aria-labelledby="wi-presets" style={{ marginTop: 6 }}>
+                {PRESETS.map((p) => {
+                  const s = presetScenario(m, p);
+                  return (
+                    <button key={p.label} type="button" className="g2-preset" aria-pressed={sameScenario(s, applied)} onClick={() => apply(s)}>
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <Select
+              id="wi-ind"
+              label="Indicator"
+              value={draft.ind}
+              onChange={(v) => setDraft({ ...draft, ind: v, shift: draft.ind === v ? draft.shift : 0 })}
+              options={mf.indicators.map((k, i) => ({ value: k, label: `${indName(k)} (${fmtInt(linksBy.get(i) ?? 0)} SKU links)` }))}
+            />
+            <div className="g2-slider">
+              <label className="top" htmlFor="wi-shift">
+                <span>Shift, {IND[draft.ind]?.unit ?? "units of the indicator"}</span>
+                <b>{draft.shift > 0 ? "+" : draft.shift < 0 ? "−" : ""}{Math.abs(draft.shift)}</b>
+              </label>
+              <input id="wi-shift" type="range" min={-lim} max={lim} step={step} value={draft.shift} onChange={(e) => setDraft({ ...draft, shift: Number(e.target.value) })} aria-valuetext={`${draft.shift} ${IND[draft.ind]?.unit ?? ""}`} />
+              <span className="ends">
+                <span>−{lim}</span>
+                <span>history sd {sd.toFixed(1)}</span>
+                <span>+{lim}</span>
+              </span>
+            </div>
+            <div className="grid2">
+              <Select id="wi-from" label="From" value={draft.start} onChange={(v) => setDraft({ ...draft, start: v })} options={winMonths.map((mm) => ({ value: mm, label: monthName(m.months[mm]) }))} />
+              <Select id="wi-for" label="For" value={draft.months} onChange={(v) => setDraft({ ...draft, months: v })} options={[{ value: 0, label: "Rest of the window" }, ...[1, 2, 3, 6, 9, 12].map((n) => ({ value: n, label: `${n} month${n > 1 ? "s" : ""}` }))]} />
+            </div>
+            <label className="g2-check">
+              <input type="checkbox" checked={draft.removeEvents} onChange={(e) => setDraft({ ...draft, removeEvents: e.target.checked })} />
+              <span>Also remove the forecast's window events{custEvents.length ? ` (${custEvents.join(", ")})` : ""}</span>
             </label>
-            <label className="small">
-              For
-              <select className="plain" value={sc.months} onChange={(e) => setSc({ ...sc, months: Number(e.target.value) })}>
-                <option value={0}>the rest of the window</option>
-                {[1, 2, 3, 6, 9, 12].map((n) => (
-                  <option key={n} value={n}>
-                    {n} month{n > 1 ? "s" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="actions">
+              <Button variant="primary" disabled={!dirty} onClick={() => apply(draft)}>
+                Apply scenario
+              </Button>
+              <Button onClick={() => apply({ ...draft, shift: 0, removeEvents: false })} disabled={applied.shift === 0 && !applied.removeEvents}>
+                Back to base
+              </Button>
+              <span className="pending" aria-live="polite">
+                {dirty ? "Changes not applied yet" : `Showing: ${name}`}
+              </span>
+            </div>
+            {kd >= 0 && !linksBy.get(kd) && <Notice tone="warn">The model has no sensitivity to {indName(draft.ind)}: no SKU selected it as a driver, so a shift changes nothing.</Notice>}
           </div>
-        </div>
-        <div className="toolbar" style={{ marginTop: 12 }}>
-          <span className="small muted">Presets:</span>
-          {PRESETS.map((p) => (
-            <button key={p.label} type="button" className="btn" onClick={() => applyPreset(p)}>
-              {p.label}
-            </button>
-          ))}
-          <label className="small toolbar" style={{ gap: 6, marginLeft: "auto" }}>
-            <input type="checkbox" checked={sc.removeEvents} onChange={(e) => setSc({ ...sc, removeEvents: e.target.checked })} /> also remove window events (e.g. the Orion Driveline shutdown)
-          </label>
-          <button type="button" className="btn" onClick={() => setSc({ ...sc, shift: 0, removeEvents: false })}>
-            Reset to base
-          </button>
-        </div>
-      </Card>
-      {nSens === 0 && <div className="callout warn">The model has no sensitivity to {mf.labels[sc.indicator].replace(/_/g, " ")} in macro_sensitivity.csv (it is not a selected driver of any SKU), so this scenario changes nothing.</div>}
-      <div className="kpis" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-        <Kpi label="Base, 19 months (mean)" value={fmtMeasure(baseT, measure, 2)} unit={usd ? "" : "units"} />
-        <Kpi label="Scenario, 19 months" value={fmtMeasure(scenT, measure, 2)} unit={usd ? "" : "units"} foot={<span className={scenT >= baseT ? "delta-up" : "delta-down"}>{fmtSignedPct(baseT ? scenT / baseT - 1 : 0, 2)} vs base</span>} />
-        <Kpi label="P90 of the 19-month total" value={p90 ? fmtMeasure(p90.scen, measure, 2) : "–"} foot={p90 ? `base ${fmtMeasure(p90.base, measure, 2)} · Δ ${compact(p90.scen - p90.base, 2)}` : ""} info={<Info what="Procurement cover at P90 under the scenario (noise and level-error variances held at base)." how="Contract aggregate-quantile formula with the scenario's means." />} />
-        <Kpi label="Forecast rows changed" value={fmtInt(result?.changed ?? 0)} foot={`of ${fmtInt(runs.reduce((a, r) => a + m.rLen[r], 0))} rows in the selection; structural zeros untouched`} />
+        </Module>
+
+        <Module
+          title={tlTitle}
+          dek={`${usd ? "Revenue in USD" : "Units"} per month, ${rangeText}. The submitted forecast with its P10–P90 range, and the scenario's order mean after the shift.`}
+          tools={<RangePresets value={range} options={rangePresets(m)} onChange={(v) => setParam({ tl: v === "window" ? null : v }, true)} />}
+          info={{ what: "The base forecast and the scenario on the shared timeline.", how: "The scenario line is the sum of the recomputed order means; the base band is the aggregate P10–P90 of the submitted forecast.", source: "computed in the browser from forecast.json, forecast_detail.json, macro.json" }}
+          keyItems={timelineKey({ latent: false, rebuilt: true, lost: true, columns: single !== null, extra: [{ kind: "line", color: "var(--scenario)", label: "Scenario" }] })}
+        >
+          {lens === "latent" && <Notice tone="info">The what-if works on orders as booked; the latent lens does not apply here.</Notice>}
+          <TimelineChart
+            spec={spec}
+            annotate={annotate}
+            height={360}
+            ariaLabel={`${tlTitle}. ${name}.`}
+            busy={res.loading}
+            footnote={() =>
+              ladder.final ? (
+                <span>
+                  The base forecast starts after the last actual, {monthName(m.months[m.asOf])}; it scores {fmtPct(ladder.final.wape)} WAPE over {ladder.origins} backtest origins (floor {ladder.floor !== null ? fmtPct(ladder.floor) : "–"}). The scenario moves its mean, not its error.
+                </span>
+              ) : null
+            }
+          />
+        </Module>
       </div>
-      <Card title={`Base vs scenario · ${usd ? "USD" : "units"} per month`} sub="Orange = submitted base forecast with its P10–P90 range; violet dashed = scenario order mean." info={<Info what="The scenario on the shared timeline." source="computed in the browser from the bundle" />}>
-        <EChart option={option} height={340} ariaLabel="Scenario timeline" />
-        <TimelineLegend
-          latent={false}
-          extra={
-            <span>
-              <i className="lk dash" style={{ borderColor: "var(--scenario)" }} />
-              Scenario
-            </span>
-          }
-        />
-      </Card>
-      <Card title="Impact by family" sub="19-month totals of the order means, base vs scenario." info={<Info what="Where the scenario lands: units and revenue at the forecast's prices." />}>
-        <DataTable rows={famRows} cols={cols} pageSize={7} csvName="whatif_by_family.csv" initialSort={{ key: "d", desc: false }} />
-      </Card>
+
+      {sums && q && (
+        <FigureStrip columns={3}>
+          <Figure
+            label="P90 cover, 19-month total"
+            value={fv(q.scen90)}
+            unit={usd ? undefined : "units"}
+            context={`**${fmtSigned(q.scen90 - q.p90, measure, 1)}** against the base P90 of ${fv(q.p90)} (${fmtSignedPct(q.p90 > 0 ? q.scen90 / q.p90 - 1 : 0)})`}
+            link={{ label: "Procurement plan", onClick: () => go("procurement") }}
+            info={{ what: "The P90 of the 19-month total under the scenario: what a P90 buyer would cover.", how: "Contract aggregate-quantile formula with the scenario's means; noise and level-error variances held at base.", source: "forecast.json, computed" }}
+          />
+          <Figure
+            label={usd ? "Scenario change in units" : "Scenario change in revenue"}
+            value={usd ? fmtSigned(altD, "units", 2) : fmtSigned(altD, "usd", 2)}
+            unit={usd ? "units" : undefined}
+            context={`**${fmtSignedPct(altB > 0 ? altD / altB : 0)}** of the base ${usd ? `${fmtNum(altB)} units` : fmtMoney(altB, 2)}${usd ? "" : ", at the forecast's prices"}`}
+            info={{ what: usd ? "The same scenario in units: Σ scenario mean − Σ base mean over the 19 months." : "The same scenario in revenue: each row's change × the forecast's assumed invoice price for that row.", source: "forecast.json (price), computed" }}
+          />
+          <Figure
+            label="Forecast rows changed"
+            value={fmtInt(result?.changed ?? 0)}
+            context={`of **${fmtInt(result?.rows ?? 0)}** rows in the selection; ${fmtInt(result?.linked ?? 0)} of ${fmtInt(result?.series ?? 0)} series respond to ${indName(applied.ind)}${applied.removeEvents ? " or carry an event" : ""}; scheduled zeros stay zero`}
+            info={{ what: "Forecast rows (series × month) whose order mean changes.", how: "Rows with a zero mean (off-phase months, lost accounts, after EOL) are never touched." }}
+          />
+        </FigureStrip>
+      )}
+
+      {sums && (
+        <div className="cols-7-5">
+          <Module
+            title={render(FAM_TEMPLATES.title, { rows: famRows }).text}
+            dek={`Change in the 19-month order mean by family, units and revenue at the forecast's prices. Sorted by the relative change.`}
+            info={{ what: "Where the scenario lands, family by family.", how: "Σ scenario mean − Σ base mean over the family's forecast rows in the selection; USD at each row's price.", source: "forecast.json, forecast_detail.json, macro.json" }}
+          >
+            <div ref={famRef}>
+            <BarTable
+              ariaLabel="Scenario impact by family"
+              rows={famRows}
+              rowKey={(r) => r.label}
+              bar={{ value: (r) => r.pct, tone: "history", leader: (r) => r === topFam }}
+              cols={[
+                { key: "l", label: "Family", kind: "label", value: (r) => r.label, width: "33%" },
+                { key: "b", label: "Change", kind: "bar" },
+                { key: "p", label: "%", kind: "num", value: (r) => fmtSignedPct(r.pct), width: "13%" },
+                { key: "d", label: "Units", kind: "num", value: (r) => fmtOnScale(r.d, dMax, "units", true), width: "13%" },
+                ...(narrow ? [] : [{ key: "u", label: "USD", kind: "num" as const, value: (r: (typeof famRows)[number]) => fmtOnScale(r.du, duMax, "usd", true), width: "13%" }]),
+              ]}
+              total={{ l: "Selection", p: fmtSignedPct(chgT), d: fmtOnScale(sum(famRows.map((r) => r.d)), dMax, "units", true), ...(narrow ? {} : { u: fmtOnScale(sum(famRows.map((r) => r.du)), duMax, "usd", true) }) }}
+            />
+            </div>
+          </Module>
+          <Module
+            title={render(BYMONTH_TEMPLATES.title, { first: facts.firstMonth, full: fullK >= 0 ? m.months[m.w0 + fullK] : null, measure }).text}
+            dek={`Scenario minus base, ${usd ? "USD" : "units"} per forecast month, ${monthName(m.months[m.w0])} – ${monthName(m.months[m.nMonths - 1])}: lags delay the effect, ordering cycles make it lumpy.`}
+            info={{ what: "The month-by-month difference between the scenario and the base order means.", how: "Each SKU's response arrives after its own lag; an order carries every latent month since the previous order.", source: "computed in the browser" }}
+          >
+            {!facts.nonZero ? (
+              <Empty title="No month moves">The selection's SKUs carry no sensitivity to {indName(applied.ind)}. Pick another indicator in the builder, or clear the family filter.</Empty>
+            ) : byMonth && <EChart option={byMonth} height={260} ariaLabel={`${render(BYMONTH_TEMPLATES.title, { first: facts.firstMonth, full: fullK >= 0 ? m.months[m.w0 + fullK] : null, measure }).text}.`} />}
+          </Module>
+        </div>
+      )}
+
+      <aside className="colophon" aria-label="Method">
+        <span>
+          <b>Response</b> latent × exp(Σ β · Δindicator(t − lag)) per SKU and channel group
+        </span>
+        <span>
+          <b>Orders</b> re-accumulated through each series' ordering cycle
+        </span>
+        <span>
+          <b>Base</b> the submitted forecast's means, {usd ? fmtMoney(baseT, 2) : `${fmtNum(baseT)} units`}
+        </span>
+        <span>
+          <b>Scenario</b> {name}
+        </span>
+      </aside>
     </>
   );
 }

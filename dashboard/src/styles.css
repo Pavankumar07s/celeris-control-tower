@@ -1,8 +1,6 @@
-/* Celeris control tower stylesheet entry.  Order matters: tokens, base, shell, components, then the
-   transitional re-skin of legacy classes.  View-specific styles go in `src/views/<View>.css`, imported by
+/* Celeris control tower stylesheet entry.  Order matters: tokens, base, shell, components.  View-specific styles go in `src/views/<View>.css`, imported by
    the view itself, so engineers never collide in one file.  See docs/design_system.md. */
 @import "./styles/tokens.css";
 @import "./styles/base.css";
 @import "./styles/shell.css";
 @import "./styles/components.css";
-@import "./styles/legacy.css";

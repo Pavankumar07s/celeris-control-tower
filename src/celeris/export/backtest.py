@@ -1,11 +1,13 @@
 """Backtest part of the bundle.
 
-``backtest.json`` (accuracy view): the model ladder pooled over all origins, per-series error sums by horizon bucket
+``backtest.json`` (accuracy view): the model ladder pooled over the decision folds, per-series error sums by horizon bucket
 (so WAPE = sum|e| / sum actual and bias = sum e / sum actual are exact for any filter), per family x region x channel
 error sums by horizon 1..19, the pipeline's own ``metrics.csv`` (aggregate levels) and ``summary.json``.
 ``backtest_origin_<YYYY-MM>.json`` (time machine): per series the actuals and the final model's forecast made at that
 origin for horizons 1..19, plus the best baseline, so any filter can replay "what we would have said then".
-Only scored cells (``is_scored``: actual known and not masked) count.
+Only scored cells (``is_scored``: actual known and not masked) count, and only on the decision folds that chose the
+model (``summary.origins.decision_folds``; the 2021-10 stress fold is replayed in the time machine but never pooled),
+and only cells that every model forecasts, so a model with missing predictions is never credited with zero error.
 """
 
 from __future__ import annotations
@@ -58,6 +60,28 @@ def find_noise_floor(summary: Any) -> float | None:
     return None
 
 
+def scored_origins(summary: dict[str, Any], origins: list[str]) -> list[str]:
+    """The decision folds named in summary.json (all origins when it names none)."""
+    folds = summary.get("origins", {}).get("decision_folds") if isinstance(summary.get("origins"), dict) else None
+    chosen = sorted(o for o in origins if folds and o in folds)
+    return chosen or origins
+
+
+def common_cells(p: pd.DataFrame, n_models: int) -> pd.DataFrame:
+    """Rows of cells (origin x series x date) that every model forecast with a finite value."""
+    keys = ["origin", "sku_id", "region", "date"]
+    ok = np.isfinite(p["pred"].to_numpy(dtype=float))
+    bad = p.loc[~ok, keys].drop_duplicates()
+    out = p
+    if not bad.empty:
+        hit = p[keys].merge(bad.assign(_bad=True), on=keys, how="left")["_bad"].fillna(False).to_numpy(dtype=bool)
+        out = p[~hit]
+    per_cell = out.groupby(["origin", "model"]).size().unstack()
+    if per_cell.shape[1] != n_models or per_cell.nunique(axis=1).max() > 1:
+        raise ValueError("models were scored on different cells: pooled WAPEs would not be comparable")
+    return out
+
+
 def _bucket(h: pd.Series) -> np.ndarray:
     out = np.full(len(h), -1)
     for i, (lo, hi) in enumerate(BUCKETS):
@@ -70,7 +94,9 @@ def build_backtest(pred: pd.DataFrame, metrics: pd.DataFrame, summary: dict[str,
     models = sorted(pred["model"].unique().tolist())
     final = final_model(summary, models)
     order = model_order(models, final)
-    p = pred[pred["is_scored"].astype(bool)].copy()
+    origins = sorted(pred["origin"].unique().tolist())
+    scored = scored_origins(summary, origins)
+    p = common_cells(pred[pred["is_scored"].astype(bool) & pred["origin"].isin(scored)], len(models)).copy()
     p["series"] = index.idx_of(p["sku_id"], p["region"])
     p["err"] = p["pred"] - p["actual"]
     p["abs"] = p["err"].abs()
@@ -79,7 +105,6 @@ def build_backtest(pred: pd.DataFrame, metrics: pd.DataFrame, summary: dict[str,
     p["family"] = attrs.loc[p["series"], "product_family"].to_numpy()
     p["region_"] = attrs.loc[p["series"], "region"].to_numpy()
     p["channel"] = attrs.loc[p["series"], "sales_channel"].to_numpy()
-    origins = sorted(pred["origin"].unique().tolist())
 
     ladder = []
     for model in order:
@@ -120,9 +145,11 @@ def build_backtest(pred: pd.DataFrame, metrics: pd.DataFrame, summary: dict[str,
         fine["abs"][model] = nums(g["abs"], 1)
         fine["err"][model] = nums(g["err"], 1)
 
-    m = metrics[metrics["slice_type"].isin(["all", "family", "region", "channel", "horizon", "horizon_bucket"])]
+    m = metrics[metrics["slice_type"].isin(["all", "family", "region", "channel", "horizon", "horizon_bucket"])
+                & metrics["origin"].isin(scored)]
     bundle = {
-        "models": order, "final": final, "origins": origins, "buckets": [list(b) for b in BUCKETS],
+        "models": order, "final": final, "origins": origins, "scored_origins": scored,
+        "buckets": [list(b) for b in BUCKETS],
         "ladder": ladder, "noise_floor": find_noise_floor(summary),
         "series_buckets": out_cols, "fine": fine,
         "metrics": records(m.reset_index(drop=True), {"actual_sum": 1, "pred_sum": 1, "abs_err_sum": 1, "wape": 4, "bias": 4}),
@@ -156,6 +183,7 @@ def build_backtest(pred: pd.DataFrame, metrics: pd.DataFrame, summary: dict[str,
         pb[bi] = bl_part["pred"].to_numpy(dtype=float)
         per_origin[origin] = {
             "origin": origin, "origin_month": month_index(origin), "final": final, "baseline": best_baseline,
+            "scored": origin in scored,
             "series": series_ids, "horizons": HORIZONS,
             "actual": nums(actual.reshape(-1), 0), "pred": nums(pf.reshape(-1), 0), "baseline_pred": nums(pb.reshape(-1), 0),
         }

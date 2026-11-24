@@ -54,6 +54,8 @@ export interface Model {
   rCvl: Float64Array;
   rGroup: Int32Array;
   groupCv: Float64Array;
+  /** Market-wide coefficient of variation (0 for a bundle written before it existed). */
+  cvCommon: number;
   groupFamily: Int32Array;
   groupRegion: Int32Array;
   runOfSeries: Int32Array;
@@ -187,6 +189,7 @@ export function buildModel(meta: Meta, dims: Dims, hist: HistoryFile, fcf: Forec
     rCvl: Float64Array.from(fcf.cv_level),
     rGroup: i32(fcf.group),
     groupCv: Float64Array.from(fcf.groups.cv_group),
+    cvCommon: fcf.cv_common ?? 0,
     groupFamily: i32(fcf.groups.family),
     groupRegion: i32(fcf.groups.region),
     runOfSeries,
@@ -246,10 +249,6 @@ export function selectSeries(m: Model, f: Filters): number[] {
     out.push(s);
   }
   return out;
-}
-
-export function seriesLabel(m: Model, s: number): string {
-  return `${m.dims.skus.id[m.sSku[s]]} · ${m.dims.regions[m.sRegion[s]]}`;
 }
 
 export function filterLabel(m: Model, f: Filters): string {

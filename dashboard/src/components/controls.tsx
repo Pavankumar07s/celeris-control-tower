@@ -1,7 +1,7 @@
 // Controls: segmented (lenses and modes), range presets, tabs (content inside a module), chips, rule chips,
 // status pills, buttons and links.  All are keyboard reachable and carry the 2px burnt-orange focus ring.
 import type { ButtonHTMLAttributes, KeyboardEvent, ReactNode } from "react";
-import { ArrowRight } from "./icons";
+import { ArrowRight, CheckCircle, CrossCircle, MinusIcon, PlusIcon, WarnTriangle } from "./icons";
 
 export interface Option<T extends string> {
   value: T;
@@ -121,15 +121,6 @@ export function Button({ variant = "default", size = "md", children, ...rest }: 
   );
 }
 
-/** Square icon button (theme toggle, close). */
-export function IconButton({ label, children, ...rest }: { label: string; children: ReactNode } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button type="button" className="icon-btn" aria-label={label} title={label} {...rest}>
-      {children}
-    </button>
-  );
-}
-
 /** An inline link inside prose that performs an action (applies a filter, opens a view). */
 export const LinkButton = ({ onClick, children, title }: { onClick: () => void; children: ReactNode; title?: string }) => (
   <button type="button" className="linkish" onClick={onClick} title={title}>
@@ -148,3 +139,77 @@ export const MoreLink = ({ onClick, href, children }: { onClick?: () => void; hr
       {children} <ArrowRight size={11} />
     </button>
   );
+
+/** A native select with a visible sentence-case label: stacked (label above) or `inline` (label left). */
+export function Select<T extends string | number>({ label, value, options, onChange, id, inline }: { label: ReactNode; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; id?: string; inline?: boolean }) {
+  return (
+    <label className={`field${inline ? " inline" : ""}`} htmlFor={id}>
+      <span>{label}</span>
+      <select
+        id={id}
+        className="select"
+        value={String(value)}
+        onChange={(e) => {
+          const hit = options.find((o) => String(o.value) === e.target.value);
+          if (hit) onChange(hit.value);
+        }}
+      >
+        {options.map((o) => (
+          <option key={String(o.value)} value={String(o.value)}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** Numeric stepper (− value +): keyboard reachable, the value announced politely, 44px targets on phones. */
+export function Stepper({ value, min, max, onChange, label, format }: { value: number; min: number; max: number; onChange: (v: number) => void; label: string; format: (v: number) => ReactNode }) {
+  const what = label.toLowerCase();
+  return (
+    <span className="stepper" role="group" aria-label={label}>
+      <button type="button" aria-label={`Shorter ${what}`} title={`Shorter ${what}`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>
+        <MinusIcon />
+      </button>
+      <output aria-live="polite">{format(value)}</output>
+      <button type="button" aria-label={`Longer ${what}`} title={`Longer ${what}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>
+        <PlusIcon />
+      </button>
+    </span>
+  );
+}
+
+/** A rule check with its word: a green tick or a red cross, never colour alone (wrap several in `.stamps`). */
+export function Stamp({ ok, children }: { ok: boolean; children: ReactNode }) {
+  return (
+    <span className={`stamp ${ok ? "good" : "crit"}`}>
+      {ok ? <CheckCircle size={13} /> : <CrossCircle size={13} />}
+      <span className="visually-hidden">{ok ? "Passes:" : "Fails:"}</span>
+      <span>{children}</span>
+    </span>
+  );
+}
+
+/** A data-quality check's state as a pill: Pass / Fail / Warning / Note, each with its icon. */
+export function CheckPill({ passed, severity }: { passed: boolean; severity: "error" | "warning" | "info" }) {
+  if (passed)
+    return (
+      <StatusPill tone="good" icon={<CheckCircle size={11} />}>
+        Pass
+      </StatusPill>
+    );
+  if (severity === "error")
+    return (
+      <StatusPill tone="crit" icon={<CrossCircle size={11} />}>
+        Fail
+      </StatusPill>
+    );
+  if (severity === "warning")
+    return (
+      <StatusPill tone="warn" icon={<WarnTriangle size={11} />}>
+        Warning
+      </StatusPill>
+    );
+  return <StatusPill tone="neutral">Note</StatusPill>;
+}

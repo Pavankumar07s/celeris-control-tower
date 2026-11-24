@@ -37,7 +37,9 @@ export interface Meta {
   submission: { rows: number; total_units: number; matches_forecast: boolean };
   price_assumption: { vs_2026_pct: Record<string, number> };
   uncertainty: Record<string, unknown>;
-  backtest: { models: string[]; final: string; origins: string[]; ladder: LadderEntry[]; noise_floor: number | null };
+  /** `origins`: every backtest origin (the time machine replays all); `scored_origins`: the decision folds that are
+   *  pooled into every WAPE and bias (the stress fold is replayed but never pooled). */
+  backtest: { models: string[]; final: string; origins: string[]; scored_origins?: string[]; ladder: LadderEntry[]; noise_floor: number | null };
   members: string[];
   quantile_selfcheck: SelfCheck[];
 }
@@ -114,6 +116,8 @@ export interface ForecastFile {
   cv_level: number[];
   group: number[];
   groups: { family: number[]; region: number[]; cv_group: number[] };
+  /** Market-wide coefficient of variation shared by every row (the (cv_common × M)² term). */
+  cv_common?: number;
   forecast: number[];
   mean: number[];
   var_noise: number[];
@@ -282,6 +286,7 @@ export interface BacktestFile {
   models: string[];
   final: string;
   origins: string[];
+  scored_origins?: string[];
   buckets: [number, number][];
   ladder: LadderEntry[];
   noise_floor: number | null;

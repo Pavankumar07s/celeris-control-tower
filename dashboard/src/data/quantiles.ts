@@ -2,6 +2,7 @@
 // reference implementation src/celeris/export/quantiles.py.
 //   M = Σ mean
 //   V = Σ var_noise + Σ_series (cv_level × Σ series' selected means)² + Σ_groups (cv_group × Σ family×region's selected means)²
+//       + (cv_common × M)²   (the market-wide shock every row shares)
 //   σ² = ln(1 + V/M²), μ = ln M − σ²/2, Pq = exp(μ + z_q σ)   (0 when M = 0)
 // An optional per-row weight (the row's price) gives the same construction in USD.
 import type { Filters, Model } from "./model";
@@ -63,6 +64,7 @@ export function moments(m: Model, runs: number[], inMonth: (month: number) => bo
     const c = m.groupCv[g] * groupSum[g];
     V += c * c;
   }
+  V += (m.cvCommon * M) ** 2;
   return { M, V };
 }
 
@@ -94,7 +96,7 @@ export function monthlyMoments(m: Model, runs: number[], usd = false, meanOverri
       V[t] += c * c;
     }
   }
-  return Array.from({ length: n }, (_, t) => ({ M: M[t], V: V[t] }));
+  return Array.from({ length: n }, (_, t) => ({ M: M[t], V: V[t] + (m.cvCommon * M[t]) ** 2 }));
 }
 
 export interface SelfCheckResult {

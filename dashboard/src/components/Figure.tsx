@@ -2,7 +2,7 @@
 // replaces KPI tiles: label, value with a thin unit, ONE inline visual chosen by job (sparkline for trend,
 // ladder for accuracy, meter for progress, range strip for uncertainty), one line of context, an evidence
 // link.  Hero and figure values use proportional numerals and a sans face, never serif.
-import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Info, type InfoProps } from "./overlays";
 import { MoreLink } from "./controls";
 import { Trend } from "./icons";
@@ -12,9 +12,16 @@ export function Rich({ text }: { text: string }) {
   const parts = text.split(/\*\*/);
   return (
     <>
-      {parts.map((p, i) => (i % 2 ? <b key={i}>{p}</b> : <Fragment key={i}>{p}</Fragment>))}
+      {parts.map((p, i) => (i % 2 ? <b key={i}>{noBreakCodes(p)}</b> : <Fragment key={i}>{noBreakCodes(p)}</Fragment>))}
     </>
   );
+}
+
+/** SKU codes (AAA-000) never wrap at their hyphen. */
+export function noBreakCodes(text: string): ReactNode {
+  const parts = text.split(/\b([A-Z]{3}-\d{3})\b/);
+  if (parts.length === 1) return text;
+  return parts.map((p, i) => (i % 2 ? <span key={i} className="nb">{p}</span> : <Fragment key={i}>{p}</Fragment>));
 }
 
 export interface LedeProps {
@@ -34,15 +41,13 @@ export function Lede({ headline, standfirst, eyebrow, figure }: LedeProps) {
     <section className={`lede ${figure ? "" : "no-fig"}`} aria-label="Summary">
       <div className="lede-text" aria-live="polite">
         {eyebrow && <span className="kicker">{eyebrow}</span>}
-        <h1 className={`headline ${headline.length > 46 ? "long" : ""}`}>{headline}</h1>
+        <h1 className={`headline ${headline.length > 46 ? "long" : ""}`}>{noBreakCodes(headline)}</h1>
         {standfirst && <p className="standfirst">{typeof standfirst === "string" ? <Rich text={standfirst} /> : standfirst}</p>}
       </div>
       {figure}
     </section>
   );
 }
-/** Alias: the spec calls it the view header. */
-export const ViewHeader = Lede;
 
 export interface RangeStripProps {
   p10: number;
@@ -134,7 +139,7 @@ export const HeroFigure = (p: Omit<FigureProps, "hero">) => <Figure {...p} hero 
 /** A row of 2-5 supporting figures: 1px top rule (ink when `heavy`), hairline dividers, no cards. */
 export function FigureStrip({ children, heavy, columns, ariaLabel = "Headline figures" }: { children: ReactNode; heavy?: boolean; columns?: number; ariaLabel?: string }) {
   return (
-    <section className={`figures ${heavy ? "heavy" : ""}`} aria-label={ariaLabel} style={columns ? ({ "--fig-cols": columns } as CSSProperties) : undefined}>
+    <section className={`figures${heavy ? " heavy" : ""}${columns ? ` n${columns}` : ""}`} aria-label={ariaLabel}>
       {children}
     </section>
   );
@@ -229,7 +234,7 @@ export function Sparkline({ history, forecast, divider, height = 34, ariaLabel, 
 }
 
 /** Progress meter: segments with a tone (good / warn / ink / accent / rest), widths proportional to value. */
-export function Meter({ segments, ariaLabel }: { segments: { value: number; tone: "good" | "warn" | "ink" | "accent" | "rest"; label?: string }[]; ariaLabel: string }) {
+export function Meter({ segments, ariaLabel }: { segments: { value: number; tone: "good" | "warn" | "crit" | "ink" | "accent" | "rest"; label?: string }[]; ariaLabel: string }) {
   const total = segments.reduce((a, s) => a + s.value, 0) || 1;
   return (
     <div className="meter" role="img" aria-label={ariaLabel}>

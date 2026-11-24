@@ -61,12 +61,14 @@ export interface InfoProps {
   source?: string;
   align?: "left" | "right";
   size?: "sm" | "md";
+  /** Accessible name of the "i" button (default "About this module"). */
+  label?: string;
 }
 
 /** The "i" popover every module carries: what it shows · how it is computed · source file. */
-export function Info({ what, how, source, align = "right", size = "md" }: InfoProps) {
+export function Info({ what, how, source, align = "right", size = "md", label = "About this module" }: InfoProps) {
   return (
-    <Popover trigger="i" triggerClassName={`info-btn ${size === "sm" ? "sm" : ""}`} ariaLabel="About this module" align={align}>
+    <Popover trigger="i" triggerClassName={`info-btn ${size === "sm" ? "sm" : ""}`} ariaLabel={label} align={align}>
       <p>
         <b>What it shows.</b> {what}
       </p>

@@ -3,6 +3,9 @@
 This is the canonical, as-built design system of the Celeris control tower (`dashboard/`). Code against it. The
 Executive overview (`dashboard/src/views/Overview.tsx`) is the reference implementation: when in doubt, copy what it does.
 
+All twelve views are built on this system (integration pass, 24 Nov 2026); the per-view gate results are in
+[`docs/design_gate_results.md`](design_gate_results.md).
+
 The dashboard reads like a well-edited planning report set in the team owner's black / orange / cream palette (the
 "rover-hire" look): cream paper for content, black bands for navigation and the footer, one scarce orange. Typography
 leads; rules and whitespace replace boxes; every chart title states its conclusion; annotations tell the story.
@@ -112,6 +115,8 @@ Rules:
   action fill, the focus ring, and the brand's single 2px rule under the masthead. Nothing else: links, tabs, chips and
   segmented controls are ink with underline, outline or weight.
 - **The primary button** (`.btn.primary`) is the one orange fill on a screen, with ink text.
+- **When every mark is a forecast** (procurement's mean + buffer bars), the orange goes to what the chart is about (the
+  buffer) and the rest recedes to `--accent-tint`; a chart that is a solid orange mass has no emphasis left.
 
 ### 2.3 Semantic colours (always with a word or an icon)
 
@@ -142,8 +147,8 @@ Alert never reads as forecast: status and loss are red / green / amber, never or
 | Last actual | `--ink` | solid 1px vertical rule, labelled "Oct 2026 · last actual" |
 | Benchmark / another forecast | `--ink-3`, `--ink-4` | 1.5px **dashed 4/3** (dashes mean "another forecast"; never gridlines, never history) |
 | What-if scenario | `--scenario` | 2px solid; base forecast stays orange; gap labelled at the end |
-| Data error fixed (anomaly) | `--cat-1` rose | 9px hollow diamond **plus** a text annotation (`anomalyAnnotations`) |
-| Real event (anomaly) | `--cat-7` jade | 9px filled triangle **plus** a text annotation |
+| Data error fixed (anomaly) | `--cat-1` rose | 9px hollow diamond **plus** a text annotation (`anomalyAnnotations`); drawn by `buildTimeline` itself |
+| Real event (anomaly) | `--cat-7` jade | 9px filled triangle **plus** a text annotation; drawn by `buildTimeline` itself |
 
 History and forecast stay distinguishable in greyscale: the divider rule, the wash, the FORECAST zone label and the
 band carry it as well as the hue.
@@ -191,7 +196,7 @@ orange if it is the forecast) and the rest in `--ink-4`. **At most 4–5 colours
 Diverging: `div-1` is strong **jade (negative pole, "under")**, `div-5` the warm neutral middle, `div-9` strong **plum
 (positive pole, "over")**. Neither pole is orange, so a bias map never reads as forecast volume. Always print the
 numeric ends and name the poles in words in the legend (`scaleLegend`). For ordinal use start at step 3.
-Deprecated aliases: `--slate-n` = `--hist-n`, `--cobalt-n` = `--fc-n`, `theme.slate` = `hist`, `theme.cobalt` = `fcRamp`.
+(The old `--slate-n` / `--cobalt-n` aliases and `theme.slate` / `theme.cobalt` were removed once every view was restyled.)
 
 ### 2.7 Spacing, radius, elevation, z-index, motion, layout
 
@@ -205,8 +210,8 @@ Deprecated aliases: `--slate-n` = `--hist-n`, `--cobalt-n` = `--fc-n`, `theme.sl
 | Motion | `--ease` `cubic-bezier(.2,.7,.2,1)`, `--dur` 180ms, `--dur-fast` 150ms. Hover feedback is colour / opacity / box-shadow over 150ms (never a transform that shifts layout); popovers fade and rise 6px; drawers slide 24px; charts update in 300ms and dim to 60 % while busy; no load animation on numbers; continuous animation only for loading; `prefers-reduced-motion` disables all of it. |
 | Borders | 1px everywhere: `--rule` between rows, `--rule-strong` above modules and around controls, `--ink` above the figure strip when it marks where the numbers start (`heavy`). Selected tab: 2px ink underline. The masthead carries the single 2px `--orange` rule. |
 
-Deprecated aliases (`--surface`, `--muted`, `--hair`, `--history`, `--demand`, `--accent-ink`, `--slate-*`,
-`--cobalt-*` …) exist only for views not yet restyled. Do not use them in new code.
+The deprecated aliases (`--surface`, `--muted`, `--hair`, `--history`, `--demand`, `--accent-ink`, `--slate-*`,
+`--cobalt-*` …) and `styles/legacy.css` were deleted in the integration pass: nothing uses them any more.
 
 ---
 
@@ -296,23 +301,29 @@ Scale (use the shorthand tokens: `font: var(--t-title)`):
 
 Global state lives in the URL hash (`state/url.ts`): `#/<view>?fam=HYD&sku=HYD-004&reg=Europe&ch=…&cust=…&m=usd&lens=latent`.
 Put in-view UI state there too with `setParam(patch, true)` (replace, no history entry), so every state is a link. The
-overview uses `tl` (range preset), `ev=1` (event rug), `by` (breakdown tab); the inbox reads `case=<row>`.
+overview uses `tl` (range preset), `ev=1` (event rug), `by` (breakdown tab); the inbox reads `case=<row>`; every view
+opens the lineage drawer from `cell=<SKU>|<region>|<yyyy-mm>` (`encodeCell` / `decodeCell` in `components/Lineage.tsx`),
+so a reload or a shared link reopens it on the same cell.
+
+**Theme.** `theme=dark|light` in the hash wins (a shared link opens in the sender's theme), then the choice saved by the
+toggle (`localStorage` `celeris-theme`), then the system preference. Toggling drops a `theme` carried in by a link.
 
 ---
 
 ## 5. Components
 
-Import from the component files (new code) or from `components/ui.tsx` (a barrel that re-exports everything plus the
-deprecated `Card`, `Kpi`, `TimelineLegend`). All props are typed; the signatures below are exact.
+Import from the component files. (The `components/ui.tsx` barrel and the deprecated `Card`, `Kpi`, `TimelineLegend`
+were deleted once every view was restyled.) All props are typed; the signatures below are exact.
 
 ### 5.1 The view header: `Lede` (`components/Figure.tsx`)
 
 ```ts
 Lede({ headline: string; standfirst?: string | ReactNode; eyebrow?: ReactNode /* sentence-case kicker */; figure?: ReactNode })
-// alias: ViewHeader
 ```
 Headline and standfirst on 8 columns, the hero figure on 4 behind a vertical `--rule-strong` hairline. A string
 standfirst may carry `**bold**` markers for the key numbers (rendered by `Rich`). Both are computed ([§7](#7-headline-templates)).
+SKU codes (`AAA-000`) in the headline and in `Rich` text are wrapped in a no-break span (`noBreakCodes`), so they never
+split at the hyphen.
 
 ```tsx
 <Lede
@@ -332,6 +343,9 @@ Figure({ label: ReactNode; value: ReactNode; unit?: ReactNode; visual?: ReactNod
 HeroFigure(props without hero)            // 54px value; one per view, inside the Lede
 FigureStrip({ children: ReactNode; heavy?: boolean; columns?: number; ariaLabel?: string })   // default 4 columns
 ```
+`columns` is a class (`n2`, `n3`, `n5`), so the responsive rules still apply: four or five figures fold to 2 × 2 at
+1180px; a strip of two or three stays one row until 700px; everything is one column below 700px. A figure's value and
+its unit are two unbreakable pieces that wrap as a pair, so a long unit moves to the next line instead of overflowing.
 Contract: label → value with a thin unit → **one** inline visual chosen by job (`Sparkline` for trend, `Ladder` for
 accuracy, `Meter` for progress, `RangeStrip` for uncertainty) → one line of context in plain words → an evidence link.
 Links align across the strip (the link sits at `margin-top: auto`).
@@ -354,9 +368,10 @@ RangeStrip({ p10: number; p90: number; mid: number; reference?: number; refLabel
 Ladder({ rows: { label: string; value: number; me?: boolean }[]; max?: number; format: (v: number) => string; foot?: ReactNode })
 Sparkline({ history: ArrayLike<number|null>; forecast?: ArrayLike<number|null>; divider?: number; height?: number; ariaLabel: string; floor?: number })
 // inline SVG; history ink, forecast orange (repeat the last actual as its first point), window washed from `divider`
-Meter({ segments: { value: number; tone: "good" | "warn" | "ink" | "accent" | "rest"; label?: string }[]; ariaLabel: string })
+Meter({ segments: { value: number; tone: "good" | "warn" | "crit" | "ink" | "accent" | "rest"; label?: string }[]; ariaLabel: string })
 Delta({ value: number; digits?: number; suffix?: ReactNode })   // SVG triangle + "3.5%" in ink: a change of demand takes no status colour
-Rich({ text: string })                                          // "**x**" -> <b>x</b>, no HTML injection
+Rich({ text: string })                                          // "**x**" -> <b>x</b>, no HTML injection; SKU codes no-break
+noBreakCodes(text: string): ReactNode                           // wraps AAA-000 codes in <span class="nb">
 ```
 
 ### 5.3 Modules: `Module`, `Key`, `KeyMark`, `timelineKey` (`components/Module.tsx`)
@@ -394,10 +409,16 @@ Tabs<T>({ value: T; options: Option<T>[]; onChange: (v: T) => void; ariaLabel: s
 RuleChip({ children: ReactNode; title?: string })
 StatusPill({ tone?: "neutral" | "warn" | "good" | "crit" | "forecast"; children: ReactNode; onClick?: () => void; title?: string; icon?: ReactNode })
 Button({ variant?: "default" | "primary" | "quiet"; size?: "sm" | "md"; children } & ButtonHTMLAttributes)
-IconButton({ label: string; children } & ButtonHTMLAttributes)
 LinkButton({ onClick: () => void; children: ReactNode; title?: string })      // an action inside prose
 MoreLink({ onClick?: () => void; href?: string; children: ReactNode })      // underlined ink evidence link + ArrowRight icon
+Select<T extends string | number>({ label: ReactNode; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; id?: string; inline?: boolean })
+Stepper({ value: number; min: number; max: number; onChange: (v: number) => void; label: string; format: (v: number) => ReactNode })
+Stamp({ ok: boolean; children: ReactNode })                                   // a rule check: tick or cross + words; wrap in <div className="stamps">
+CheckPill({ passed: boolean; severity: "error" | "warning" | "info" })        // Pass / Fail / Warning / Note pill with its icon
 ```
+- **Select**: a native `<select>` with a visible sentence-case label, stacked (label above) or `inline` (label left);
+  `.field` / `.select` in `components.css`, 44px tall below 700px.
+- **Stepper**: "− 3 months +" (procurement lead time); the value is announced politely.
 - **Segmented** sets a lens or mode (Units | USD, Open | All, New | In review | Resolved): grey track, the pressed
   segment raised with a ring, never ink-filled (the headline stays the darkest object on screen).
 - **RangePresets** replace zoom sliders on timelines ("2019–2028 | Since 2024 | Forecast window").
@@ -452,7 +473,7 @@ opens. Every chart should have a table twin with the same columns as its CSV.
 ```ts
 Popover({ trigger: ReactNode; triggerClassName?: string; ariaLabel?: string; title?: string; align?: "left" | "right";
           width?: number; children: ReactNode | ((close: () => void) => ReactNode) })
-Info({ what: ReactNode; how?: ReactNode; source?: string; align?: "left" | "right"; size?: "sm" | "md" })   // the "i"
+Info({ what: ReactNode; how?: ReactNode; source?: string; align?: "left" | "right"; size?: "sm" | "md"; label?: string })   // the "i"; label defaults to "About this module" (the masthead's says "About this view")
 Drawer({ title: ReactNode; sub?: ReactNode; eyebrow?: ReactNode /* sentence-case kicker */; onClose: () => void; children: ReactNode; width?: number })
 toast(text: string)            // bottom-left, auto-dismiss after 4 s; <ToastHost/> is mounted once by the shell
 useDismiss(open, close)        // ref for "close on outside click and Escape"
@@ -492,7 +513,8 @@ the customer or SKU filter to widen the view."
 ### 5.9 Icons (`components/icons.tsx`)
 
 Inline SVG, `currentColor`, no dependency: `ChevronDown, Moon, Sun, LinkIcon, WarnTriangle, CheckCircle, CrossCircle,
-Close, Search, Menu, ArrowRight, Download, TableIcon, Glyph` (all take `size`). Icons are functional, never decoration.
+Close, Search, Menu, ArrowRight, Download, Glyph, Trend, CopyIcon, MinusIcon, PlusIcon, PendingIcon` (all take `size`).
+Icons are functional, never decoration.
 
 ---
 
@@ -503,15 +525,14 @@ Close, Search, Menu, ArrowRight, Download, TableIcon, Glyph` (all take `size`). 
 `const { theme } = useApp()` gives the `Theme` read from the CSS tokens for the active theme; put `theme` in your
 `useMemo` deps so charts re-render on the toggle. Fields: `paper raised hover ink ink2 ink3 ink4 rule ruleStrong grid
 accent accentText accentStrong accentWash accentBand accentEdge accentTint loss lossFill good warn warnMark crit
-scenario cat[8] hist[7] fcRamp[7] diverging[9] orange onOrange band bandInk bandInk2 shadowPop` (plus deprecated aliases `slate cobalt surface muted axis history demand
-forecast forecastBand forecastP50 baseline zone seq[13] div[7] error event tooltipBg tooltipBorder` for unconverted views).
+scenario cat[8] hist[7] fcRamp[7] diverging[9] orange onOrange band bandInk bandInk2 shadowPop`. (The deprecated aliases
+were removed with the last unconverted view.)
 
 | Helper | Signature | What it gives |
 |---|---|---|
 | `baseOption` | `(t) => {...}` | Plex Sans, ink-3 text, `animation: false` on first paint, 300ms updates, aria on |
 | `categoryAxis` | `(t, data, extra?)` | 1px rule-strong baseline, no ticks, no gridlines, ink-3 11.5px labels |
-| `valueAxis` | `(t, { max?, min?, usd?, percent?, name? })` | zero baseline, 4 intervals to `max`, compact labels ("150K", "$12M", "40%"), solid 1px grid |
-| `axisStyle` | `(t)` | the value-axis look as a spread (legacy-compatible) |
+| `valueAxis` | `(t, { max?, min?, usd?, percent?, name? })` | zero baseline (or `min` for a signed axis: bias uses `min: −max`), 4 intervals to `max`, compact labels ("150K", "$12M", "40%", "−2%" with a true minus), solid 1px grid |
 | `gridStd` | `(narrow?, extra?)` | `{left 46, right 92, top 30, bottom 30}` (92px right margin for end labels); phones 34 / 58 |
 | `niceMax` | `(v) => number` | smallest 1 / 1.2 / 1.6 / 2 / 2.4 / 3 / 4 / 5 / 6 / 8 × 10ᵏ ≥ v (quarters are round) |
 | `axisTick` | `(v, usd?) => string` | "0", "7.5K", "150K", "$2.4B" with a true minus |
@@ -521,9 +542,7 @@ forecast forecastBand forecastP50 baseline zone seq[13] div[7] error event toolt
 | `esc` | `(s) => string` | escape data labels before they go into tooltip HTML |
 | `onFill` | `(t, fill) => string` | ink or paper label colour by fill luminance (heatmap cells, bar labels) |
 | `barStyle`, `BAR_MAX` | `(color, horizontal?)`, `24` | 2px data-end radius, square baseline; bars at most 24px thick |
-| `barLabel` | `(t, format, horizontal = true)` | value label at the bar end in ink-2 11.5px (ranked bars carry their values) |
 | `scaleLegend` | `(t, { min, max, colors, format, low?, high?, dimension? })` | numeric heatmap legend: printed end values, poles named in words |
-| `waterfallLabel` | `(t, (index) => string)` | a label on every waterfall step |
 | `readTheme`, `cssVar` | `(name)`, `(varName)` | read the tokens (the shell does this; views use `useApp().theme`) |
 
 Every chart obeys: solid hairline gridlines, never dashed; **never a dual axis** (index to a common base, or use two
@@ -538,7 +557,7 @@ const option = useMemo(() => ({
   xAxis: categoryAxis(t, labels),
   yAxis: valueAxis(t, { max: niceMax(maxV * 1.1), usd }),
   tooltip: axisTooltip(t, (items) => ttHead(monthLong(m.months[i0 + items[0].dataIndex]), "actual") + ttRow(t.ink, "lost", fmtInt(v), "box") + ttEnd()),
-  series: [{ type: "bar", data, barMaxWidth: BAR_MAX, itemStyle: barStyle(t.hist[3]), label: barLabel(t, fmtInt, false) }],
+  series: [{ type: "bar", data, barMaxWidth: BAR_MAX, itemStyle: barStyle(t.hist[3]) }],
 }), [t, …]);
 <EChart option={option} height={260} ariaLabel="Lost units by month, 2019–2026" />
 ```
@@ -564,7 +583,8 @@ last actual) → last-actual rule → HTML annotations → end label.
 ```ts
 TimelineChart({ spec: Omit<TimelineSpec, "narrow" | "height">; annotate?: (model: TimelineModel) => Annotation[];
                 height?: number /* 360 */; ariaLabel: string; busy?: boolean; onXClick?: (absoluteMonth: number) => void;
-                footnote?: (model: TimelineModel) => ReactNode })
+                footnote?: (model: TimelineModel) => ReactNode;
+                patch?: (option: EChartsCoreOption, model: TimelineModel) => EChartsCoreOption /* a view-only layer, memoised */ })
 
 TimelineSpec = {
   m, theme, measure, lens, filters,
@@ -575,7 +595,6 @@ TimelineSpec = {
   showEvents?: boolean /* event rug */;   columns?: boolean /* one series */;   narrow?: boolean;   height?: number }
 
 buildTimeline(spec) => TimelineModel { option, start, labels, yMax, frame, demand, shipped, fc, p10, p50, p90, p50Drawn, p50MaxRel, hasBand, latent }
-timelineOption(spec) => EChartsCoreOption        // legacy: option only, no overlay
 rangePresets(m) => Option[]                      // computed labels "2019–2028", "Since 2024", "Forecast window"
 rangeStart(m, preset) => number;  laneEvents(m, filters);  eventTitle(description)
 timelineAnnotations({ spec, model, exceptions?, exceptionRows?, include? }) => Annotation[]
@@ -587,7 +606,17 @@ only when it departs by more than 1px (`p50Drawn`; use `p50MaxRel` in the footno
 history as ink columns (shipped + lost stacked), forecast as orange columns with P10–P90 whiskers, the divider and
 wash on the band edge; the latent lens swaps history and forecast to latent demand and drops the band (say so in the
 dek); `unknownDemand` keeps ERP-blank cells out of the lost-sales gap; the tooltip lists demand, shipped, lost and
-rebuilt cells in history and forecast, P90, P50, P10 in the window, plus any extra line.
+rebuilt cells in history and forecast, P90, P50, P10 in the window, plus any extra line. Also built in:
+
+- **History-only charts** (no forecast and no extra line) end at the last actual with no divider, no wash and no
+  end-label margin; columns charts carry no end label either, so their right margin shrinks to 24px (12px on phones).
+- **Anomaly marks** in their roles (rose hollow diamond, jade triangle), so views pass `anomalies` and nothing else.
+- **Phones**: below 640px the year labels thin to every second or third January (ticks stay yearly) and the story
+  annotations become a numbered list under the chart.
+- **`patch`** lets a view add one evidence layer without forking the component (the case file adds the "at risk if it
+  returns" area this way). The width hook is `useElementWidth()` in `app/hooks.ts`: a callback ref, so it also measures
+  an element that mounts after a loading state.
+- The in-window event label is written in the active measure ("−5,420 units" or "−$4.62M of revenue").
 
 Pass `hist.unknownDemand: h.unknownDemand` and `hist.missing: h.missing` whenever you have a `HistoryAgg`.
 
@@ -629,13 +658,13 @@ it to `TimelineChart.annotate` (or use `AnnotationLayer` with `EChart.onLayout`)
   for signed values; 2px paper gaps between cells (`itemStyle.borderColor: t.paper, borderWidth: 2`); a value label
   only where the cell fits, coloured with `onFill`; always a **numeric** scale legend with the poles named in words
   (`visualMap: scaleLegend(t, { min, max, colors, format, low: "under-forecast", high: "over-forecast" })`).
-- **Waterfall** (forecast X-ray, row waterfall): horizontal warm-grey steps, distinct start and end bars (the final
-  bar orange for a forecast, ink for a history total), **every step labelled** (`waterfallLabel`: "× 1.12 season",
-  "+1,204"), connectors 1px `--rule-strong`.
+- **Waterfall** (forecast X-ray, row bridge): built as an HTML bar table (one row per step, the factor and the signed
+  change printed on every row, a zero line, the forecast step's bar orange), so small steps stay readable; distinct
+  start and end rows.
 - **Gantt** (lifecycle): active span `--hist-4`, in-window part `--accent-tint`; ▲ launch, ■ EOL, ○ planned; the
   predecessor link a hairline; a "today" rule at the last actual.
 - **Dot / dumbbell** for before → after comparisons (data health, accuracy by aggregation level).
-- **Ranked bars** are sorted descending (natural order excepted) and carry value labels (`barLabel`).
+- **Ranked bars** are `BarTable`s: sorted descending (natural order excepted), every value printed in its own column.
 - **Anomalies** get a marker and a text annotation (`anomalyAnnotations`); never a marker alone.
 - **No pie** with more than five segments (use a ranked bar); no radar; no dual axis.
 - **Benchmarks** dashed 4/3 in ink-3 / ink-4; **scenarios** solid `--scenario`; **end labels** instead of legends for
@@ -677,7 +706,6 @@ const facts = useMemo(() => stockoutFacts(...), [deps]);
 interface Template<F> { id: string; when?: (f: F) => boolean; text: (f: F) => string; fallback: (f: F) => string }
 render(t, f) => { id, text, fallback: boolean }     // never throws: a failing builder falls back
 renderFirst([t1, t2, t3], f)                        // first template whose condition holds; else the last one's fallback
-renderAll({ a: t1, b: t2 }, f) => { a: string, b: string }
 ```
 
 Rules: facts are computed once per selection and are pure; templates only format; a template's `when` guards every
@@ -709,10 +737,27 @@ Voice: active, plain, one claim per sentence, no adjective the data cannot suppo
 | Top exceptions | `{Five} series hold {sum} of the {total} at risk` | "Five series hold $9.4M of the $66.8M at risk" |
 | Outlook | `Every {unit} eases; {worst} falls furthest, {x}%` · `Every {unit} grows; {best} leads, +{x}%` · `{n} of {N} {units} grow; {best} leads, +{x}%, and {worst} trails, {y}%` | "6 of 7 families grow; Precision Machined Parts leads, +11.4%, and Electrical Assemblies trails, −0.1%" |
 
-### 7.4 Templates specified for the other views (implement in `insights/<view>.ts`)
+### 7.4 As-built templates of the other views (`insights/<view>.ts`)
 
-| View | Headline template | Hero figure |
+Every view follows §7.1: one `facts` function per selection, `Template`s with a descriptive fallback, `renderFirst`
+where several claims compete. Default-selection outputs (final bundle):
+
+| View (facts file) | Headline as built | Hero figure |
 |---|---|---|
+| Data health (`health.ts`) | "Every blocking check now passes; 47 failed on the raw files" (leads with the finding; fallback names the row bridge) | 108 of 116 checks passing, raw → cleaned dumbbell (61 → 108) |
+| Demand explorer (`explorer.ts`) | "Ordering cycles explain 99.4% of zero months"; one series: "HYD-004 in Europe orders two months in every three"; lost account: "{series} has placed no order since {month}"; planned launch: "{series} launches in {month}, with no history of its own" | last-12-month demand with the ordering-cycle cells or the cycle mix |
+| Anomaly monitor (`anomalies.ts`) | "78% of flagged cells were real business, not errors" | share of flagged cells that were real, split bar real / error |
+| Stock-outs (`stockouts.ts`) | "Electrical Assemblies accounts for 75% of all lost sales" | 106,925 lost units with the lost / back-ordered split |
+| Macro lead / lag (`macro.ts`) | "Vehicle orders leads Electrical Assemblies by two months (r = 0.93)" | 5 of 7 families with a stable driver |
+| Forecast & accuracy (`accuracy.ts`) | "Our model beats seasonal naive by 12.3 points of WAPE" (selection-led when filtered); time machine "The forecast made in {origin} missed monthly totals by {x}; seasonal naive missed by {y}"; bias by horizon "Bias stays within ±{n}% at every horizon; the largest is {b} at {h}" | WAPE 26.3% on its benchmark ladder (4 origins, floor 23.6%) |
+| Lifecycle (`lifecycle.ts`) | "Three SKUs hand over to successors in 2027" | successors' volume by May 2028 as a share of their predecessors' (48%) |
+| What-if (`whatif.ts`) | "PMI −3 from Jan 2027 cuts the plan by 1.8%" | the scenario change (−50.1K units) on a strip against the base P10–P90 |
+| Exception inbox (`inbox.ts`) | "285 series need a planner's judgement this cycle" (one series: "{series} needs …") | $66.78M at risk with the three-colour review meter |
+| Case file (`inbox.ts`) | lost account "{customer} has placed no {sku} order since {month}"; EOL, cold start and year-on-year variants | at risk · units if it returns · window |
+| Procurement (`procurement.ts`) | "Pooling {lead} months cuts the P90 safety stock by {x}%" | safety stock for the first cover (USD) against summing the monthly P90s |
+| Data download (`downloads.ts`) | "Every number here traces to pipeline run {short hash}" | 23 of 23 files re-hashed in the browser |
+
+---|---|---|
 | Data health | "{raw} raw rows became {cells} clean grid cells; {pass_after} of {checks} checks now pass" | checks passing after cleaning (before → after dumbbell) |
 | Demand explorer | "{selection}: {cycle summary}, {zero share} of zero months scheduled" ("HYD-004 in Europe orders every second month; all 39 zero months are scheduled") | last-12 volume with the ordering-cycle chip |
 | Anomaly monitor | "{n} flagged points: {errors} data errors fixed, {events} real events kept" | share of flagged points that were real business |
@@ -740,9 +785,14 @@ Use the helpers in `data/format.ts`; never `toFixed` in a view.
 | `fmtSigned(x, measure?, mbDigits?)` | `+14.3K`, `−11.0K`, `+$3.4M` |
 | `fmtInt`, `fmt1` | `106,925`; `110.8` |
 | `fmtPct(x, d=1)`, `fmtPctAbs`, `fmtSignedPct`, `fmtPts(x, d)` | `28.1%`; `3.5%`; `+3.5%` / `−0.1%`; `−0.34 pts` |
-| `monthName` = `monthShort`, `monthLong`, `monthOnly(l, long?)`, `monthSpan(a, b)`, `yearSpan(a, b)` | `Oct 2026`; `October 2026`; `Oct` / `October`; `Mar–May 2023`, `Dec 2026 – Feb 2027`; `2021–22` |
+| `monthName`, `monthLong`, `monthOnly(l, long?)`, `monthSpan(a, b)`, `yearSpan(a, b)` | `Oct 2026`; `October 2026`; `Oct` / `October`; `Mar–May 2023`, `Dec 2026 – Feb 2027`; `2021–22` |
 | `MINUS` | U+2212 |
-| legacy `compact`, `fmtUsd`, `fmtMeasure` | kept for unconverted views (now with a true minus) |
+| `fmtOnScale(x, colMax, measure?, signed?)` | a value on its **column's** scale, so a table column never mixes `14.3K` with `9,479`: K (one decimal) when the column's largest magnitude is ≥ 10,000, M (two decimals) from a million; a value that prints as zero is `0` |
+| `fmtFixed(x, digits)` | fixed decimals with a true minus for correlations and coefficients (`−0.65`) |
+| `fmtBytes(n)` | `1.21 MB`, `71.2 kB` |
+
+`fmtSignedPct`, `fmtPts` and `fmtSigned` never print a signed zero (`0.0%`, `0`, never `−0.0%`). The legacy `compact`,
+`fmtUsd`, `fmtMeasure` and the `monthShort` alias were deleted.
 
 Copy rules:
 
@@ -803,7 +853,7 @@ Copy rules:
 | Use `Segmented` for lenses, `Tabs` for content, `RangePresets` for time | Fill a segmented control with ink |
 | Format with `data/format.ts`; months as "Oct 2026" | Show ISO months, hyphen-minus or `toFixed` output |
 | Keep in-view state in the URL with `setParam(patch, true)` | Keep shareable state in component memory only |
-| Put view-only CSS in `views/<View>.css` imported by the view | Add rules to `styles/legacy.css` or hard-code colours inline |
+| Put view-only CSS in `views/<View>.css` (or the view group's `views/g1|g2|g3/*.css`), imported by every view that uses it | Rely on another module to import your stylesheet, or hard-code colours inline |
 | Dim the previous render while loading (`busy`) | Show a spinner over a chart or a skeleton flash on refetch |
 
 ---
@@ -823,12 +873,19 @@ Copy rules:
 7. Tables: rankings → `BarTable`; registers → `DataTable` with `num`, `id`, `clamp`, `fc`; ISO months → `monthName`.
 8. Chips/badges → `RuleChip` / `StatusPill`; toggles → `Segmented` / `Tabs`; in-view state → URL via `setParam(…, true)`.
 9. Loading → `Loading` / `SkeletonChart`; errors → `ErrorState`; empty → `Empty` with what to do.
-10. Delete the view's uses of deprecated aliases (`theme.seq`, `theme.div`, `theme.muted`, `var(--muted)`, `.card`,
-    `.kpis`, `.badge`, `.legend`); then remove now-unused rules from `styles/legacy.css`.
+10. Use only tokens and theme roles (the deprecated aliases and `legacy.css` no longer exist); import every stylesheet
+    the view uses directly in the view.
 11. `npm run build`, then screenshot light and dark at 1440×900 and 1280×720, one filtered state and one single series;
     check no overlapping or clipped text and that every number comes from the bundle.
 
-### 11.2 Per-view notes (the specification for the remaining eleven views)
+### 11.2 Per-view notes (as built; the original specification with the integration changes)
+
+Integration changes on top of the original notes: Data health's checks ledger and the anomaly register print pipeline
+prose through `readableMonths` (ISO months, "->", "x10" and hyphen-minus made readable); Forecast & accuracy adds
+**bias by horizon** (a WAPE | Bias toggle on the horizon chart, `hm=bias`), names the challengers (global GBM,
+ensemble) under the value-added steps, renders the X-ray as a waterfall bar table and calibration as HTML 100 % bars;
+Lifecycle uses a grouped Gantt plus one handover panel per predecessor → successor; Procurement puts the orange on the
+buffer and the tint on the mean; the inbox's cause tabs count cases (the headline counts series).
 
 Every view: masthead, filter bar, then a lede (headline and standfirst on 8 columns, the hero figure on 4), then modules.
 
@@ -893,38 +950,45 @@ Every view: masthead, filter bar, then a lede (headline and standfirst on 8 colu
 
 ```
 dashboard/src/
-  styles.css                 entry: imports the five files below in order
+  styles.css                 entry: imports the four files below in order
   styles/tokens.css          @font-face, every token, light + dark            (edit only to add a token)
-  styles/base.css            element defaults, utilities, focus, reduced motion, print
+  styles/base.css            element defaults, utilities, native input accents, focus, reduced motion, print
   styles/shell.css           rail, masthead, filter bar, page grid, column helpers, breakpoints
-  styles/components.css      lede, figures, modules, keys, annotations, controls, tables, tooltips, overlays, states, brief, rank list, multiples
-  styles/legacy.css          TRANSITIONAL re-skin of Card / Kpi / grids / legends / badges (shrink it, never grow it)
+  styles/components.css      lede, figures, modules, keys, annotations, controls, fields, tables, tooltips, overlays,
+                             states, brief, rank list, multiples, drawers (trio, lineage blocks)
   assets/fonts/              Source Serif 4, IBM Plex Sans (variable), IBM Plex Mono 400 / 500 (woff2, OFL)
   app/context.ts             AppState (useApp), VIEWS (titles, rail labels, blurbs), GROUPS (sections, masthead section names, markers)
-  app/hooks.ts               useSelection(): segs, runs, series, single, h (HistoryAgg), fc (ForecastAgg)
+  app/hooks.ts               useSelection(): segs, runs, series, single, h (HistoryAgg), fc (ForecastAgg); useElementWidth(); useMedia()
   charts/theme.ts            readTheme, Theme, axis / grid / tooltip / bar helpers
   charts/EChart.tsx          the ECharts wrapper
-  charts/timeline.ts         buildTimeline, timelineOption (legacy), presets, annotation generators
-  charts/TimelineChart.tsx   <TimelineChart>: option + annotation overlay + narrow mode + footnote
+  charts/timeline.ts         buildTimeline, presets, annotation generators
+  charts/TimelineChart.tsx   <TimelineChart>: option (+ optional patch) + annotation overlay + narrow mode + footnote
   charts/Annotations.tsx     the annotation layout engine and overlay
-  components/Figure.tsx      Lede, HeroFigure, Figure, FigureStrip, RangeStrip, Ladder, Sparkline, Meter, Delta, Rich
+  components/Figure.tsx      Lede, HeroFigure, Figure, FigureStrip, RangeStrip, Ladder, Sparkline, Meter, Delta, Rich, noBreakCodes
   components/Module.tsx      Module, Key, KeyMark, timelineKey
-  components/controls.tsx    Segmented, RangePresets, Tabs, RuleChip, StatusPill, Button, IconButton, LinkButton, MoreLink
+  components/controls.tsx    Segmented, RangePresets, Tabs, RuleChip, StatusPill, Button, LinkButton, MoreLink, Select, Stepper, Stamp, CheckPill
   components/tables.tsx      BarTable, BarTrack, InlineBar, DataTable, toCsv, download
   components/overlays.tsx    Popover, Info, Drawer, toast, ToastHost, useDismiss
   components/states.tsx      Skeleton, SkeletonText, SkeletonChart, Loading, Empty, ErrorState, Notice
   components/icons.tsx       inline SVG icons
   components/shell/          Rail.tsx, Masthead.tsx, Footer.tsx (provenance band on every view)
   components/FilterBar.tsx   the five cascading filter chips
-  components/Lineage.tsx     the cell lineage drawer
-  components/ui.tsx          barrel + deprecated Card, Kpi, TimelineLegend
+  components/Lineage.tsx     the cell lineage drawer; encodeCell / decodeCell / cellOfExample (the `cell=` URL parameter)
   data/format.ts             number, percentage and month formatting
   data/breakdown.ts          monthly sums by family / region / channel for a selection; shares last 12 vs next 12
   data/aggregate.ts          HistoryAgg (incl. unknownDemand), ForecastAgg, forecastLatent, sum
+  data/quantiles.ts          the aggregate-quantile engine (with cv_common) and the start-up self-check
   insights/headlines.ts      the template engine and vocabulary
   insights/overview.ts       the overview's facts and templates (reference)
-  insights/briefing.tsx      the brief (BriefItem { tag, tone?, body }), exceptionRowsIn, readableMonths, largestShift
+  insights/<view>.ts         health, explorer, anomalies, stockouts, macro, accuracy, lifecycle, whatif, inbox,
+                             procurement, downloads (+ indicators): each view's facts and templates
+  insights/briefing.tsx      the brief (BriefItem { tag, tone?, body }), ladderFacts, exceptionRowsIn, readableMonths, largestShift
   views/Overview.tsx (+ Overview.css)   the reference view
+  views/<View>.tsx           the other eleven views
+  views/g1/                  parts.tsx (Dumbbell, SplitBar, ConfMeter) and g1.css: Data health, Explorer, Anomalies, Stock-outs
+  views/g2/                  parts.tsx (FvaSteps, CalBars, Dumbbell, ScenarioStrip), XRay.tsx, forecast / macro / lifecycle
+                             chart builders and g2.css: Macro, Forecast, Lifecycle, What-if
+  views/g3/                  CaseFile.tsx, ui.tsx (HashCell, CheckMark) and inbox / procurement / downloads / g3 CSS
 ```
 
 Dependencies are unchanged: React 19, ECharts 6, Vite 7, TypeScript 5.9. No UI or CSS framework, no icon package, no
@@ -935,7 +999,8 @@ font CDN.
 ## 13. Acceptance gates: every view, before it ships
 
 Tick both gates against screenshots (light and dark at 1440×900 and 1280×720, plus 1024, 768 and 375 px, one filtered
-state and one single series). The UI/UX Pro Max gate comes first. A view that fails an item does not ship.
+state and one single series). The UI/UX Pro Max gate comes first. A view that fails an item does not ship. The results
+of the integration pass, view by view, are in [`docs/design_gate_results.md`](design_gate_results.md).
 
 ### 13.1 UI/UX Pro Max gate (18 points; skill `ui-ux-pro-max`, notes in `research/dashboard-skill-ui-ux-pro-max.md`)
 

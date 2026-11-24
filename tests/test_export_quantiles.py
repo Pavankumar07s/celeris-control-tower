@@ -57,3 +57,21 @@ def test_matches_reference_implementation() -> None:
     want = reference.aggregate_quantiles(rows["mean"].to_numpy(), rows["var_noise"].to_numpy(), rows["cv_level"].to_numpy(),
                                          rows["cv_group"].to_numpy(), rows["series"].to_numpy(), rows["group"].to_numpy())
     assert got == pytest.approx([want["p10"], want["p50"], want["p90"]], rel=1e-9)
+
+
+def test_common_term_widens_the_range_and_matches_reference() -> None:
+    rows = _rows(seed=5)
+    narrow = aggregate_quantiles(rows)
+    wide = aggregate_quantiles(rows, cv_common=0.022)
+    assert wide[0] < narrow[0] and wide[2] > narrow[2]
+    m = rows["mean"].sum()
+    v = rows["var_noise"].sum() + (0.022 * m) ** 2
+    v += sum((g["cv_level"].iat[0] * g["mean"].sum()) ** 2 for _, g in rows.groupby("series"))
+    v += sum((g["cv_group"].iat[0] * g["mean"].sum()) ** 2 for _, g in rows.groupby("group"))
+    s2 = math.log1p(v / m**2)
+    assert wide[2] == pytest.approx(math.exp(math.log(m) - s2 / 2 + Z_P90 * math.sqrt(s2)), rel=1e-12)
+    reference = pytest.importorskip("celeris.models.quantiles")
+    want = reference.aggregate_quantiles(rows["mean"].to_numpy(), rows["var_noise"].to_numpy(), rows["cv_level"].to_numpy(),
+                                         rows["cv_group"].to_numpy(), rows["series"].to_numpy(), rows["group"].to_numpy(),
+                                         cv_common=0.022)
+    assert wide == pytest.approx([want["p10"], want["p50"], want["p90"]], rel=1e-9)

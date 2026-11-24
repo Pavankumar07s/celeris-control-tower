@@ -118,7 +118,7 @@
 .rail .rail-toggle { display: none; }
 @media (max-width: 900px) {
   :root { --gutter: max(16px, env(safe-area-inset-left, 0px)); }
-  .shell { grid-template-columns: minmax(0, 1fr); }
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; align-content: start; }
   .rail { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px var(--gutter); border-right: 0; border-bottom: 1px solid var(--rule); }
   .rail .colour-key, .rail-foot { display: none; }
   .rail .toc { display: none; flex-basis: 100%; }

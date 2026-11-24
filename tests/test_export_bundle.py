@@ -146,6 +146,25 @@ def test_exceptions_are_ranked_and_explained(bundle: Path) -> None:
     assert ex["rule"].count("lost_account") == int(state["is_lost_account"].sum())
 
 
+def test_backtest_pools_decision_folds_on_common_cells(bundle: Path) -> None:
+    bt = load(bundle, "backtest.json")
+    folds = bt["summary"]["origins"]["decision_folds"]
+    assert sorted(bt["scored_origins"]) == sorted(folds)
+    assert set(folds) < set(bt["origins"])  # the stress fold is replayed (time machine) but never pooled
+    assert len({entry["cells"] for entry in bt["ladder"]}) == 1  # every model scored on the same cells
+    floor = next(entry for entry in bt["ladder"] if entry["model"] == "oracle")["wape"]
+    assert all(entry["wape"] >= floor - 1e-9 for entry in bt["ladder"])  # nothing beats the in-hindsight oracle
+    final = next(entry for entry in bt["ladder"] if entry["model"] == bt["final"])
+    want = next(entry for entry in bt["summary"]["ladder"] if entry["model"] == bt["final"])["mean_over_decision_folds"]["wape"]
+    assert final["wape"] == pytest.approx(want, abs=0.002)
+
+
+def test_forecast_carries_the_common_shock(bundle: Path) -> None:
+    fc = load(bundle, "forecast.json")
+    meta = load(bundle, "meta.json")
+    assert fc["cv_common"] == pytest.approx(float(meta["uncertainty"].get("cv_common", 0.0)), abs=1e-6)
+
+
 def test_export_is_deterministic(bundle: Path, tmp_path: Path) -> None:
     again = tmp_path / "again"
     run_export(PATHS, bundle_dir=again)

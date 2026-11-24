@@ -54,33 +54,7 @@ export interface Theme {
   band: string;
   bandInk: string;
   bandInk2: string;
-  /** @deprecated alias of hist. */
-  slate: string[];
-  /** @deprecated alias of fcRamp. */
-  cobalt: string[];
   shadowPop: string;
-
-  // ---- DEPRECATED aliases for views not yet restyled (do not use in new code) ----
-  surface: string; // = paper
-  page: string; // = paper
-  muted: string; // = ink3
-  axis: string; // = ruleStrong
-  history: string; // = ink
-  demand: string; // = ink
-  forecast: string; // = accent
-  forecastBand: string; // = accentBand
-  forecastP50: string; // = accentEdge
-  baseline: string; // = ink3
-  zone: string; // = accentWash
-  seq: string[]; // 13-step slate (old index range 0..12)
-  div: string[]; // 7-step diverging, [0] negative .. [3] neutral .. [6] positive
-  error: string; // data-error anomaly = cat[1] rust
-  event: string; // real-event anomaly = cat[0] teal
-  tooltipBg: string;
-  tooltipBorder: string;
-  warning: string;
-  serious: string;
-  critical: string;
 }
 
 /** Fallback values (the light theme) used when CSS variables are unavailable (tests, first paint). */
@@ -156,33 +130,9 @@ export function readTheme(name: ThemeName): Theme {
     band: v("--band"),
     bandInk: v("--band-ink"),
     bandInk2: v("--band-ink-2"),
-    slate: hist,
-    cobalt: fcRamp,
     shadowPop: v("--shadow-pop"),
   };
-  return {
-    ...t,
-    surface: t.paper,
-    page: t.paper,
-    muted: t.ink3,
-    axis: t.ruleStrong,
-    history: t.ink,
-    demand: t.ink,
-    forecast: t.accent,
-    forecastBand: t.accentBand,
-    forecastP50: t.accentEdge,
-    baseline: t.ink3,
-    zone: t.accentWash,
-    seq: Array.from({ length: 13 }, (_, k) => hist[Math.round((k * 6) / 12)]),
-    div: [diverging[0], diverging[1], diverging[2], diverging[4], diverging[6], diverging[7], diverging[8]],
-    error: cat[1],
-    event: cat[0],
-    tooltipBg: t.raised,
-    tooltipBorder: t.rule,
-    warning: t.warnMark,
-    serious: t.loss,
-    critical: t.crit,
-  };
+  return t;
 }
 
 export const FONT = '"IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif';
@@ -236,17 +186,6 @@ function trim(x: number): string {
 // Axis, grid and tooltip conventions shared by every chart type (bars, heatmaps, waterfalls, lines).
 // ---------------------------------------------------------------------------------------------------
 
-/** Value-axis styling: no axis line, no ticks, solid 1px gridlines, compact ink-3 labels.
- *  (Legacy signature kept: spread it into a value OR category axis.) */
-export function axisStyle(t: Theme) {
-  return {
-    axisLine: { show: false, lineStyle: { color: t.ruleStrong } },
-    axisTick: { show: false },
-    axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5 },
-    splitLine: { lineStyle: { color: t.grid, width: 1, type: "solid" as const } },
-  };
-}
-
 /** Category axis: 1px rule-strong baseline, no gridlines, ink-3 labels. */
 export function categoryAxis(t: Theme, data: (string | number)[], extra: Record<string, unknown> = {}) {
   return {
@@ -272,7 +211,7 @@ export function valueAxis(t: Theme, opts: { max?: number; min?: number; usd?: bo
       color: t.ink3,
       fontFamily: FONT,
       fontSize: 11.5,
-      formatter: (v: number) => (opts.percent ? `${Math.round(v * 100)}%` : axisTick(v, opts.usd)),
+      formatter: (v: number) => (opts.percent ? `${Math.round(v * 100) < 0 ? "\u2212" : ""}${Math.abs(Math.round(v * 100))}%` : axisTick(v, opts.usd)),
     },
     splitLine: { lineStyle: { color: t.grid, width: 1, type: "solid" as const } },
   };
@@ -357,19 +296,6 @@ export function barStyle(color: string, horizontal = false) {
 }
 export const BAR_MAX = 24;
 
-/** Value label on a bar (ranked bars carry their value; sort the data descending first). */
-export function barLabel(t: Theme, format: (v: number) => string, horizontal = true) {
-  return {
-    show: true,
-    position: horizontal ? ("right" as const) : ("top" as const),
-    distance: 6,
-    color: t.ink2,
-    fontFamily: FONT,
-    fontSize: 11.5,
-    formatter: (p: { value: number | number[] }) => format(Array.isArray(p.value) ? p.value[p.value.length - 1] : p.value),
-  };
-}
-
 /** A numeric scale legend for heatmaps: horizontal, the end values printed, the poles named in words.
  *  `colors` is a ramp (t.hist / t.fcRamp) or the diverging ramp (t.diverging) for signed values. */
 export function scaleLegend(
@@ -394,7 +320,3 @@ export function scaleLegend(
   };
 }
 
-/** Step label for a waterfall bar: "× 1.12 season" for a multiplicative step, "+1,204" for an additive one. */
-export function waterfallLabel(t: Theme, text: (index: number) => string) {
-  return { show: true, position: "right" as const, distance: 6, color: t.ink2, fontFamily: FONT, fontSize: 11.5, formatter: (p: { dataIndex: number }) => text(p.dataIndex) };
-}

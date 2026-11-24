@@ -117,7 +117,7 @@ export function BarTable<R>({ rows, cols, bar, onRow, selected, rowKey, ariaLabe
         <tfoot>
           <tr>
             {cols.map((c) => (
-              <td key={c.key} className={c.kind === "text" || c.kind === "label" ? "l" : ""}>
+              <td key={c.key} className={[c.kind === "text" || c.kind === "label" ? "l" : "", c.hideNarrow ? "hide-narrow" : ""].filter(Boolean).join(" ") || undefined}>
                 {total[c.key] ?? ""}
               </td>
             ))}

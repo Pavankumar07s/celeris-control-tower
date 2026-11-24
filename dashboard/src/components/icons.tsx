@@ -95,14 +95,6 @@ export const Download = ({ size = 14, ...p }: P) => (
   </g>
   </svg>
 );
-export const TableIcon = ({ size = 14, ...p }: P) => (
-  <svg viewBox="0 0 24 24" {...base(size, p)}>
-    <g transform="scale(1.71429)">
-    <rect x="2" y="2.5" width="10" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth={1.3} />
-    <path d="M2 6h10M2 9h10M6 2.5v9" stroke="currentColor" strokeWidth={1.1} />
-  </g>
-  </svg>
-);
 /** The wordmark glyph: two ink (chalk) bars and one orange bar, the colour grammar in miniature. */
 export const Glyph = ({ size = 18, ...p }: P) => (
   <svg viewBox="0 0 24 24" {...base(size, p)}>
@@ -117,5 +109,30 @@ export const Glyph = ({ size = 18, ...p }: P) => (
 export const Trend = ({ dir, size = 10, ...p }: P & { dir: "up" | "down" | "flat" }) => (
   <svg viewBox="0 0 24 24" {...base(size, p)}>
     {dir === "flat" ? <circle cx="12" cy="12" r="5" fill="currentColor" /> : <path d={dir === "up" ? "M12 4l9 15H3z" : "M12 20L3 5h18z"} fill="currentColor" />}
+  </svg>
+);
+/** Copy (two sheets). */
+export const CopyIcon = ({ size = 14, ...p }: P) => (
+  <svg viewBox="0 0 24 24" {...base(size, p)}>
+    <g transform="scale(1.71429)" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinejoin="round">
+      <rect x="4.6" y="4.6" width="7.2" height="7.6" rx="1.2" />
+      <path d="M9.4 4.4V3.2a1.1 1.1 0 0 0-1.1-1.1H3.3a1.1 1.1 0 0 0-1.1 1.1v5.4a1.1 1.1 0 0 0 1.1 1.1h1.1" strokeLinecap="round" />
+    </g>
+  </svg>
+);
+export const MinusIcon = ({ size = 12, ...p }: P) => (
+  <svg viewBox="0 0 24 24" {...base(size, p)}>
+    <path d="M5 12h14" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+  </svg>
+);
+export const PlusIcon = ({ size = 12, ...p }: P) => (
+  <svg viewBox="0 0 24 24" {...base(size, p)}>
+    <path d="M5 12h14M12 5v14" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+  </svg>
+);
+/** A dashed ring for "pending" (a state, not a status: no colour). */
+export const PendingIcon = ({ size = 12, ...p }: P) => (
+  <svg viewBox="0 0 24 24" {...base(size, p)}>
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth={2.2} strokeDasharray="4 3.2" />
   </svg>
 );

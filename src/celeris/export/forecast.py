@@ -47,6 +47,13 @@ def load_rows(forecast: pd.DataFrame, grid: pd.DataFrame, index: SeriesIndex) ->
     f["var_b"] = np.round(significant(f["var_noise"].to_numpy(dtype=float), 3), 3)
     f["cvl_b"] = np.round(f["cv_level"].to_numpy(dtype=float), 6)
     f["cvg_b"] = np.round(f["cv_group"].to_numpy(dtype=float), 6)
+    # the market-wide term of the formula: one value for every row (0 for a forecast written before it existed)
+    if "cv_common" in f.columns:
+        if f["cv_common"].nunique() > 1:
+            raise ValueError("cv_common is not constant: the aggregate-quantile formula needs one market-wide value")
+        f["cvc_b"] = np.round(f["cv_common"].to_numpy(dtype=float), 6)
+    else:
+        f["cvc_b"] = 0.0
     for column, key in (("cv_level", "series"), ("cv_group", ["product_family", "region"])):
         if (f.groupby(key)[column].nunique() > 1).any():
             raise ValueError(f"{column} is not constant within its {key}: the aggregate-quantile formula needs it")
@@ -92,6 +99,7 @@ def build_forecast(rows: ForecastRows, index: SeriesIndex) -> dict[str, Json]:
         "groups": {"family": [index.families.index(v) for v in groups["product_family"]],
                    "region": [REGIONS.index(v) for v in groups["region"]],
                    "cv_group": [float(v) for v in groups["cvg_b"]]},
+        "cv_common": common_cv(f),
         "forecast": ints(f["forecast"]),
         "mean": nums(f["mean_b"], 1),
         "var_noise": nums(f["var_b"], 3),
@@ -99,6 +107,11 @@ def build_forecast(rows: ForecastRows, index: SeriesIndex) -> dict[str, Json]:
         "zero_reasons": list(ZERO_REASONS),
         "price": nums(f["price_usd"], 2),
     }
+
+
+def common_cv(f: pd.DataFrame) -> float:
+    """The bundled market-wide coefficient of variation (the same for every row)."""
+    return float(f["cvc_b"].iat[0]) if len(f) else 0.0
 
 
 def build_detail(rows: ForecastRows) -> dict[str, Json]:
@@ -161,7 +174,7 @@ def self_check(rows: ForecastRows, index: SeriesIndex) -> list[dict[str, Json]]:
         sel = f[_selection(f, spec, index)]
         q = aggregate_quantiles(pd.DataFrame({
             "series": sel["series"], "group": sel["product_family"] + "|" + sel["region"], "mean": sel["mean_b"],
-            "var_noise": sel["var_b"], "cv_level": sel["cvl_b"], "cv_group": sel["cvg_b"]}))
+            "var_noise": sel["var_b"], "cv_level": sel["cvl_b"], "cv_group": sel["cvg_b"]}), cv_common=common_cv(f))
         out.append({**spec, "mean_sum": round(float(sel["mean_b"].sum()), 6), "p10": q[0], "p50": q[1], "p90": q[2]})
     return out
 

@@ -16,11 +16,11 @@ import { Notice } from "../components/states";
 import { BarTable } from "../components/tables";
 import { breakdown, sharesOf, type BreakdownDim } from "../data/breakdown";
 import { forecastAgg, forecastLatent, historyAgg, sum } from "../data/aggregate";
-import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtSigned, fmtSignedPct, fmtValue, monthLong, monthName } from "../data/format";
+import { fmt1, fmtInt, fmtMoney, fmtNum, fmtOnScale, fmtPct, fmtSignedPct, fmtValue, monthLong, monthName } from "../data/format";
 import { useResource } from "../data/load";
 import { lognormalQuantile, moments, Z10, Z90 } from "../data/quantiles";
 import type { ExceptionFile, ForecastDetail, StockoutFile } from "../data/types";
-import { briefing, exceptionRowsIn, readableMonths } from "../insights/briefing";
+import { briefing, exceptionRowsIn, ladderFacts, readableMonths } from "../insights/briefing";
 import { countWord, render, selectionWords } from "../insights/headlines";
 import { CHANGE_TEMPLATES, OUTLOOK_TEMPLATES, OVERVIEW_TEMPLATES, TOP_TEMPLATES, changeDek, changeFacts, changeTitle, overviewFacts, timelineDek } from "../insights/overview";
 import "./Overview.css";
@@ -95,10 +95,7 @@ export default function Overview() {
   const fullRange = `${monthName(m.months[0])} – ${monthName(m.months[m.nMonths - 1])}`;
   const pa = m.meta.price_assumption.vs_2026_pct;
   const priceYears = Object.entries(pa).filter(([, v]) => v !== 0);
-  const bt = m.meta.backtest;
-  const final = bt.ladder.find((l) => l.model === bt.final) ?? bt.ladder.find((l) => l.model === "final");
-  const naive = bt.ladder.find((l) => l.model === "naive");
-  const snaive = bt.ladder.find((l) => l.model === "seasonal_naive");
+  const { final, naive, snaive, floor, origins: nOrigins } = ladderFacts(m);
   const lost = useMemo(() => {
     if (!stock.data) return null;
     const c = stock.data.cells;
@@ -246,18 +243,18 @@ export default function Overview() {
         <Figure
           label="Backtest error (WAPE)"
           value={final ? fmtPct(final.wape) : "–"}
-          context={final && snaive ? `**${((snaive.wape - final.wape) * 100).toFixed(1)} pts** ${snaive.wape >= final.wape ? "better" : "worse"} than seasonal naive; lower is better` : undefined}
+          context={final && snaive ? `**${fmt1(Math.abs(snaive.wape - final.wape) * 100)} pts** ${snaive.wape >= final.wape ? "better" : "worse"} than seasonal naive; lower is better` : undefined}
           visual={
             final ? (
               <Ladder
                 rows={[...(naive ? [{ label: "Naive", value: naive.wape }] : []), ...(snaive ? [{ label: "Seasonal naive", value: snaive.wape }] : []), { label: "Our model", value: final.wape, me: true }]}
-                format={(v) => (v * 100).toFixed(1)}
-                foot={`${bt.origins.length} origins${bt.noise_floor !== null ? `, noise floor ${fmtPct(bt.noise_floor)}` : ""}, all series`}
+                format={(v) => fmt1(v * 100)}
+                foot={`${nOrigins} origins${floor !== null ? `, noise floor ${fmtPct(floor)}` : ""}, all series`}
               />
             ) : undefined
           }
           link={{ label: "Forecast & accuracy", onClick: () => go("forecast") }}
-          info={{ what: "Rolling-origin backtest at a 19-month horizon over every SKU × region × month, pooled over all origins (all series, not the filter).", how: "WAPE = Σ|actual − forecast| / Σ actual on unconstrained demand. Lower is better; the noise floor is the error a perfect model of the level would still make.", source: "meta.json (backtest ladder)" }}
+          info={{ what: "Rolling-origin backtest at a 19-month horizon over every SKU × region × month, pooled over the scored origins on the cells every model forecast (all series, not the filter).", how: "WAPE = Σ|actual − forecast| / Σ actual on unconstrained demand. Lower is better; the noise floor is the error a perfect model of the level would still make.", source: "meta.json (backtest ladder)" }}
         />
         <Figure
           label={`Lost sales, ${m.months[0].slice(0, 4)}–${m.months[m.asOf].slice(0, 4)}`}
@@ -314,9 +311,9 @@ export default function Overview() {
                 bar={{ value: (r) => r.d, tone: "forecast", leader: (r) => r === change.leader }}
                 cols={[
                   { key: "l", label: DIM_LABEL[dim], kind: "label", value: (r) => r.label, width: "30%" },
-                  { key: "s", label: "Share next 12", kind: "num", value: (r) => `${(r.share * 100).toFixed(1)}%`, width: "18%", hideNarrow: true },
+                  { key: "s", label: "Share next 12", kind: "num", value: (r) => fmtPct(r.share), width: "18%", hideNarrow: true },
                   { key: "b", label: "Change", kind: "bar" },
-                  { key: "d", label: usd ? "USD" : "Units", kind: "num", value: (r) => fmtSigned(r.d, measure, 1), width: "15%" },
+                  { key: "d", label: usd ? "USD" : "Units", kind: "num", value: (r) => fmtOnScale(r.d, Math.max(...change.rows.map((x) => Math.abs(x.d))), measure, true), width: "15%" },
                   { key: "p", label: "%", kind: "num", value: (r) => fmtSignedPct(r.pct), width: "14%" },
                 ]}
               />
