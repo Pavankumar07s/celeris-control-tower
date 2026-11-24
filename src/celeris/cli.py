@@ -41,7 +41,7 @@ STAGES: dict[str, Stage] = {
     "features": Stage("features", run_features, "modelling: feature tables, macro lead/lag analysis, feature catalogue"),
     "backtest": Stage("backtest", run_backtest, "modelling: rolling-origin backtest, model ladder, ensemble rule, uncertainty calibration"),
     "forecast": Stage("forecast", run_forecast, "modelling: fit as of 2026-10, forecast.parquet, submission.csv, quantiles, hierarchy checks"),
-    "export": Stage("export", run_export, "dashboard: write the data bundle to dashboard/public/data (reads outputs/, writes nothing there)"),
+    "export": Stage("export", run_export, "dashboard: write the data bundle to --bundle-dir (reads outputs/, writes nothing else)"),
 }
 
 
@@ -51,15 +51,19 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("stage", choices=[*registered, "all"], help="stage to run ('all' = every registered stage in order)")
     parser.add_argument("--raw-dir", type=Path, default=Paths().raw_dir, help="directory of the raw CSV files")
     parser.add_argument("--out-dir", type=Path, default=Paths().outputs_dir, help="output root (clean/, quality/, ...)")
+    parser.add_argument("--bundle-dir", type=Path, default=None,
+                        help="where 'export' writes the dashboard data bundle (default: dashboard/public/data with the "
+                             "default --out-dir, <out-dir>/dashboard_bundle with any other)")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    paths = Paths(raw_dir=args.raw_dir, outputs_dir=args.out_dir)
+    paths = Paths(raw_dir=args.raw_dir, outputs_dir=args.out_dir, bundle_dir=args.bundle_dir)
     names = [name for name in STAGE_ORDER if name in STAGES] if args.stage == "all" else [args.stage]
     for name in names:
         started = time.perf_counter()
         STAGES[name].run(paths)
-        print(f"celeris {name}: done in {time.perf_counter() - started:.1f} s -> {paths.outputs_dir}")
+        target = paths.bundle_dir if name == "export" else paths.outputs_dir
+        print(f"celeris {name}: done in {time.perf_counter() - started:.1f} s -> {target}")
     return 0

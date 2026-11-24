@@ -1,12 +1,14 @@
-"""The ``export`` stage: read the pipeline outputs, write the dashboard data bundle to ``dashboard/public/data``.
+"""The ``export`` stage: read the pipeline outputs, write the dashboard data bundle to ``paths.bundle_dir``
+(``dashboard/public/data`` for the default outputs root, ``<outputs_dir>/dashboard_bundle`` for any other one, or
+``--bundle-dir``).
 
 Start-up files (loaded by every view): ``meta.json``, ``dims.json``, ``history.json``, ``forecast.json``.
 Lazy files (loaded by the views that need them): ``forecast_detail.json``, ``profiles.json``, ``quality.json``,
 ``anomalies.json``, ``stockouts.json``, ``macro.json``, ``backtest.json``, ``backtest_origin_<YYYY-MM>.json``,
 ``exceptions.json``, ``lineage/<family code>.json``.
 
-The stage writes nothing under ``outputs/`` and keeps no wall-clock value, so two runs on the same inputs give
-byte-identical bundles. Stale bundle files from an earlier run are removed first.
+The stage writes nothing else (no file under ``outputs/`` outside the bundle) and keeps no wall-clock value, so two
+runs on the same inputs give byte-identical bundles. Stale bundle files from an earlier run are removed first.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from typing import Any
 import pandas as pd
 
 from celeris import __version__
-from celeris.config import PROJECT_ROOT, Paths
+from celeris.config import Paths
 from celeris.export.anomalies import build_anomalies
 from celeris.export.backtest import build_backtest
 from celeris.export.encode import Json, write
@@ -30,7 +32,6 @@ from celeris.export.quality import build_lineage, build_quality
 from celeris.export.sources import Sources, resolve
 from celeris.io import sha256_file
 
-BUNDLE_DIR = PROJECT_ROOT / "dashboard" / "public" / "data"
 BUNDLE_VERSION = 1
 STARTUP_FILES = ("dims.json", "history.json", "forecast.json")
 PIPELINE_INPUTS = (
@@ -74,8 +75,9 @@ def _pipeline_hashes(paths: Paths) -> dict[str, str]:
     return {relative: listed.get(relative) or sha256_file(paths.outputs_dir / relative) for relative in PIPELINE_INPUTS}
 
 
-def run_export(paths: Paths, bundle_dir: Path = BUNDLE_DIR) -> dict[str, Any]:
-    """Write the bundle and return its metadata (also written as ``meta.json``)."""
+def run_export(paths: Paths, bundle_dir: Path | None = None) -> dict[str, Any]:
+    """Write the bundle to ``bundle_dir`` (default ``paths.bundle_dir``) and return its metadata (also ``meta.json``)."""
+    bundle_dir = paths.bundle_dir if bundle_dir is None else bundle_dir
     sources: Sources = resolve(paths)
     frames = load_frames(paths)
     index = series_index(frames)

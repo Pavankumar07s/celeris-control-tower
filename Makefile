@@ -1,6 +1,6 @@
 PY ?= .venv/bin/python
 
-.PHONY: all clean-data demand anomalies features backtest forecast submission export dashboard dashboard-dev test install
+.PHONY: all clean-data demand anomalies features backtest forecast submission export dashboard dashboard-dev test test-all install
 
 ## all: run every registered pipeline stage in order (clean, demand, anomalies, features, backtest, forecast, ...)
 all:
@@ -45,9 +45,13 @@ dashboard: export
 dashboard-dev:
 	cd dashboard && npm run dev
 
-## test: run the pytest suite
+## test: run the fast pytest suite (tests marked slow are deselected; pipeline runs go to temp dirs)
 test:
 	$(PY) -m pytest
+
+## test-all: the whole suite including the slow end-to-end test (python -m celeris all twice into temp dirs, ~20 min, 2.5 GB)
+test-all:
+	$(PY) -m pytest -m "slow or not slow"
 
 ## install: editable install of the package into the project virtualenv (no dependency changes)
 install:

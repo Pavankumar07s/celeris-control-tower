@@ -25,12 +25,28 @@ RAW_FILES: Final[tuple[str, ...]] = (
 )
 
 
+DEFAULT_OUTPUTS_DIR: Final[Path] = PROJECT_ROOT / "outputs"
+DEFAULT_BUNDLE_DIR: Final[Path] = PROJECT_ROOT / "dashboard" / "public" / "data"
+ISOLATED_BUNDLE_DIR: Final = "dashboard_bundle"  # bundle folder inside a non-default outputs root
+
+
 @dataclass(frozen=True)
 class Paths:
-    """Input and output locations. Tests point ``outputs_dir`` at a temporary directory."""
+    """Input and output locations. Tests point ``outputs_dir`` at a temporary directory.
+
+    ``bundle_dir`` is where ``export`` writes the dashboard data bundle. Left unset it is ``dashboard/public/data`` for
+    the default outputs root and ``<outputs_dir>/dashboard_bundle`` for any other one, so a run into a temporary
+    directory never rewrites the dashboard's bundle. After construction it is always a ``Path``.
+    """
 
     raw_dir: Path = field(default=PROJECT_ROOT / "data" / "raw")
-    outputs_dir: Path = field(default=PROJECT_ROOT / "outputs")
+    outputs_dir: Path = field(default=DEFAULT_OUTPUTS_DIR)
+    bundle_dir: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.bundle_dir is None:
+            default = Path(self.outputs_dir).resolve() == DEFAULT_OUTPUTS_DIR
+            object.__setattr__(self, "bundle_dir", DEFAULT_BUNDLE_DIR if default else Path(self.outputs_dir) / ISOLATED_BUNDLE_DIR)
 
     @property
     def clean_dir(self) -> Path:

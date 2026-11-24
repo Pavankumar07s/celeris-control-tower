@@ -42,12 +42,13 @@ src/celeris/
   export/                  dashboard data bundle, submission file
   cli.py                   `python -m celeris <stage>`; stages: clean, demand, anomalies, features, backtest, forecast, export, all
                            (only registered stages are callable; a later stage plugs in with one `Stage` entry in `STAGES`)
-tests/                     pytest suite (schema, invariants, oracle, rule fixtures, corruption-recovery, idempotence, contract)
+tests/                     pytest suite (schema, invariants, oracle, rule fixtures, corruption-recovery, idempotence, contract);
+                           `make test` deselects `@pytest.mark.slow`, `make test-all` adds the end-to-end `all` run (~20 min)
 outputs/                   everything the pipeline writes (see below)
 dashboard/                 static web app; reads only `dashboard/public/data/*` written by `celeris export`
 docs/                      problem statement, jury criteria, this file, methodology
 research/                  forensic reports and skeptic reviews (evidence of process; not used at runtime)
-Makefile                   all, clean-data, test, install (dashboard, submission added with their stages)
+Makefile                   all, clean-data, test, test-all, install (dashboard, submission added with their stages)
 ```
 
 Part A lives in `src/celeris/cleaning/`: one module per dossier step (`keys` 1, `dedup` 2, `record_id` 3, `grid` 4,
@@ -170,7 +171,9 @@ Columns added to `train_clean.parquet` by later stages (`celeris.tables`). The d
 Compact JSON written by `celeris export`; the dashboard reads nothing else and no number in it is typed by hand.
 The file list, what each is built from and which view loads it are in `docs/dashboard.md`. The stage writes nothing
 under `outputs/`; `meta.json` records, per modelling input, whether the real file or the dev-only stand-in in
-`outputs/_provisional/` was used.
+`outputs/_provisional/` was used. The destination is `Paths.bundle_dir` (`--bundle-dir`): `dashboard/public/data` for
+the default outputs root, `<out-dir>/dashboard_bundle` when `--out-dir` points anywhere else, so runs into a temporary
+directory (tests, experiments) never rewrite the dashboard's bundle.
 
 ## Metrics
 
