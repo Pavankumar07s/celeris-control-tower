@@ -118,6 +118,29 @@ def test_macro_drivers_have_the_economic_sign(fold) -> None:
     assert 0.0 <= fit.macro_paths.damping <= 1.0 and fit.macro_paths.fuel <= 0.0
 
 
+def test_averaged_driver_sets_are_weighted_and_sign_consistent(fold) -> None:
+    """Model-averaged family driver sets: weights are positive, sorted and sum to 1, the reported drivers are the best
+    set, every set carries the economic sign, and the SKU paths are the weighted sum over the sets."""
+    _, fit, _, _ = fold
+    paths = fit.macro_paths
+    assert set(paths.driver_sets) == set(paths.drivers)
+    for family, sets in paths.driver_sets.items():
+        weights = np.array([weight for _, weight in sets])
+        assert len(sets) <= fit.config.macro.max_sets and (weights > 0).all() and np.isclose(weights.sum(), 1.0)
+        assert (np.diff(weights) <= 1e-12).all() and sets[0][0] is paths.drivers[family]
+        for d, _ in sets:
+            assert len(set(d.indicators)) == len(d.indicators) <= fit.config.macro.max_drivers
+            assert (d.coef * np.array([SIGN[name] for name in d.indicators]) >= 0).all()
+    lagged = np.stack([fit.macro.lagged(lag) for lag in range(paths.response.shape[2])], axis=2)  # (113, 7, lags)
+    assert np.allclose(np.einsum("nil,til->nt", paths.response, lagged), paths.u, atol=1e-9)
+
+
+def test_backfit_converges(fold) -> None:
+    """The factor backfit stops on its convergence criterion, not on the iteration cap."""
+    _, fit, _, _ = fold
+    assert len(fit.trace) < fit.config.n_iter and fit.trace[-1]["max_dlog_g"] < fit.config.tol
+
+
 def test_fit_is_reproducible(inputs: ModelInputs, fold) -> None:
     ctx, fit, targets, pred = fold
     again = predict(fit_structural(inputs, ctx, StructuralConfig()), targets)

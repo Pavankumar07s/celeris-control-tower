@@ -16,7 +16,12 @@ Everything is estimated from data up to the origin (``OriginContext``), with mea
 1. **Factor backfit** (Poisson likelihood by cyclic exact block updates, i.e. ratio-of-sums) on single-month
    fitting cells: segment levels (series x customer run), region x calendar-month and channel x calendar-month
    seasonality (+ Thermal), LNY and Ramadan depths (day-count exposure), class-level EV betas, the measured size of
-   open-ended programme steps (Helios India) and the SKU macro paths (``celeris.features.macro``).
+   open-ended programme steps (Helios India) and the SKU macro paths (``celeris.features.macro``), iterated to
+   convergence (no live cell's log factor moves by more than ``tol``; cap ``n_iter``). The EV betas and holiday depths
+   are updated on the profile likelihood (segment levels / regional factor profiled out): the plain block updates
+   zig-zag along a ridge (the EV index trends inside every segment), so a fixed six iterations left the EV beta at
+   0.018-0.029 per index point instead of its fixed point 0.030-0.037 and under-forecast EV SKUs by 1-20 %
+   (``docs/optimisation_log.md``, E4).
 2. **Forecast level**: ratio of sums of demand over the accumulated factors in the last ``level_window`` months of
    level cells (arithmetic, never a log mean: a log mean biases aggregates by -3 to -10 %). Series younger than
    ``young_months`` blend in a cross-sectional prior with ``young_n0`` pseudo-months (dossier 5.5); series with no
@@ -33,7 +38,7 @@ Everything is estimated from data up to the origin (``OriginContext``), with mea
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import pandas as pd
@@ -51,7 +56,7 @@ from celeris.features.calendar import (
     month_index,
 )
 from celeris.features.lifecycle import LAUNCH_TAU, MEA_OPENING_TAU, lifecycle_matrix
-from celeris.features.macro import AFTERMARKET, GroupIndex, MacroConfig, MacroData, SkuPaths, fit_sku_paths, macro_data
+from celeris.features.macro import AFTERMARKET, Drivers, GroupIndex, MacroConfig, MacroData, SkuPaths, fit_sku_paths, macro_data
 from celeris.anomalies.expectation import ONE_OFF_CHANNELS
 from celeris.models.context import ModelInputs, OriginContext
 
@@ -77,7 +82,10 @@ class StructuralConfig:
     macro_gamma: float = 1.0  # amplitude applied to the fitted path (1.0 with the capped / era-factor estimator)
     launch_tau: float = LAUNCH_TAU
     mea_tau: float = MEA_OPENING_TAU
-    n_iter: int = 6
+    n_iter: int = 40  # maximum backfit iterations (exactly this many when ``tol`` is None)
+    tol: float | None = 1e-6  # stop when no factor moves log latent demand by more than this between iterations
+    ev_profile: bool = True  # EV beta step with the segment levels profiled out (the plain step zig-zags, E4)
+    holiday_profile: bool = True  # holiday depth step with the region x month factor profiled out (where identified)
     one_off_uplift: bool = True  # add the expected one-off volume to Direct OEM / Tier-1 means (dossier 9.1 #5)
     young_months: int = 24
     young_n0: float = 2.0
@@ -228,6 +236,55 @@ def _holiday_depth(d: np.ndarray, w: np.ndarray, mu: np.ndarray, share: np.ndarr
     return (lo + hi) / 2
 
 
+def _holiday_depth_profile(
+    d: np.ndarray, w: np.ndarray, mu: np.ndarray, share: np.ndarray, member: np.ndarray, codes: np.ndarray, current: float
+) -> float | None:
+    """Poisson MLE of the depth in ``mu = base x S[code] x (1 - depth x share)`` with the region x calendar-month
+    factor ``S`` profiled out (bisection on the score; envelope theorem: the profile score is the plain score at the
+    profiled ``S``). ``None`` when the depth is not identified apart from ``S``.
+
+    The holiday falls in the same calendar month most years (LNY: February in six of eight years), so the regional
+    February factor absorbs most of the dip and the depth is identified by the years the holiday moves. Updating the
+    two in turn converges slowly; profiling the factor out solves for the depth in one step. A calendar month whose
+    cells all carry the same share adds nothing to the profile score; if no month has two distinct shares (MEA at
+    2022-10: one Ramadan observed) the depth is not identified and the caller keeps the plain update.
+    """
+    if (member & (share > 0)).sum() < 20:
+        return current
+    cells = member & np.isin(codes, np.unique(codes[member & (share > 0)]))
+    s, dd, ww, cc = share[cells], d[cells], w[cells], pd.factorize(codes[cells])[0]
+    size = int(cc.max()) + 1
+    low, high = np.full(size, np.inf), np.full(size, -np.inf)
+    np.minimum.at(low, cc, s)
+    np.maximum.at(high, cc, s)
+    if not np.any(high - low > 1e-9):
+        return None
+    base = mu[cells] / (1.0 - current * s)
+
+    def score(depth: float) -> float:  # d loglik / d depth at the profiled factor, decreasing in depth
+        e = base * (1.0 - depth * s)
+        m = e * _ratio(cc, ww * dd, ww * e, size)[cc]
+        return float((ww * m * s / (1.0 - depth * s)).sum() - (ww * dd * s / (1.0 - depth * s)).sum())
+
+    lo, hi = 0.0, 0.8
+    if score(lo) <= 0:
+        return 0.0
+    if score(hi) >= 0:
+        return hi
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if score(mid) > 0 else (lo, mid)
+    return (lo + hi) / 2
+
+
+def _update_depth(
+    d: np.ndarray, w: np.ndarray, mu: np.ndarray, share: np.ndarray, member: np.ndarray, codes: np.ndarray, current: float, profile: bool
+) -> float:
+    """One backfit update of a holiday depth: the profile step where it is identified, else the plain step."""
+    depth = _holiday_depth_profile(d, w, mu, share, member, codes, current) if profile else None
+    return _holiday_depth(d, w, mu, share, member, current) if depth is None else depth
+
+
 def _ev_beta(d: np.ndarray, w: np.ndarray, mu: np.ndarray, x: np.ndarray, current: float) -> float:
     """Poisson MLE of ``beta`` in ``mu = base x exp(beta x)`` by Newton steps (class level, dossier 4.8)."""
     if len(d) < 100 or np.ptp(x) == 0:
@@ -240,6 +297,36 @@ def _ev_beta(d: np.ndarray, w: np.ndarray, mu: np.ndarray, x: np.ndarray, curren
         if info <= 0:
             break
         beta += float((w * (d - m) * x).sum()) / info
+    return beta
+
+
+def _ev_beta_profile(d: np.ndarray, w: np.ndarray, mu: np.ndarray, x: np.ndarray, seg: np.ndarray, current: float) -> float:
+    """Poisson MLE of ``beta`` in ``mu = level[seg] x base x exp(beta x)`` with the segment levels profiled out.
+
+    Newton on the profile likelihood: for a given beta each segment level is its ratio of sums, the score is
+    ``sum w x (d - m)`` and the curvature uses the within-segment spread of ``x`` only. A step with the levels held
+    fixed (``_ev_beta``) uses the full spread instead, so when the EV index trends inside the segments (it does: the
+    index rises over every series' life) it moves beta a fraction of the way and the backfit needs many iterations.
+    """
+    if len(d) < 100 or np.ptp(x) == 0:
+        return current
+    codes, size = pd.factorize(seg)[0], len(np.unique(seg))
+    base = mu * np.exp(-current * x)
+    beta = current
+    for _ in range(8):
+        e = base * np.exp(beta * x)
+        m = e * _ratio(codes, w * d, w * e, size)[codes]
+        swm = np.bincount(codes, w * m, minlength=size)
+        swmx = np.bincount(codes, w * m * x, minlength=size)
+        with np.errstate(all="ignore"):
+            within = np.where(swm > 0, swmx**2 / np.where(swm > 0, swm, 1.0), 0.0)
+        info = float((w * m * x * x).sum() - within.sum())
+        if info <= 0:
+            break
+        step = float((w * (d - m) * x).sum()) / info
+        beta += step
+        if abs(step) < 1e-7:
+            break
     return beta
 
 
@@ -294,6 +381,7 @@ class StructuralFit:
     family_names: tuple[str, ...]
     fitted_history: np.ndarray  # (S_hist, 94) in-sample expected order (segment level x accumulated g)
     one_off_share: float = 0.0  # expected one-off excess volume of Direct OEM / Tier-1 series (0 if not applied)
+    trace: tuple[dict, ...] = ()  # per backfit iteration: largest change of log g and the scalar factors
 
     @property
     def g(self) -> np.ndarray:
@@ -409,10 +497,16 @@ def fit_structural(inputs: ModelInputs, ctx: OriginContext, config: StructuralCo
     family_index: GroupIndex | None = None
     prior = config.season_prior_units
 
-    def g_cells() -> np.ndarray:
+    def g_matrix() -> np.ndarray:
         season, holiday, ev, event = _components(f, x, ev_x, scopes)
-        return (season * holiday * np.exp(log_macro) * ev * x.lifecycle * event)[i, t]
+        return season * holiday * np.exp(log_macro) * ev * x.lifecycle * event
 
+    def g_cells() -> np.ndarray:
+        return g_matrix()[i, t]
+
+    alive = x.lifecycle > 0
+    previous = np.log(g_matrix()[alive])
+    trace: list[dict] = []
     level = np.ones(n_seg)
     for iteration in range(config.n_iter):
         g = g_cells()
@@ -436,16 +530,19 @@ def fit_structural(inputs: ModelInputs, ctx: OriginContext, config: StructuralCo
             level = _ratio(seg_codes, wd, w * g, n_seg)
             mu = level[seg_codes] * g
         if config.use_holidays:
-            new = _holiday_depth(d, w, mu, x.lny[t], x.apac[i], f.lny_depth)
+            new = _update_depth(d, w, mu, x.lny[t], x.apac[i], rm, f.lny_depth, config.holiday_profile)
             mu = mu * np.where(x.apac[i], (1 - new * x.lny[t]) / (1 - f.lny_depth * x.lny[t]), 1.0)
             f.lny_depth = new
-            new = _holiday_depth(d, w, mu, x.ram[t], x.mea[i], f.ramadan_depth)
+            new = _update_depth(d, w, mu, x.ram[t], x.mea[i], rm, f.ramadan_depth, config.holiday_profile)
             mu = mu * np.where(x.mea[i], (1 - new * x.ram[t]) / (1 - f.ramadan_depth * x.ram[t]), 1.0)
             f.ramadan_depth = new
         if config.use_ev:
             for pt in EV_CLASSES:
                 cells = (x.powertrain[i] == pt) & (t >= config.ev_from_month)
-                new = _ev_beta(d[cells], w[cells], mu[cells], ev_x[t[cells]], f.ev_beta[pt])
+                if config.ev_profile:
+                    new = _ev_beta_profile(d[cells], w[cells], mu[cells], ev_x[t[cells]], seg_codes[cells], f.ev_beta[pt])
+                else:
+                    new = _ev_beta(d[cells], w[cells], mu[cells], ev_x[t[cells]], f.ev_beta[pt])
                 cells = x.powertrain[i] == pt
                 mu[cells] *= np.exp((new - f.ev_beta[pt]) * ev_x[t[cells]])
                 f.ev_beta[pt] = new
@@ -458,8 +555,15 @@ def fit_structural(inputs: ModelInputs, ctx: OriginContext, config: StructuralCo
                 mu[exposed] = base * f.steps[key] ** exposure[exposed]
         if config.use_macro and iteration >= 1:
             mu0 = mu / np.exp(log_macro[i, t])
-            macro_paths, family_index = _fit_macro(d, w, mu0, mu, i, t, as_of, x, macro, config.macro)
+            incumbent = macro_paths.drivers if macro_paths is not None else None
+            macro_paths, family_index = _fit_macro(d, w, mu0, mu, i, t, as_of, x, macro, config.macro, incumbent)
             log_macro = config.macro_gamma * macro_paths.log_multiplier(x.sku_row, x.aftermarket, macro)
+        current = np.log(g_matrix()[alive])
+        change = float(np.max(np.abs(current - previous)))
+        previous = current
+        trace.append({"iteration": iteration + 1, "max_dlog_g": change, "ev": f.ev_beta["EV"], "ice": f.ev_beta["ICE"], "lny": f.lny_depth, "ramadan": f.ramadan_depth})
+        if config.tol is not None and iteration >= 2 and change < config.tol:
+            break
 
     season, holiday, ev, event = _components(f, x, ev_x, scopes)
     g_full = season * holiday * np.exp(log_macro) * ev * x.lifecycle * event
@@ -476,6 +580,27 @@ def fit_structural(inputs: ModelInputs, ctx: OriginContext, config: StructuralCo
         season=season, holiday=holiday, log_macro=log_macro, ev=ev, lifecycle=x.lifecycle, event=event,
         level=level_u, level_source=source, prior_level=prior_level, n_level_cells=n_cells,
         family_index=family_index, family_names=x.families, fitted_history=fitted,
+        one_off_share=one_off_share(ctx) if config.one_off_uplift else 0.0,
+        trace=tuple(trace),
+    )
+
+
+LEVEL_STAGE_FIELDS = ("level_window", "young_months", "young_n0", "one_off_uplift", "shade")  # never read by the backfit
+
+
+def shares_factors(config: StructuralConfig, other: StructuralConfig) -> bool:
+    """True if the two configurations differ only in level-stage fields (same factor backfit)."""
+    return replace(config, **{name: getattr(other, name) for name in LEVEL_STAGE_FIELDS}) == other
+
+
+def refit_levels(fit: StructuralFit, ctx: OriginContext, config: StructuralConfig) -> StructuralFit:
+    """``fit`` with another level-stage configuration: identical to ``fit_structural(inputs, ctx, config)`` when
+    ``shares_factors(config, fit.config)``, at the cost of the level stage only (backtest experiments)."""
+    if not shares_factors(config, fit.config):
+        raise ValueError("refit_levels needs a configuration that differs from the fit's in level-stage fields only")
+    level, source, prior_level, n_cells = _forecast_levels(ctx, fit.universe, fit.g, config)
+    return replace(
+        fit, config=config, level=level, level_source=source, prior_level=prior_level, n_level_cells=n_cells,
         one_off_share=one_off_share(ctx) if config.one_off_uplift else 0.0,
     )
 
@@ -496,9 +621,10 @@ def one_off_share(ctx: OriginContext, months: int = 36) -> float:
 
 def _fit_macro(
     d: np.ndarray, w: np.ndarray, mu0: np.ndarray, mu: np.ndarray, i: np.ndarray, t: np.ndarray, as_of: int,
-    x: _Design, macro: MacroData, config: MacroConfig,
+    x: _Design, macro: MacroData, config: MacroConfig, incumbent: dict[str, Drivers] | None = None,
 ) -> tuple[SkuPaths, GroupIndex]:
-    """Aggregate the fitting cells to SKU / family / Aftermarket monthly indices and fit the SKU macro paths."""
+    """Aggregate the fitting cells to SKU / family / Aftermarket monthly indices and fit the SKU macro paths
+    (``incumbent``: the previous iteration's family driver sets, kept unless clearly beaten)."""
     n_t = as_of + 1
     var = w * w * (config.noise_a * mu + config.noise_b * mu * mu)
     am = x.aftermarket[i]
@@ -515,7 +641,7 @@ def _fit_macro(
     sku_index = index(x.sku_row[i], len(x.skus), ~am)
     family_index = index(x.family_row[i], len(x.families), ~am)
     am_index = index(x.sku_row[i], len(x.skus), am)
-    paths = fit_sku_paths(sku_index, x.skus, x.sku_family, family_index, x.families, am_index, macro, config)
+    paths = fit_sku_paths(sku_index, x.skus, x.sku_family, family_index, x.families, am_index, macro, config, incumbent)
     return paths, family_index
 
 

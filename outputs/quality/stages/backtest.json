@@ -24,11 +24,11 @@
       "adida": 0.56224,
       "imapa": 0.56211,
       "cycle_aware": 0.35151,
-      "structural": 0.27286,
-      "gbm": 0.29438,
-      "ensemble": 0.27557,
-      "oracle": 0.23802,
-      "final": 0.27286
+      "structural": 0.26758,
+      "gbm": 0.282,
+      "ensemble": 0.27016,
+      "oracle": 0.23702,
+      "final": 0.26758
     },
     "leakage_check_passed": true
   },
@@ -39,7 +39,7 @@
       "file": "train.csv",
       "rule": "dossier 6.7",
       "title": "Every fold's final forecast scores above the in-hindsight oracle (noise floor of the scoring set)",
-      "description": "2021-10: final 0.3618 vs oracle 0.2764; 2022-10: final 0.2882 vs oracle 0.2519; 2023-10: final 0.2614 vs oracle 0.2346; 2024-10: final 0.2516 vs oracle 0.2296; 2025-03: final 0.2517 vs oracle 0.2305",
+      "description": "2021-10: final 0.3225 vs oracle 0.2704; 2022-10: final 0.2832 vs oracle 0.2500; 2023-10: final 0.2600 vs oracle 0.2341; 2024-10: final 0.2506 vs oracle 0.2286; 2025-03: final 0.2507 vs oracle 0.2300",
       "dimension": "validity",
       "severity": "error",
       "unit": "folds",

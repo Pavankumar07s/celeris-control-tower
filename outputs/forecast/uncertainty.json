@@ -1,40 +1,40 @@
 {
   "noise_a": 1.0,
   "noise_b": {
-    "North America": 0.04546814285722914,
-    "Europe": 0.0457246324949187,
-    "Asia Pacific": 0.05558682924887526,
-    "India": 0.06907520727407787,
-    "Latin America": 0.0860285310940414,
-    "Middle East & Africa": 0.1000741612526501
+    "North America": 0.04457858130619244,
+    "Europe": 0.04470917204258891,
+    "Asia Pacific": 0.05454184742987498,
+    "India": 0.06801208913903467,
+    "Latin America": 0.08483974274020073,
+    "Middle East & Africa": 0.09914557509121168
   },
-  "noise_scale": 0.877490234375,
+  "noise_scale": 0.893896484375,
   "cv_level": {
-    "mature": 0.13642236847924338,
-    "young": 0.21371555844912407,
-    "cold_start": 0.5985708832797921
+    "mature": 0.1295811764032537,
+    "young": 0.19596612334370356,
+    "cold_start": 0.5725621429591995
   },
-  "cv_group": 0.0452423095703125,
-  "cv_common": 0.022381591796875003,
+  "cv_group": 0.0417633056640625,
+  "cv_common": 0.018890380859375,
   "coverage": {
     "monthly": {
       "series": {
         "n": 193953,
         "coverage_p10_p90": 0.8,
-        "below_p10": 0.0987,
-        "above_p90": 0.1013
+        "below_p10": 0.1019,
+        "above_p90": 0.0981
       },
       "sku": {
         "n": 43901,
-        "coverage_p10_p90": 0.7398,
-        "below_p10": 0.1353,
-        "above_p90": 0.1248
+        "coverage_p10_p90": 0.7458,
+        "below_p10": 0.1389,
+        "above_p90": 0.1153
       },
       "family_region": {
         "n": 3192,
         "coverage_p10_p90": 0.8001,
-        "below_p10": 0.0959,
-        "above_p90": 0.104
+        "below_p10": 0.1046,
+        "above_p90": 0.0952
       },
       "total": {
         "n": 76,
@@ -46,21 +46,21 @@
     "horizon_total": {
       "series": {
         "n": 12131,
-        "coverage_p10_p90": 0.8598,
-        "below_p10": 0.0601,
-        "above_p90": 0.0801
+        "coverage_p10_p90": 0.8541,
+        "below_p10": 0.069,
+        "above_p90": 0.0769
       },
       "sku": {
         "n": 2347,
-        "coverage_p10_p90": 0.7925,
-        "below_p10": 0.098,
-        "above_p90": 0.1095
+        "coverage_p10_p90": 0.787,
+        "below_p10": 0.1125,
+        "above_p90": 0.1006
       },
       "family_region": {
         "n": 168,
-        "coverage_p10_p90": 0.9762,
+        "coverage_p10_p90": 0.9702,
         "below_p10": 0.0119,
-        "above_p90": 0.0119
+        "above_p90": 0.0179
       },
       "total": {
         "n": 4,

@@ -1,0 +1,33 @@
+# E6 (rejected): launch-cohort calibration of the prior, as evaluated. It lived in celeris.models.structural with
+# StructuralConfig.launch_cohort (a level-stage field) and these lines in _forecast_levels after the smear:
+#     tail = (universe['sku_tier'] == 'tail').to_numpy()
+#     calibration = _launch_calibration(ctx, universe, prior, (i, t, w, d, acc), in_window, lost, config)
+#     prior = np.where(tail, prior * calibration, prior)
+
+def _launch_calibration(
+    ctx: OriginContext, universe: pd.DataFrame, prior: np.ndarray, cells: tuple[np.ndarray, ...], in_window: np.ndarray, lost: np.ndarray,
+    config: StructuralConfig, min_series: int = 30,
+) -> float:
+    """Ratio of sums of demand to ``prior x accumulated factors`` over the level-window cells of the tail-tier series
+    launched ``config.launch_cohort`` months before the origin (1.0 when off or with fewer than ``min_series``).
+
+    The prior is fitted on mature series and smeared to their mean; recently launched tail series run 4-13 % below it
+    as of every backtest origin, and cold starts / young series (all tail tier from 2024 on) were over-forecast by
+    +5 to +35 % / +1 to +6 % (optimisation log, E6). The ratio rescales the prior of tail-tier young and cold-start
+    series; mature levels are untouched.
+    """
+    if config.launch_cohort is None:
+        return 1.0
+    i, t, w, d, acc = cells
+    n_hist = ctx.state.panel.n_series
+    hist = universe.iloc[:n_hist]
+    since = ctx.as_of - hist["launch_idx"].to_numpy()
+    lo, hi = config.launch_cohort
+    cohort = hist["product_launch"].to_numpy(dtype=bool) & (hist["sku_tier"] == "tail").to_numpy() & (since >= lo) & (since < hi) & ~lost
+    use = cohort[i] & in_window
+    den = float((w * prior[i] * acc)[use].sum())
+    if cohort.sum() < min_series or den <= 0:
+        return 1.0
+    return float((w * d)[use].sum()) / den
+
+

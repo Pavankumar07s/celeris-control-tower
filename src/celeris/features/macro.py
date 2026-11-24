@@ -16,12 +16,17 @@ Estimation, from data up to the origin only (the indicator values of target mont
 
 1. **Family stage.** The family log index ``r_t = log(sum demand / sum expectation without macro)`` over the fitting
    cells of non-Aftermarket series is regressed (weighted least squares, weights from the negative-binomial variance
-   plus a model floor) on standardised indicators at lags 0..6; up to three drivers are added by forward selection,
-   each with the economic sign. Each driver's lag posterior comes from the deviance profile over lags.
+   plus a model floor) on standardised indicators at lags 0..6, each with the economic sign. Every set of at most
+   three drivers is scored at its best lag combination by ``RSS + min_gain x k``; the near-tied best sets are
+   averaged with posterior weights (``set_averaging``, the default; ``family_driver_sets``), because picking one set
+   is discontinuous and moved a fold's score by up to 0.008. ``select_drivers`` (forward selection, one set) remains
+   for the era analysis and as the non-averaging mode. Each driver's lag posterior comes from the deviance profile.
 2. **SKU stage.** Per SKU the same regression on its own index, with the family drivers; each driver's lag is averaged
    over a SKU posterior (prior centred on the family lag), and the coefficients get a Gaussian prior centred on the
    family coefficients with sd ``prior_sd`` (empirical-Bayes shrinkage; true across-SKU sd about 0.04-0.05 per sd).
-   Signs are clipped to the economic sign. The soft cap is fitted by Gauss-Newton.
+   Signs are clipped to the economic sign. The soft cap (knee rounded over +-``cap_smooth``) is fitted by projected
+   Gauss-Newton with step halving. With averaged sets the stage runs once per set and the SKU linear predictors are
+   averaged with the set weights before the cap.
 3. **Aftermarket stage.** Pooled damping ``c`` and Fuel coefficient ``f`` from the Aftermarket SKU indices.
 
 The indicators are standardised with the mean and sd of the months up to the origin.
@@ -29,6 +34,7 @@ The indicators are standardised with the mean and sd of the months up to the ori
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -94,17 +100,34 @@ def era_scale(months: np.ndarray, era_factor: float) -> np.ndarray:
     return np.where((months >= ERA_MUTED[0]) & (months <= ERA_MUTED[1]), era_factor, 1.0)
 
 
-def soft_cap(u: np.ndarray, enabled: bool = True) -> np.ndarray:
-    """Soft upward saturation of the log multiplier: slope 1 below the knee, ``SOFT_CAP_SLOPE`` above (MI.v)."""
+def soft_cap(u: np.ndarray, enabled: bool = True, smooth: float = 0.0) -> np.ndarray:
+    """Soft upward saturation of the log multiplier: slope 1 below the knee, ``SOFT_CAP_SLOPE`` above (MI.v).
+
+    ``smooth`` > 0 rounds the knee: the slope falls linearly from 1 to ``SOFT_CAP_SLOPE`` over ``knee +- smooth``
+    (at most ``smooth x (1 - SOFT_CAP_SLOPE) / 4`` from the hinge). The hinge is not differentiable, so a SKU whose
+    fitted path touches the knee never settles and keeps the backfit from converging.
+    """
+    u = np.asarray(u, dtype=float)
     if not enabled:
         return u
-    return np.where(u > SOFT_CAP_KNEE, SOFT_CAP_KNEE + SOFT_CAP_SLOPE * (u - SOFT_CAP_KNEE), u)
+    hinge = np.where(u > SOFT_CAP_KNEE, SOFT_CAP_KNEE + SOFT_CAP_SLOPE * (u - SOFT_CAP_KNEE), u)
+    if smooth <= 0:
+        return hinge
+    inside = np.abs(u - SOFT_CAP_KNEE) < smooth
+    rounded = u - (1.0 - SOFT_CAP_SLOPE) * (u - SOFT_CAP_KNEE + smooth) ** 2 / (4.0 * smooth)
+    return np.where(inside, rounded, hinge)
 
 
-def soft_cap_slope(u: np.ndarray, enabled: bool = True) -> np.ndarray:
+def soft_cap_slope(u: np.ndarray, enabled: bool = True, smooth: float = 0.0) -> np.ndarray:
+    """Derivative of ``soft_cap``."""
+    u = np.asarray(u, dtype=float)
     if not enabled:
         return np.ones_like(u)
-    return np.where(u > SOFT_CAP_KNEE, SOFT_CAP_SLOPE, 1.0)
+    hinge = np.where(u > SOFT_CAP_KNEE, SOFT_CAP_SLOPE, 1.0)
+    if smooth <= 0:
+        return hinge
+    inside = np.abs(u - SOFT_CAP_KNEE) < smooth
+    return np.where(inside, 1.0 - (1.0 - SOFT_CAP_SLOPE) * (u - SOFT_CAP_KNEE + smooth) / (2.0 * smooth), hinge)
 
 
 @dataclass(frozen=True)
@@ -122,6 +145,13 @@ class MacroConfig:
     model_sd: float = 0.03  # floor on the sd of a monthly log index (family x month residual, dossier 4.7)
     min_months: int = 18
     fixed_damping: float | None = None  # Aftermarket damping; None = estimate (dossier 9.1 #9: 0.37 vs 0.42)
+    switch_margin: float | None = 2.0  # selection mode: keep the incumbent driver set unless beaten by this (None: off)
+    cap_iter: int = 20  # Gauss-Newton steps of the soft-capped SKU fit
+    cap_line_search: bool = True  # step halving so that no Gauss-Newton step raises a SKU's loss
+    cap_smooth: float = 0.05  # half-width of the rounded soft-cap knee (0: hinge)
+    set_averaging: bool = True  # average the SKU paths over near-tied family driver sets instead of picking one
+    max_sets: int = 4  # driver sets averaged per family (the best by penalised RSS)
+    min_set_weight: float = 0.01  # sets below this weight relative to the best one are dropped
 
 
 @dataclass(frozen=True)
@@ -182,9 +212,8 @@ def _design(macro: MacroData, months: np.ndarray, indicators: tuple[str, ...], l
     return np.stack(cols, axis=1) if cols else np.zeros((len(months), 0))
 
 
-def select_drivers(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig) -> Drivers:
-    """Forward selection of up to ``max_drivers`` indicators (economic sign) at their best lag 0..6 (family stage)."""
-    era = era_scale(months, config.era_factor)
+def _forward_selection(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig, era: np.ndarray) -> tuple[list[str], list[int], list[float]]:
+    """Greedy forward selection: indicators, MAP lags and the RSS gain of each added driver."""
     chosen: list[str] = []
     lags: list[int] = []
     gains: list[float] = []
@@ -207,18 +236,122 @@ def select_drivers(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: Macr
         rss = best[0]
         chosen.append(best[1])
         lags.append(best[2])
-    posterior = np.zeros((len(chosen), MAX_LAG + 1))
-    for k, name in enumerate(chosen):
+    return chosen, lags, gains
+
+
+def _penalised_rss(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig, era: np.ndarray, names: tuple[str, ...], lags: tuple[int, ...]) -> float:
+    """``RSS + min_gain x k`` of a driver set (the forward selection's own criterion); inf if a sign is wrong."""
+    beta, rss = _wls(r, w, _design(macro, months, names, lags, era))
+    if names and np.any(beta * np.array([SIGN[n] for n in names]) <= 0):
+        return float("inf")
+    return rss + config.min_gain * len(names)
+
+
+def _sequential_gains(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, era: np.ndarray, names: tuple[str, ...], lags: tuple[int, ...]) -> list[float]:
+    """RSS gain of each driver of a set when added in the set's order (reporting)."""
+    rss = [_wls(r, w, _design(macro, months, names[:k], lags[:k], era))[1] for k in range(len(names) + 1)]
+    return [round(rss[k] - rss[k + 1], 2) for k in range(len(names))]
+
+
+def select_drivers(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig, incumbent: Drivers | None = None) -> Drivers:
+    """Forward selection of up to ``max_drivers`` indicators (economic sign) at their best lag 0..6 (family stage).
+
+    With ``config.switch_margin`` and an ``incumbent`` (the set selected at the previous backfit iteration), the
+    incumbent is kept unless the new selection lowers the penalised RSS by more than the margin. Forward selection is
+    discontinuous: when two sets are nearly tied, each choice moves the levels and factors enough to favour the other
+    one at the next iteration and the backfit cycles (Precision Machined Parts at 2025-03: gains 158.38 vs 157.99).
+    """
+    era = era_scale(months, config.era_factor)
+    chosen, lags, gains = _forward_selection(r, w, months, macro, config, era)
+    if config.switch_margin is not None and incumbent is not None and (tuple(chosen), tuple(lags)) != (incumbent.indicators, incumbent.lags):
+        new = _penalised_rss(r, w, months, macro, config, era, tuple(chosen), tuple(lags))
+        old = _penalised_rss(r, w, months, macro, config, era, incumbent.indicators, incumbent.lags)
+        if old - new <= config.switch_margin:
+            chosen, lags = list(incumbent.indicators), list(incumbent.lags)
+            gains = _sequential_gains(r, w, months, macro, era, incumbent.indicators, incumbent.lags)
+    return _drivers_at(r, w, months, macro, era, tuple(chosen), tuple(lags), tuple(gains))
+
+
+def _drivers_at(
+    r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, era: np.ndarray, names: tuple[str, ...], lags: tuple[int, ...],
+    gains: tuple[float, ...],
+) -> Drivers:
+    """A family driver set at its MAP lags: each driver's lag posterior (deviance profile with the other drivers at
+    their MAP lags) and the sign-clipped coefficients on the lag-averaged indicators."""
+    posterior = np.zeros((len(names), MAX_LAG + 1))
+    for k in range(len(names)):
         profile = np.empty(MAX_LAG + 1)
         for lag in range(MAX_LAG + 1):
             trial = list(lags)
             trial[k] = lag
-            profile[lag] = _wls(r, w, _design(macro, months, tuple(chosen), tuple(trial), era))[1]
+            profile[lag] = _wls(r, w, _design(macro, months, names, tuple(trial), era))[1]
         weight = np.exp(-(profile - profile.min()) / 2.0)
         posterior[k] = weight / weight.sum()
-    coef = _wls(r, w, _lag_averaged(macro, months, tuple(chosen), posterior, era))[0] if chosen else np.zeros(0)
-    coef = np.where(coef * np.array([SIGN[n] for n in chosen]) > 0, coef, 0.0) if chosen else coef
-    return Drivers(tuple(chosen), tuple(lags), posterior, coef, tuple(gains))
+    coef = _wls(r, w, _lag_averaged(macro, months, names, posterior, era))[0] if names else np.zeros(0)
+    coef = np.where(coef * np.array([SIGN[n] for n in names]) > 0, coef, 0.0) if names else coef
+    return Drivers(names, lags, posterior, coef, gains)
+
+
+def _subset_rss(gram: np.ndarray, cross: np.ndarray, total: float, columns: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Batched weighted least squares on column subsets of a centred Gram matrix: (slopes (n, k), RSS (n,))."""
+    g = gram[columns[:, :, None], columns[:, None, :]] + 1e-9 * np.eye(columns.shape[1])[None]
+    c = cross[columns]
+    beta = np.linalg.solve(g, c[:, :, None])[:, :, 0]
+    rss = total - 2.0 * (beta * c).sum(axis=1) + np.einsum("ni,nij,nj->n", beta, g, beta)
+    return beta, rss
+
+
+def _set_order(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, era: np.ndarray, names: tuple[str, ...], lags: tuple[int, ...]) -> tuple[tuple[str, ...], tuple[int, ...]]:
+    """Drivers of a set ordered by importance (RSS increase when the driver is dropped, largest first)."""
+    if len(names) < 2:
+        return names, lags
+    drop = [_wls(r, w, _design(macro, months, names[:k] + names[k + 1 :], lags[:k] + lags[k + 1 :], era))[1] for k in range(len(names))]
+    order = np.argsort(-np.array(drop), kind="stable")
+    return tuple(names[k] for k in order), tuple(lags[k] for k in order)
+
+
+def family_driver_sets(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig) -> list[tuple[Drivers, float]]:
+    """Posterior-weighted family driver sets (model averaging instead of forward selection).
+
+    Every set of at most ``max_drivers`` indicators is scored at its best lag combination (0..``MAX_LAG`` each)
+    among those whose coefficients all carry the economic sign: ``S = RSS + min_gain x k`` (the forward selection's
+    own criterion). Weights ``exp(-(S - S_min) / 2)``; the ``max_sets`` best sets with at least ``min_set_weight`` of
+    the best one's weight are kept and renormalised. Picking one set is discontinuous: when two sets are nearly
+    tied, which one wins moves a fold's forecasts by up to 0.008 of WAPE + |bias| (optimisation log, E4); with
+    averaging a near-tied set enters with a weight close to its rival's, so only sets of small weight move the path
+    discretely. All 7^k lag combinations of a set are solved at once on the centred Gram matrix (``_subset_rss``).
+    """
+    era = era_scale(months, config.era_factor)
+    n_lag = MAX_LAG + 1
+    x = np.stack([macro.lagged(lag)[months] for lag in range(n_lag)], axis=2).reshape(len(months), -1) * era[:, None]
+    sw = w.sum()
+    if sw <= 0:
+        return [(_drivers_at(r, w, months, macro, era, (), (), ()), 1.0)]
+    xc = x - (w @ x) / sw
+    rc = r - (w @ r) / sw
+    gram, cross, total = xc.T @ (w[:, None] * xc), xc.T @ (w * rc), float(w @ rc**2)
+    candidates: list[tuple[float, tuple[str, ...], tuple[int, ...]]] = [(total, (), ())]
+    for k in range(1, config.max_drivers + 1):
+        lag_grid = np.array(list(itertools.product(range(n_lag), repeat=k)))
+        for names in itertools.combinations(range(len(INDICATORS)), k):
+            columns = np.array(names)[None, :] * n_lag + lag_grid
+            beta, rss = _subset_rss(gram, cross, total, columns)
+            ok = np.all(beta * np.array([SIGN[INDICATORS[j]] for j in names])[None, :] > 0, axis=1)
+            if not ok.any():
+                continue
+            best = np.flatnonzero(ok)[np.argmin(rss[ok])]
+            candidates.append((float(rss[best]) + config.min_gain * k, tuple(INDICATORS[j] for j in names), tuple(int(v) for v in lag_grid[best])))
+    scores = np.array([c[0] for c in candidates])
+    order = np.argsort(scores, kind="stable")
+    weight = np.exp(-(scores - scores[order[0]]) / 2.0)
+    keep = [j for j in order[: config.max_sets] if weight[j] >= config.min_set_weight]
+    total_weight = float(weight[keep].sum())
+    sets = []
+    for j in keep:
+        names, lags = _set_order(r, w, months, macro, era, candidates[j][1], candidates[j][2])
+        gains = tuple(_sequential_gains(r, w, months, macro, era, names, lags))
+        sets.append((_drivers_at(r, w, months, macro, era, names, lags, gains), float(weight[j]) / total_weight))
+    return sets
 
 
 def _lag_averaged(macro: MacroData, months: np.ndarray, indicators: tuple[str, ...], posterior: np.ndarray, era: np.ndarray) -> np.ndarray:
@@ -237,18 +370,20 @@ class SkuPaths:
 
     skus: tuple[str, ...]
     family_of: dict[str, str]
-    drivers: dict[str, Drivers]  # by family
-    lag_posterior: np.ndarray  # (n_sku, 3, MAX_LAG + 1), rows of unused drivers are 0
-    coef: np.ndarray  # (n_sku, 3)
+    drivers: dict[str, Drivers]  # by family (the best-weighted set when sets are averaged)
+    lag_posterior: np.ndarray  # (n_sku, 3, MAX_LAG + 1) of ``drivers``, rows of unused drivers are 0
+    coef: np.ndarray  # (n_sku, 3) of ``drivers``
     u: np.ndarray  # (n_sku, 113) linear predictor (calendar amplitude 1)
     n_months: np.ndarray  # months used per SKU
     damping: float  # Aftermarket c
     fuel: float  # Aftermarket Fuel coefficient per sd at lag FUEL_LAG
     config: MacroConfig = field(default_factory=MacroConfig)
+    response: np.ndarray | None = None  # (n_sku, 7, MAX_LAG + 1) coefficient per sd of each indicator at each lag
+    driver_sets: dict[str, tuple[tuple[Drivers, float], ...]] = field(default_factory=dict)  # by family: (set, weight)
 
     def log_multiplier(self, sku_rows: np.ndarray, aftermarket: np.ndarray, macro: MacroData) -> np.ndarray:
         """(n, 113) log macro multiplier for series with SKU row ``sku_rows`` (-1 = family prior handled upstream)."""
-        capped = soft_cap(self.u[sku_rows], self.config.soft_cap)
+        capped = soft_cap(self.u[sku_rows], self.config.soft_cap, self.config.cap_smooth)
         fuel = macro.lagged(FUEL_LAG)[:, INDICATORS.index("fuel")]
         am = self.damping * capped + self.fuel * fuel[None, :]
         return np.where(np.asarray(aftermarket)[:, None], am, capped)
@@ -263,60 +398,47 @@ def fit_sku_paths(
     am_index: GroupIndex,
     macro: MacroData,
     config: MacroConfig,
+    incumbent: dict[str, Drivers] | None = None,
 ) -> SkuPaths:
-    """Steps 1-3 of the module docstring. Index arrays cover months ``0..T-1`` (T = as_of + 1)."""
+    """Steps 1-3 of the module docstring. Index arrays cover months ``0..T-1`` (T = as_of + 1). ``incumbent``: the
+    family driver sets of the previous backfit iteration (see ``select_drivers``; unused with ``set_averaging``,
+    where each family's SKU paths are the weighted mean of the paths fitted under each of its driver sets)."""
     n_months = sku_index.observed.shape[1]
     months = np.arange(n_months)
     era = era_scale(months, config.era_factor)
     r_f, w_f = _weights(family_index, config)
-    drivers = {name: select_drivers(r_f[k], w_f[k], months, macro, config) for k, name in enumerate(family_names)}
+    if config.set_averaging:
+        sets = {name: tuple(family_driver_sets(r_f[k], w_f[k], months, macro, config)) for k, name in enumerate(family_names)}
+    else:
+        previous = incumbent or {}
+        sets = {name: ((select_drivers(r_f[k], w_f[k], months, macro, config, previous.get(name)), 1.0),) for k, name in enumerate(family_names)}
+    drivers = {family: alternatives[0][0] for family, alternatives in sets.items()}
     r_s, w_s = _weights(sku_index, config)
     n_sku = len(sku_names)
     posterior = np.zeros((n_sku, 3, MAX_LAG + 1))
     coef = np.zeros((n_sku, 3))
+    response = np.zeros((n_sku, len(INDICATORS), MAX_LAG + 1))
     used = (w_s > 0).sum(axis=1)
-    lag_grid = np.arange(MAX_LAG + 1)
-    stacks = {name: np.stack([macro.lagged(lag)[:, INDICATORS.index(name)] for lag in lag_grid], axis=1) for name in INDICATORS}
-    for family, d in drivers.items():
-        rows = np.flatnonzero(np.asarray(sku_family) == family)
-        k = len(d.indicators)
-        if k == 0 or not len(rows):
-            continue
-        prior_lag = np.stack([config.lag_decay ** np.abs(lag_grid - lag) for lag in d.lags])  # (k, L)
-        prior_lag /= prior_lag.sum(axis=1, keepdims=True)
-        r, w = r_s[rows], w_s[rows]
-        enough = used[rows] >= config.min_months
-        post = np.repeat(d.lag_posterior[None, :, :], len(rows), axis=0)  # (n, k, L)
-        for j, name in enumerate(d.indicators):
-            rss = np.empty((len(rows), len(lag_grid)))
-            for li, lag in enumerate(lag_grid):
-                x = stacks[name][:n_months, li] * era  # (T,)
-                rss[:, li] = _batched_single_rss(r, w, x)
-            loglik = -(rss - rss.min(axis=1, keepdims=True)) / 2.0
-            weight = np.exp(loglik) * prior_lag[j][None, :]
-            weight /= weight.sum(axis=1, keepdims=True)
-            post[enough, j] = weight[enough]
-        x = np.einsum("tjl,njl->ntj", np.stack([stacks[n][:n_months] for n in d.indicators], axis=1), post) * era[None, :, None]
-        b = _batched_ridge(r, w, x, d.coef, config.prior_sd)
-        signs = np.array([SIGN[n] for n in d.indicators])
-        b = np.where(b * signs > 0, b, 0.0)
-        if config.soft_cap:
-            full_x = x
-            for _ in range(2):
-                u = np.einsum("ntj,nj->nt", full_x, b)
-                slope = soft_cap_slope(u)
-                offset = soft_cap(u) - slope * u
-                jac = full_x * slope[:, :, None]
-                b = _batched_ridge(r - offset, w, jac, d.coef, config.prior_sd)
-                b = np.where(b * signs > 0, b, 0.0)
-        b[~enough] = d.coef
-        posterior[rows, :k] = post
-        coef[rows, :k] = b
+    stacks = {name: np.stack([macro.lagged(lag)[:, INDICATORS.index(name)] for lag in range(MAX_LAG + 1)], axis=1) for name in INDICATORS}
     u = np.zeros((n_sku, N_CALENDAR))
-    for family, d in drivers.items():
+    for family, alternatives in sets.items():
         rows = np.flatnonzero(np.asarray(sku_family) == family)
-        for j, name in enumerate(d.indicators):
-            u[rows] += coef[rows, j, None] * (posterior[rows, j] @ stacks[name].T)
+        if not len(rows):
+            continue
+        enough = used[rows] >= config.min_months
+        for a, (d, weight) in enumerate(alternatives):
+            k = len(d.indicators)
+            if k == 0:
+                continue
+            post, b = _fit_family_skus(d, r_s[rows], w_s[rows], enough, stacks, era, config)
+            if a == 0:
+                posterior[rows, :k] = post
+                coef[rows, :k] = b
+            path = np.zeros((len(rows), N_CALENDAR))
+            for j, name in enumerate(d.indicators):
+                path += b[:, j, None] * (post[:, j] @ stacks[name].T)
+                response[rows, INDICATORS.index(name)] += weight * b[:, j, None] * post[:, j]
+            u[rows] += path if weight == 1.0 else weight * path
     damping, fuel = _fit_aftermarket(am_index, u[:, :n_months], macro, config)
     return SkuPaths(
         skus=tuple(sku_names),
@@ -329,7 +451,46 @@ def fit_sku_paths(
         damping=damping,
         fuel=fuel,
         config=config,
+        response=response,
+        driver_sets=sets,
     )
+
+
+def driver_set_weights(paths: SkuPaths) -> dict[str, list[dict]]:
+    """Per family: the averaged driver sets (``indicator@lag + ...``, best first) and their posterior weights."""
+    return {
+        family: [{"drivers": " + ".join(f"{n}@{lag}" for n, lag in zip(d.indicators, d.lags, strict=True)), "weight": round(weight, 4)} for d, weight in sets]
+        for family, sets in paths.driver_sets.items()
+    }
+
+
+def _fit_family_skus(
+    d: Drivers, r: np.ndarray, w: np.ndarray, enough: np.ndarray, stacks: dict[str, np.ndarray], era: np.ndarray, config: MacroConfig
+) -> tuple[np.ndarray, np.ndarray]:
+    """SKU stage for the SKUs of one family under one driver set: (lag posterior (n, k, L), coefficients (n, k)).
+
+    SKUs with fewer than ``min_months`` usable months keep the family posterior and coefficients.
+    """
+    n_months = r.shape[1]
+    lag_grid = np.arange(MAX_LAG + 1)
+    prior_lag = np.stack([config.lag_decay ** np.abs(lag_grid - lag) for lag in d.lags])  # (k, L)
+    prior_lag /= prior_lag.sum(axis=1, keepdims=True)
+    post = np.repeat(d.lag_posterior[None, :, :], len(r), axis=0)  # (n, k, L)
+    for j, name in enumerate(d.indicators):
+        rss = np.empty((len(r), len(lag_grid)))
+        for li in range(len(lag_grid)):
+            rss[:, li] = _batched_single_rss(r, w, stacks[name][:n_months, li] * era)
+        weight = np.exp(-(rss - rss.min(axis=1, keepdims=True)) / 2.0) * prior_lag[j][None, :]
+        weight /= weight.sum(axis=1, keepdims=True)
+        post[enough, j] = weight[enough]
+    x = np.einsum("tjl,njl->ntj", np.stack([stacks[n][:n_months] for n in d.indicators], axis=1), post) * era[None, :, None]
+    b = _batched_ridge(r, w, x, d.coef, config.prior_sd)
+    signs = np.array([SIGN[n] for n in d.indicators])
+    b = np.where(b * signs > 0, b, 0.0)
+    if config.soft_cap:
+        b = _soft_cap_fit(r, w, x, b, d.coef, config.prior_sd, signs, config.cap_iter, config.cap_line_search, config.cap_smooth)
+    b[~enough] = d.coef
+    return post, b
 
 
 def _batched_single_rss(r: np.ndarray, w: np.ndarray, x: np.ndarray) -> np.ndarray:
@@ -343,6 +504,74 @@ def _batched_single_rss(r: np.ndarray, w: np.ndarray, x: np.ndarray) -> np.ndarr
     sxy = (w * xc * rc).sum(axis=1)
     beta = np.where(sxx > 0, sxy / np.where(sxx > 0, sxx, 1.0), 0.0)
     return (w * (rc - beta[:, None] * xc) ** 2).sum(axis=1)
+
+
+def _cap_loss(r: np.ndarray, w: np.ndarray, x: np.ndarray, b: np.ndarray, prior: np.ndarray, prior_sd: float, smooth: float = 0.0) -> np.ndarray:
+    """Per row: weighted RSS of ``r ~ a + soft_cap(x b)`` (intercept profiled) plus the Gaussian prior penalty."""
+    resid = r - soft_cap(np.einsum("ntj,nj->nt", x, b), smooth=smooth)
+    sw = np.maximum(w.sum(axis=1), 1e-12)
+    resid = resid - ((w * resid).sum(axis=1) / sw)[:, None]
+    return (w * resid**2).sum(axis=1) + ((b - prior[None, :]) ** 2).sum(axis=1) / prior_sd**2
+
+
+def _soft_cap_fit(
+    r: np.ndarray, w: np.ndarray, x: np.ndarray, b: np.ndarray, prior: np.ndarray, prior_sd: float, signs: np.ndarray, n_iter: int,
+    line_search: bool = True, smooth: float = 0.0,
+) -> np.ndarray:
+    """Penalised least squares of the soft-capped path by projected Gauss-Newton with step halving.
+
+    Each step linearises the cap at the current path and solves the ridge problem (signs clipped to the economic
+    sign); a row moves only if its loss does not increase, halving the step up to five times. Plain Gauss-Newton
+    can alternate between two linearisations for a SKU whose path crosses the knee, and inside the backfit that
+    alternation becomes a cycle (CSS-015, ELA-039, BSS-077 at 2022-10). A row whose coefficients did not move would
+    recompute the same step forever, so it is frozen (identical results, about 20 % less time per backfit).
+    """
+    if not line_search:
+        for _ in range(n_iter):
+            u = np.einsum("ntj,nj->nt", x, b)
+            slope = soft_cap_slope(u, smooth=smooth)
+            target = _batched_ridge(r - (soft_cap(u, smooth=smooth) - slope * u), w, x * slope[:, :, None], prior, prior_sd)
+            b = np.where(target * signs > 0, target, 0.0)
+        return b
+    b = np.array(b, dtype=float)
+    loss = _cap_loss(r, w, x, b, prior, prior_sd, smooth)
+    active = np.arange(len(b))
+    for _ in range(n_iter):
+        if not len(active):
+            break
+        new_b, new_loss = _cap_step(r[active], w[active], x[active], b[active], loss[active], prior, prior_sd, signs, smooth)
+        delta = np.abs(new_b - b[active]).max(axis=1)
+        b[active], loss[active] = new_b, new_loss
+        moved = float(delta.max())
+        active = active[delta > 0]  # a row that did not move recomputes the same step forever: freeze it (exact)
+        if moved < 1e-9:
+            break
+    return b
+
+
+def _cap_step(
+    r: np.ndarray, w: np.ndarray, x: np.ndarray, b: np.ndarray, loss: np.ndarray, prior: np.ndarray, prior_sd: float, signs: np.ndarray,
+    smooth: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """One projected Gauss-Newton step with step halving (up to five times) per row: (coefficients, loss)."""
+    u = np.einsum("ntj,nj->nt", x, b)
+    slope = soft_cap_slope(u, smooth=smooth)
+    target = _batched_ridge(r - (soft_cap(u, smooth=smooth) - slope * u), w, x * slope[:, :, None], prior, prior_sd)
+    target = np.where(target * signs > 0, target, 0.0)
+    step = target - b
+    new_b, new_loss = b.copy(), loss.copy()
+    pending = np.ones(len(b), dtype=bool)
+    for _ in range(6):
+        trial = b[pending] + step[pending]
+        trial_loss = _cap_loss(r[pending], w[pending], x[pending], trial, prior, prior_sd, smooth)
+        better = trial_loss <= loss[pending]
+        rows = np.flatnonzero(pending)
+        new_b[rows[better]], new_loss[rows[better]] = trial[better], trial_loss[better]
+        pending[rows[better]] = False
+        if not pending.any():
+            break
+        step = step * 0.5
+    return new_b, new_loss
 
 
 def _batched_ridge(r: np.ndarray, w: np.ndarray, x: np.ndarray, prior: np.ndarray, prior_sd: float) -> np.ndarray:
@@ -362,7 +591,7 @@ def _fit_aftermarket(am_index: GroupIndex, u: np.ndarray, macro: MacroData, conf
     r, w = _weights(am_index, config)
     n_months = r.shape[1]
     fuel = macro.lagged(FUEL_LAG)[:n_months, INDICATORS.index("fuel")]
-    capped = soft_cap(u, config.soft_cap)
+    capped = soft_cap(u, config.soft_cap, config.cap_smooth)
     sw = np.maximum(w.sum(axis=1), 1e-12)
     keep = w.sum(axis=1) > 0
     def centred(v: np.ndarray) -> np.ndarray:
@@ -425,19 +654,21 @@ INDICATOR_LABEL = {**COLUMNS, "ev": EV_COLUMN}  # cleaned column names of macro_
 def sensitivity_table(paths: SkuPaths, macro: MacroData) -> pd.DataFrame:
     """``macro_sensitivity.csv``: change in log latent demand per +1 unit of the cleaned indicator at each lag.
 
-    Non-Aftermarket: ``coef x lag posterior / sd`` (slope below the soft cap); Aftermarket: ``c x`` that, plus the
-    Fuel term at lag 1. Rows with |beta| < 1e-6 are dropped.
+    Non-Aftermarket: ``coef x lag posterior / sd`` (slope below the soft cap; summed over the driver sets, weighted,
+    when sets are averaged); Aftermarket: ``c x`` that, plus the Fuel term at lag 1. Rows with |beta| < 1e-6 are
+    dropped.
     """
     rows = []
     for i, sku in enumerate(paths.skus):
         family = paths.family_of[sku]
-        d = paths.drivers.get(family)
-        if d is None:
+        if paths.drivers.get(family) is None:
             continue
-        for j, name in enumerate(d.indicators):
-            sd = macro.sd[INDICATORS.index(name)]
+        for j, name in enumerate(INDICATORS):
+            if not paths.response[i, j].any():
+                continue
+            sd = macro.sd[j]
             for lag in range(MAX_LAG + 1):
-                beta = paths.coef[i, j] * paths.lag_posterior[i, j, lag] / sd
+                beta = paths.response[i, j, lag] / sd
                 for group, scale in (("other", 1.0), ("aftermarket", paths.damping)):
                     if abs(beta * scale) >= 1e-6:
                         rows.append({"sku_id": sku, "channel_group": group, "indicator": INDICATOR_LABEL[name], "lag": lag, "beta": beta * scale})
