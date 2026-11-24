@@ -16,7 +16,12 @@ Everything is estimated from data up to the origin (``OriginContext``), with mea
 1. **Factor backfit** (Poisson likelihood by cyclic exact block updates, i.e. ratio-of-sums) on single-month
    fitting cells: segment levels (series x customer run), region x calendar-month and channel x calendar-month
    seasonality (+ Thermal), LNY and Ramadan depths (day-count exposure), class-level EV betas, the measured size of
-   open-ended programme steps (Helios India) and the SKU macro paths (``celeris.features.macro``).
+   open-ended programme steps (Helios India) and the SKU macro paths (``celeris.features.macro``), iterated to
+   convergence (no live cell's log factor moves by more than ``tol``; cap ``n_iter``). The EV betas and holiday depths
+   are updated on the profile likelihood (segment levels / regional factor profiled out): the plain block updates
+   zig-zag along a ridge (the EV index trends inside every segment), so a fixed six iterations left the EV beta at
+   0.018-0.029 per index point instead of its fixed point 0.030-0.037 and under-forecast EV SKUs by 1-20 %
+   (``docs/optimisation_log.md``, E4).
 2. **Forecast level**: ratio of sums of demand over the accumulated factors in the last ``level_window`` months of
    level cells (arithmetic, never a log mean: a log mean biases aggregates by -3 to -10 %). Series younger than
    ``young_months`` blend in a cross-sectional prior with ``young_n0`` pseudo-months (dossier 5.5); series with no
@@ -77,10 +82,10 @@ class StructuralConfig:
     macro_gamma: float = 1.0  # amplitude applied to the fitted path (1.0 with the capped / era-factor estimator)
     launch_tau: float = LAUNCH_TAU
     mea_tau: float = MEA_OPENING_TAU
-    n_iter: int = 6  # maximum backfit iterations (exactly this many when ``tol`` is None)
-    tol: float | None = None  # stop when no factor moves log latent demand by more than this between iterations
-    ev_profile: bool = False
-    holiday_profile: bool = False
+    n_iter: int = 40  # maximum backfit iterations (exactly this many when ``tol`` is None)
+    tol: float | None = 1e-6  # stop when no factor moves log latent demand by more than this between iterations
+    ev_profile: bool = True  # EV beta step with the segment levels profiled out (the plain step zig-zags, E4)
+    holiday_profile: bool = True  # holiday depth step with the region x month factor profiled out (where identified)
     one_off_uplift: bool = True  # add the expected one-off volume to Direct OEM / Tier-1 means (dossier 9.1 #5)
     young_months: int = 24
     young_n0: float = 2.0

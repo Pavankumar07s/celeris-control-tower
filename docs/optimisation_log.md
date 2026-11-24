@@ -213,3 +213,197 @@ Declared before running: fixed schedules A (GBM weight 0.5 at h 1-3, 0.25 at 4-6
 +0.00043). Equal weights (shipped rule): +0.00270, 1 of 4. Both fixed schedules are at the noise threshold and the
 GBM depends on the structural member, so the test must be redone on the converged model's backtest, with
 confirmation origins, before anything is kept.
+
+---------------------------------------------------------------------------------------------------------------------
+## 3. Third analyst (continuation from b7a96b4)
+
+Hand-over finding not logged by the predecessor: the scratchpad `lab/results.csv` holds a prototype "conv_bma"
+(converged fit + `lab/bma2.py`: every sign-consistent family driver set of at most three indicators, lags by
+coordinate search, weight `exp(-(RSS + 9k)/2)`, best four sets with weight >= 1 % of the best) already evaluated at
+all seven origins before any declaration (score 0.29108 / 0.26283 / 0.25898 / 0.25705 decision, 0.27044 / 0.25968 /
+0.26120 confirmation; 54-204 s per fit, not converged at 2025-03 after 40 iterations). Those numbers are reported for
+reference only: they were looked at before the estimator was declared and the prototype monkey-patches the package.
+
+### E5a. Model-averaged family driver sets (declared before evaluating the package implementation)
+Hypothesis: picking one of several near-tied driver sets per family is a discontinuous estimator whose choice moves a
+fold by up to 0.008 (E4); averaging the SKU paths over the sets with posterior weights removes that noise.
+Estimator (`MacroConfig.set_averaging`, `celeris.features.macro.family_driver_sets`): every set of 0..3 indicators is
+scored at its best lag combination (0..6 each, all 7^k combinations, batched least squares on the centred Gram
+matrix) among those whose coefficients all carry the economic sign; `S = RSS + 9 k` (the forward selection's own
+criterion); weights `exp(-(S - S_min)/2)`; the best 4 sets with weight >= 1 % of the best, renormalised. Each set gets
+its lag posterior and family coefficients as in the forward selection; the SKU stage runs once per set and the SKU
+linear predictors are averaged with the set weights before the soft cap. Driver-set hysteresis is not used in this
+mode. On top of the converged fit (E4 "conv"). Selection mode reproduces the cached base / conv predictions exactly
+(max abs difference 0). Differences to the prototype: exact (not coordinate-search) lag optimum and sign constraint
+inside the lag search. Disclosure: the 2025-03 result of this implementation was seen once while timing it (15 s,
+36 iterations, converged) before this entry was written.
+
+E5a result (`lab2/ev.py avg`, `lab2/results.csv`). Score (WAPE / bias / score); deltas vs shipping and vs conv:
+
+| origin | shipping | conv (E4) | conv + set averaging | delta vs shipping | delta vs conv | iterations |
+|---|---|---|---|---|---|---|
+| 2022-10 | 0.29843 | 0.28788 | 0.28320 / -0.77 % / 0.29092 | -0.00751 | +0.00304 | 22 |
+| 2023-10 | 0.27342 | 0.26730 | 0.25995 / -0.16 % / 0.26157 | -0.01185 | -0.00573 | 31 |
+| 2024-10 | 0.25682 | 0.26247 | 0.25060 / +0.89 % / 0.25946 | +0.00264 | -0.00301 | 18 |
+| 2025-03 | 0.26278 | 0.26354 | 0.25071 / +0.76 % / 0.25836 | -0.00442 | -0.00518 | 36 |
+| decision mean | 0.27286 | 0.27030 | 0.26112 / +0.18 % / 0.26758 | -0.00529 (3 of 4) | -0.00272 (3 of 4) | |
+| 2023-03 (confirm) | 0.28116 | 0.28366 | 0.26983 / +0.06 % / 0.27046 | -0.01070 | -0.01320 | 21 |
+| 2024-03 (confirm) | 0.26916 | 0.25985 | 0.25188 / -0.78 % / 0.25963 | -0.00953 | -0.00022 | 31 |
+| 2025-01 (confirm) | 0.26508 | 0.26792 | 0.25156 / +0.95 % / 0.26102 | -0.00406 | -0.00690 | 19 |
+| confirmation mean | 0.27180 | 0.27048 | 0.26370 | -0.00810 (3 of 3) | -0.00677 (3 of 3) | |
+| 2021-10 (stress) | 0.39436 | 0.42120 | 0.32254 / -0.63 % / 0.32886 | -0.06550 | -0.09234 | 28 |
+
+WAPE better than shipping at all 7 origins; family x month WAPE 0.0474 / 0.0334 / 0.0213 / 0.0213 (mean 0.0309 vs
+0.0345, better at all four); every fit converged (largest change of log g < 1e-6 at 18-36 iterations; 8-17 s per fit
+vs 54-204 s for the prototype). Most families end on one set (weight > 0.99); Hydraulic and Thermal average two or
+three at 2025-03. The scores are within 0.0002 of the prototype's at the confirmation origins.
+**Passes the keep rule against shipping** (3 of 4 decision origins, mean gain 0.0053, confirmation 3 of 3, aggregates
+better); the converged fit alone did not. Candidate for the factor fit; step 2 (recent over-forecast) next.
+
+### Step 2. The recent over-forecast, re-diagnosed on the converged + averaged fit (`lab2/diag.py`, `ana*.py`)
+Bias with / without the rows of accounts lost inside the horizon (`final_lost_tail`; not forecastable, none scheduled in
+the test window), score in brackets:
+
+| origin | bias all rows | bias excl. lost | score all | score excl. lost |
+|---|---|---|---|---|
+| 2022-10 | -0.77 % | -0.77 % | 0.29092 | 0.29092 |
+| 2023-10 | -0.16 % | -0.17 % | 0.26157 | 0.26157 |
+| 2024-10 | +0.89 % | +0.59 % | 0.25946 | 0.25353 |
+| 2025-03 | +0.76 % | +0.29 % | 0.25836 | 0.24890 |
+| 2023-03 | +0.06 % | +0.06 % | 0.27046 | 0.27046 |
+| 2024-03 | -0.78 % | -0.83 % | 0.25963 | 0.25963 |
+| 2025-01 | +0.95 % | +0.55 % | 0.26102 | 0.25318 |
+
+What remains at the three recent origins (+0.59 / +0.29 / +0.55 pp, 2024-10 / 2025-03 / 2025-01), by contribution:
+- **Young (< 24 months) and cold-start series: +0.39 / +0.43 / +0.43 pp** - essentially all of it. Young tail-tier
+  series are over-forecast by +4.6 / +6.3 / +5.7 % (+0.6 to +1.9 % at the older origins; core young series are
+  under-forecast), the youngest most (0-5 months since start: positive at all 7 origins, +3 to +21 %); cold starts
+  (all tail tier) by +14 / +35 / +20 % (+5 to +9 % at the older origins). Swapping any factor for its hindsight value
+  leaves this unchanged, so it is the level prior, not a factor path.
+- Mature series: +0.20 / -0.14 / +0.12 pp, Direct OEM +1.05 / +0.52 / +0.85 % against Tier-1 / Aftermarket -0.1 to
+  -1.2 %; the Direct OEM sign flips between old (-0.5 to -0.8 %) and recent origins and survives the hindsight macro
+  and season swaps: the period-specific error of the one-off uplift already documented (not fixable as of the origin).
+  Mature Export series are no longer over-forecast (-0.06 / +0.37 / +0.41 %); the "Export" excess of E4 was young
+  Export series (+9.5 % / +15.8 % at 2024-10 / 2025-01).
+- Series with level > 100: +0.8 to +3.5 % at every origin (regression to the mean; size shrinkage rejected in E1).
+- Macro path: swapping in the hindsight path moves the recent bias by -0.06 / -0.08 / -0.07 pp only. Seasonality,
+  holidays: 0. The Helios step (swap_event) raises it.
+As-of evidence for the prior (`lab2/prior_check.py`): in-sample, the tail-tier series launched 6-24 months before the
+origin run at 0.96 / 0.88 / 0.93 / 0.92 x the prior (2022-10 / 2023-10 / 2024-10 / 2025-03; 0.95 / 0.87 / 0.91 at the
+confirmation origins), and the single smear factor leaves mature core series at 1.13-1.18 x and mature tail series at
+0.963-0.976 x the prior at every origin.
+
+### E6. Launch-cohort calibration of the prior (declared before evaluation)
+Hypothesis: the prior is fitted on mature series and smeared to their mean; new tail-tier launches run below it, so
+cold starts and young blends of the tail tier inherit an upward bias. Estimator (`StructuralConfig.launch_cohort =
+(6, 24)`, level stage only): multiply the prior of every tail-tier series by `c` = sum of demand / sum of prior x
+accumulated factors over the level-window cells of the tail-tier product-launch series launched 6-24 months before
+the origin (c = 1 with fewer than 30 such series). Young blends and cold starts of the tail tier use the calibrated
+prior; mature levels and core series are untouched. Compared with the converged + averaged fit ("avg").
+
+E6 result (`lab2/ev.py avg_lc`): score 0.29240 / 0.26588 / 0.25710 / 0.25626 vs avg 0.29092 / 0.26157 / 0.25946 /
+0.25836 (delta +0.00148 / +0.00431 / -0.00236 / -0.00210, mean +0.00033, 2 of 4). WAPE improves at all four origins
+(mean -0.0006) but the calibration factor is a noisy predictor of the launch-cohort error: at 2023-10 c = 0.88
+over-corrects (cold starts +5.4 % -> -6.4 %, young launches +2.0 % -> -1.3 %, total bias -0.16 % -> -0.69 %), at
+2025-03 c = 0.92 under-corrects (cold starts still +24 %). **Rejected** (not run on the confirmation origins). The
+young / cold-start over-forecast is real but its size varies by cohort more than an as-of ratio can predict.
+
+### Step 3. Decision on the factor fit
+Scores excluding the rows of accounts lost inside the horizon (secondary view, declared in the task brief) give the
+same verdict: avg vs shipping 0.29092 / 0.26157 / 0.25353 / 0.24890 vs 0.29843 / 0.27342 / 0.25084 / 0.25324
+(3 of 4, mean -0.00525), confirmation 0.27046 / 0.25963 / 0.25318 vs 0.28116 / 0.26916 / 0.25716 (3 of 3, mean
+-0.00807). **Decision: adopt the converged fit with model-averaged driver sets** (E4 + E5a): it passes the keep
+rule in both views, improves WAPE at all 7 origins, family x month WAPE at all 4 decision origins, and the stress
+origin by 0.065. The converged fit alone (E4) is not adopted: it fails the rule, and its gain came with the discrete
+driver-selection noise that E5a removes.
+
+### E11 (proper). Horizon-aware GBM blend on the adopted structural member (declared before evaluation)
+The GBM member is retrained exactly as in the harness (inner origins every 3 months from 2021-10, targets before the
+fold's origin) on the converged + averaged structural forecasts, for the four decision and three confirmation origins
+(`lab2/gbm_eval.py`). Schedules fixed in advance (from the preliminary E11): A = GBM weight 0.5 at h 1-3, 0.25 at
+h 4-6, 0 after; B = 0.5 x max(0, 1 - (h - 1) / 12); the shipped equal-weight rule is reported for reference. A
+schedule is kept only if it passes the keep rule against the structural member alone; if both pass, the one with the
+larger mean decision gain.
+
+E11 result (`lab2/gbm_eval.py avg`, `lab2/blend.py avg gbm_avg`). Score deltas vs the structural member alone:
+
+| schedule | 2022-10 | 2023-10 | 2024-10 | 2025-03 | decision mean / wins | 2023-03 | 2024-03 | 2025-01 | confirmation mean / wins |
+|---|---|---|---|---|---|---|---|---|---|
+| A (0.5 / 0.25 / 0) | +0.00092 | -0.00018 | -0.00180 | -0.00001 | -0.00027 / 3 | +0.00102 | -0.00095 | -0.00129 | -0.00040 / 2 |
+| B (linear to h 13) | +0.00004 | -0.00025 | -0.00157 | +0.00046 | -0.00033 / 2 | +0.00618 | -0.00126 | -0.00071 | +0.00140 / 2 |
+| equal weights (shipped rule) | +0.00104 | +0.00423 | +0.00009 | +0.00496 | +0.00258 / 0 | +0.03479 | -0.00245 | +0.00270 | +0.01168 / 1 |
+| GBM alone | +0.02516 | +0.01895 | +0.00214 | +0.01143 | +0.01442 / 0 | | | | |
+
+Identical verdicts excluding the lost-account rows. **Rejected**: neither schedule clears the 0.0005 threshold on the
+adopted structural member (the preliminary -0.0007 / -0.0008 on the shipping member came mostly from the EV and
+driver-choice errors the new member no longer makes). The GBM stays out; the equal-weight rule still drops it.
+
+### Step 5. Young / cold-start priors and quarterly-cycle series
+- Young / cold-start priors: E6 above (rejected).
+- Quarterly cycle (`lab2/anaq.py`): Q series' excess over the oracle is 0.63 / 0.48 / 0.28 / 0.27 pp of total WAPE
+  (8 % of volume) at the decision origins. At 2022-10 / 2023-10 / 2023-03 8-13 % of the Q error is phase error (orders
+  in months the as-of cycle says are off: cycle changes inside the horizon, 63-129 rows); at the recent origins none.
+  The rest is level-estimation noise of a series with 8 orders in 24 months: the Q level window 36 / 48 was already
+  rejected in E1 (+0.00015 / +0.00057) and shrinkage to the cross-sectional prior hurt (E1). The diagnosis offers no
+  as-of fix, so no experiment was run. Two systematic cycle effects were noticed for the record: A-cycle series are
+  over-forecast at 6 of 7 origins (+0.5 to +1.6 %) and B-cycle series under-forecast at 7 of 7 (-0.2 to -2.5 %);
+  each moves total bias by 0.1-0.4 pp in opposite directions. Not pursued (it needs a look at the carry weights of
+  the demand stage, outside this round's scope).
+
+### Integration run (adopted estimator as the package default; `python -m celeris backtest`, 30.0 min, peak RSS 1.32 GB)
+The stage reproduces the lab numbers exactly (decision scores 0.29092 / 0.26157 / 0.25946 / 0.25836, mean 0.26758;
+stress 0.32886). Its experiment grid, re-run on the new default, flags one setting: **SKU prior sd 0.12 scores
+0.26478 vs 0.26758 for 0.06, better at 4 of 4 decision origins** (with the shipping fit it was 0.2731 vs 0.2729).
+Every other grid variant is worse or within 0.0002 (gamma 1.1 now +0.0027, era 0.9 +0.0014, log-linear +0.0007).
+
+### E12. SKU coefficient prior sd 0.12 (the grid's existing variant; declared before the confirmation run)
+Hypothesis: with converged factors and averaged family sets, the SKU coefficients are over-shrunk at prior sd 0.06.
+Only the grid value 0.12 is tested (no tuning of the value). Decision origins from the backtest stage
+(`experiments.csv`), confirmation and stress from `lab2/ev.py avg_sd12`.
+
+E12 result. Score vs the adopted fit (prior sd 0.06):
+
+| origin | sd 0.06 (adopted) | sd 0.12 | delta | WAPE 0.06 -> 0.12 | bias 0.06 -> 0.12 | iterations (last change) |
+|---|---|---|---|---|---|---|
+| 2022-10 | 0.29092 | 0.28660 | -0.00432 | 0.28320 -> 0.28425 | -0.77 -> -0.24 % | 40 (3.9e-5) |
+| 2023-10 | 0.26157 | 0.26102 | -0.00055 | 0.25995 -> 0.26000 | -0.16 -> +0.10 % | 40 (1.0e-1) |
+| 2024-10 | 0.25946 | 0.25731 | -0.00215 | 0.25060 -> 0.25031 | +0.89 -> +0.70 % | 23 |
+| 2025-03 | 0.25836 | 0.25417 | -0.00419 | 0.25071 -> 0.25066 | +0.77 -> +0.35 % | 40 (2.4e-2) |
+| 2023-03 (confirm) | 0.27046 | 0.27229 | +0.00183 | | | 40 |
+| 2024-03 (confirm) | 0.25963 | 0.25976 | +0.00013 | 0.25188 -> 0.25163 | | 40 (2.4e-2) |
+| 2025-01 (confirm) | 0.26102 | 0.25828 | -0.00274 | 0.25156 -> 0.25128 | | 40 (2.9e-2) |
+| 2021-10 (stress) | 0.32886 | 0.33414 | +0.00528 | | | 37 |
+
+**Rejected**: worse at 2 of 3 confirmation origins (rule c), mean WAPE over the decision origins slightly worse
+(0.26131 vs 0.26111; the decision gain is |bias| moving in both directions, the E2 pattern), and with the looser
+prior the backfit no longer converges at 6 of 8 origins (largest change of log g still 0.02-0.10 after 40
+iterations), so its forecasts would depend on the iteration cap. Prior sd stays 0.06.
+
+### Integration and clean-up
+- Package defaults are now the adopted estimator (`StructuralConfig`: `n_iter` 40, `tol` 1e-6, `ev_profile`,
+  `holiday_profile`; `MacroConfig`: `set_averaging`, `cap_iter` 20, `cap_line_search`, `cap_smooth` 0.05,
+  `switch_margin` 2 for the selection mode). `StructuralConfig() == lab2 "avg"` was checked, so every lab number above
+  is the shipped configuration. The rejected E6 option (`launch_cohort`) was removed from the package; its code is kept
+  in `research/optimisation_lab/lab2/e6_launch_calibration.py.txt` (so `lab2/ev.py avg_lc` no longer runs).
+- Reporting: `summary.json` -> `diagnostics_by_origin.*.family_driver_sets` and `backfit_iterations`;
+  `structural_factors.json` -> `family_macro_driver_sets`, `backfit_iterations`; `macro_sensitivity.csv` sums the
+  weighted response over the averaged sets (same schema). `macro_drivers_by_origin.csv`, `sku_macro_drivers.csv` and
+  the era analysis keep their schema and report the best-weighted set.
+- Speed-up without changing results: in the soft-cap Gauss-Newton fit a row whose coefficients did not move would
+  recompute the same step forever, so it is frozen. Bit-identical predictions and SKU paths at 2025-03, 2022-10 and
+  2021-10 (`lab2/check_cap.py`), about 20 % less time per fit (13.0 vs 15.9 s at 2025-03).
+- Tests: `test_averaged_driver_sets_are_weighted_and_sign_consistent` and `test_backfit_converges` added to
+  `tests/test_model_structural.py`.
+- Stage runs (first integration run, before the speed-up): features 19.8 s / 0.92 GB, backtest 1,799 s / 1.32 GB,
+  forecast 15.6 s / 0.74 GB.
+- Final stage runs with the final code (`/usr/bin/time -v`): features 14.7 s / 0.93 GB, backtest 1,516 s (25.3 min,
+  was 30.0 min before the soft-cap speed-up) / 1.32 GB, forecast 13.2 s / 0.72 GB. The 19 output files of the three
+  stages have the same SHA-256 hashes as the first integration run, so the speed-up and the removal of the E6 option
+  changed nothing.
+
+### Conclusion of the round
+One change adopted: the converged factor fit (profile EV / holiday steps, convergence criterion, smoothed soft cap
+fitted by projected Gauss-Newton) with model-averaged family driver sets. Decision mean WAPE 0.26326 -> 0.26111, bias
+-0.15 % -> +0.18 %, score 0.27286 -> 0.26758; confirmation mean 0.27180 -> 0.26370; stress 0.39436 -> 0.32886; family
+x month WAPE 0.0345 -> 0.0308. Rejected: E1-E3, E6, E10, E11, E12 (E4 alone). Submission total 2,793,254 ->
+2,805,199 (+0.43 %), EV SKUs +1.55 %.

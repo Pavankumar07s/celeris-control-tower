@@ -22,7 +22,7 @@ anomalies:
 features:
 	$(PY) -m celeris features
 
-## backtest: rolling-origin backtest (4 folds + stress fold), model ladder, uncertainty calibration -> outputs/backtest (~10 min)
+## backtest: rolling-origin backtest (4 folds + stress fold), model ladder, uncertainty calibration -> outputs/backtest (~25 min, 1.3 GB)
 backtest:
 	$(PY) -m celeris backtest
 

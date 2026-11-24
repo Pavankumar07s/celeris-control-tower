@@ -29,6 +29,7 @@ from celeris.backtest.targets import backtest_targets
 from celeris.cleaning.dates import month_label
 from celeris.config import REGIONS
 from celeris.anomalies.expectation import ONE_OFF_CHANNELS
+from celeris.features.macro import driver_set_weights
 from celeris.models.baselines import BASELINES
 from celeris.models.context import ModelInputs, origin_context
 from celeris.models.gbm import GbmModel, feature_frame, importance, inner_origins, predict_gbm, train_gbm
@@ -276,6 +277,8 @@ def run_backtest_folds(
                 "level_sources": {str(k): int(v) for k, v in pd.Series(fit.level_source[: p.n_series]).value_counts().items()},
                 "one_off_excess_share_oem_t1_36m": round(fit.one_off_share, 5),
                 "family_drivers": {fam: " + ".join(f"{n}@{lag}" for n, lag in zip(d.indicators, d.lags, strict=True)) for fam, d in fit.macro_paths.drivers.items()} if fit.macro_paths else {},
+                "family_driver_sets": driver_set_weights(fit.macro_paths) if fit.macro_paths else {},
+                "backfit_iterations": len(fit.trace),
             }
             folds[origin] = fold
         timings[month_label(origin)] = round(time.perf_counter() - started, 1)

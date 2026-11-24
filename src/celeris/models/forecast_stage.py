@@ -29,7 +29,7 @@ import pandas as pd
 
 from celeris.backtest.targets import cold_start_series, forecast_targets
 from celeris.config import EXPECTED, LAST_TRAIN_MONTH_IDX, Paths
-from celeris.features.macro import INDICATOR_LABEL, sensitivity_table
+from celeris.features.macro import INDICATOR_LABEL, driver_set_weights, sensitivity_table
 from celeris.io import read_raw_csv, write_csv, write_json, write_parquet
 from celeris.models.context import ModelInputs, load_model_inputs, origin_context
 from celeris.models.gbm import GbmModel, feature_frame, predict_gbm, train_gbm
@@ -225,6 +225,8 @@ def factors_json(fit: StructuralFit) -> dict:
         "shutdown_analogue": {"event": f.strike_event, "multiplier": None if f.strike_analog is None else round(f.strike_analog, 4)},
         "aftermarket": None if fit.macro_paths is None else {"damping": round(fit.macro_paths.damping, 4), "fuel_lag1_per_sd": round(fit.macro_paths.fuel, 4)},
         "family_macro_drivers": drivers,
+        "family_macro_driver_sets": {} if fit.macro_paths is None else driver_set_weights(fit.macro_paths),
+        "backfit_iterations": len(fit.trace),
         "level_window_months": fit.config.level_window,
         "launch_tau": fit.config.launch_tau,
         "mea_opening_tau": fit.config.mea_tau,
