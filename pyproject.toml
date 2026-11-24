@@ -8,18 +8,16 @@ version = "0.1.0"
 description = "Celeris Automobili Industrial: ERP extract cleaning, anomaly analysis, demand forecasting and planning control tower."
 readme = "docs/architecture.md"
 requires-python = ">=3.12,<3.13"
-# Compatible with the versions installed in .venv (pandas 3.1.1, numpy 2.5.5, pyarrow 26.0.1, ...).
+# Ranges compatible with the versions the outputs were built with; requirements.lock.txt pins those exact versions
+# (README, "Exact reproduction"). Only packages that src/ or tests/ import, plus statsmodels, which statsforecast needs.
 dependencies = [
     "pandas>=3.1,<3.2",
     "numpy>=2.5,<2.6",
     "pyarrow>=26.0,<27",
     "scipy>=1.18,<1.19",
     "statsmodels>=0.15,<0.16",
-    "scikit-learn>=1.9,<1.10",
     "lightgbm>=4.7,<4.8",
     "statsforecast>=2.0,<2.1",
-    "duckdb>=2.0,<2.1",
-    "polars>=2.1,<2.2",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +34,6 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers -m 'not slow'"
 markers = [
     "pipeline: runs the full part-A cleaning stage once per session (about 15 s)",
-    "slow: end-to-end run of every stage (python -m celeris all twice, ~22 min, 2.7 GB each); deselected by default, run with make test-all",
+    "slow: end-to-end run of every stage (python -m celeris all twice, about 24 min, peak about 4 GB); deselected by default, run with make test-all",
 ]
 filterwarnings = ["error::FutureWarning"]

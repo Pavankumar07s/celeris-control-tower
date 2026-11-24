@@ -2,7 +2,7 @@
 
 **Verdict in one paragraph.** I re-derived every finding from `data/raw/*.csv` with fresh code (no reuse of the investigator's scripts) and could not break the key-cleaning part of the report: dates, duplicates, load timestamps, the Record_ID grid, blank-region repair and the list of 982 missing rows all reproduce exactly. My independently built key table equals the investigator's `train_keys_clean.parquet` on all 244,566 records (same IDs, date, SKU, region and kept raw row), and my missing-cell list equals `missing_rows_from_id_gaps.csv` on 982 of 982 cells. **One finding needs correction: F17 (India Aftermarket 2021-H2).** The units are indeed recorded at one tenth, but the price on those rows is exactly 10 times the SKU price, so revenue is already correct. The report's rule "multiply units (and revenue) by 10" for the whole cell would inflate revenue tenfold (13.6 m USD becomes 136 m) and would corrupt 6 rows of the cell that are not pack rows. Tally: 16 confirmed, 1 partially confirmed, 0 refuted, 0 not checked.
 
-All numbers below were computed by the scripts in `/home/pavan/Desktop/mks/research/scratch/dates-dups-verify/` (listed at the end). Month index `midx` is months since 2019-01.
+All numbers below were computed by the scripts in `research/scratch/dates-dups-verify/` (working files, not included in the repository; listed at the end). Month index `midx` is months since 2019-01.
 
 ---
 
@@ -105,10 +105,9 @@ The ×10 on units itself is sound and nearly unbiased: sum(10 × recorded) / sum
 7. **Outside `train.csv`, same theme:** `macro_indicators.csv` has 114 rows for 113 months because 2022-06 appears twice with different values (PMI 53.9 vs 52.7; New_Vehicle_Orders_Index 102.9 vs 104.3; other six columns equal). There is no load timestamp to arbitrate. The second row is the one in line with its neighbours (PMI 53.5 → 52.7 → 52.2; orders 104.8 → 104.3 → 103.8). `events_calendar.csv`, `sku_master.csv`, `inventory_stockouts.csv` and `test.csv` have no duplicate rows or keys.
 
 ## Not done
-- No `graphify update` was run: there is no graph for this project (`graphify-out/GRAPH_REPORT.md` and `graph.json` do not exist), and creating one would write outside the two locations this review was allowed to touch.
 - The pre-EOL decline shape was only glanced at (units / baseline in the last three months before EOL: 0.51, 0.42, 0.47 over 25 series, noisy); it belongs to the lifecycle lens.
 
-## Scripts (all in `/home/pavan/Desktop/mks/research/scratch/dates-dups-verify/`)
+## Scripts (all in `research/scratch/dates-dups-verify/`; working files, not included in the repository)
 | Script | Covers |
 |---|---|
 | `vbase.py` | shared loader: date tokeniser, SKU / region / channel standardisation |

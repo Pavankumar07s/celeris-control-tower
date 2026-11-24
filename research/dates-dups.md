@@ -2,7 +2,7 @@
 
 **Headline.** The key columns of `train.csv` are fully recoverable, with zero residual ambiguity. `Record_ID` is not an arbitrary ERP key: its numeric part enumerates the generator's complete (series x month) grid — 3,083 SKU-Region series, 245,548 cells, SKUs ascending, months ascending inside each series from `max(2019-01, Launch_Date, 2022-01 for Middle East & Africa)` to `min(2026-10, EOL_Date)`. So `Record_ID number - month index` is a constant that uniquely identifies the series. Three independent witnesses of the delivery month — the `Date` text (7 formats), `Load_Timestamp` (always the month after delivery) and the Record_ID position — agree on **248,248 / 248,248** raw rows once 30 `2062` year typos are fixed. That gives exact repairs for every date, exact fill of all 745 blank `Region` values, proof that there are 0 key collisions after de-duplication, and an exact list of the **982 missing rows** (0.400% of the grid, missing completely at random) that must be treated as unknown, not zero. Repeated Record_IDs are always pairs: 2,946 byte-identical copies and 736 restatements whose earlier load is the true value distorted by -40%..+50%; the "latest wins" rule is confirmed by `inventory_stockouts.csv` (17/17 later versions equal `Shipped_Units`, 0/17 earlier versions). Error injection is i.i.d. across load batches, with one exception found here: the "ERP migration" event is a deterministic blanking of Units and Revenue for every Latin America Aftermarket/Export row in 2023-03..05.
 
-All numbers below were computed by the scripts in `/home/pavan/Desktop/mks/research/scratch/dates-dups/`. Month index `midx` = months since 2019-01 (0..93).
+All numbers below were computed by the scripts in `research/scratch/dates-dups/` (working files, not included in the repository). Month index `midx` = months since 2019-01 (0..93).
 
 ---
 
@@ -136,7 +136,7 @@ Duplicate and restatement rates are flat by load day, year and region (one-row-p
 
 Before / after for the data-health view: 248,248 raw rows -> 244,566 records (2,946 copies + 736 superseded loads removed) -> 245,548 grid cells (982 flagged missing).
 
-## Artefacts (all in `/home/pavan/Desktop/mks/research/scratch/dates-dups/`)
+## Artefacts (all in `research/scratch/dates-dups/`; working files, not included in the repository)
 - `build_keys_reference.py` — asserted reference implementation of rules F1-F10 (runs in a few seconds); writes the three files below.
 - `train_keys_clean.parquet` — one row per Record_ID (244,566): `Record_ID, rec_num, raw_row, date, midx, sku, region, series_key, date_fmt, year_typo, ym_conflict, region_filled_from_id, n_versions, dup_type, restatement_delay_days, units_first_load, Load_Timestamp`.
 - `dedup_decisions.csv` — 3,682 repeated IDs: type, kept/dropped raw rows, timestamps, delay, units and revenue of both versions.
@@ -147,8 +147,6 @@ Before / after for the data-health view: 248,248 raw rows -> 244,566 records (2,
 - `blank_region_repair.csv` — 737 blank-region records with the restored region and the customer cross-check.
 - `row_error_flags.parquet` — 18 boolean error flags per raw row (used for F14).
 - `restatements.parquet`, `dup_pairs.parquet` and scripts `s01`..`s25` — analysis steps in run order.
-
-Note: no `graphify` graph exists for this project (`graphify-out/` has no `graph.json`), so no graph update was run; nothing outside the lens workspace was created or modified.
 
 ## Open questions, ranked by likely impact on forecast accuracy
 1. **India Aftermarket 2021-H2 at 0.1x (F17).** Is the correction exactly x10, and are there smaller scaled cells (single SKU or customer) below the resolution of the region x channel scan? Affects level and seasonality of 90 series.

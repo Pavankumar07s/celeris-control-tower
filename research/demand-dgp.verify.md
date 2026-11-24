@@ -12,7 +12,7 @@ Two rules need softening:
 
 I found no outright refutation.
 
-**Method.** Scripts are in `/home/pavan/Desktop/mks/research/scratch/demand-dgp-verify/` (`k01` … `k16`, `k_lib.py`), with logs in `logs/`.
+**Method.** Scripts are in `research/scratch/demand-dgp-verify/` (working files, not included in the repository; `k01` … `k16`, `k_lib.py`), with logs in `logs/`.
 - **Inputs.** The scripts read only `data/raw/*.csv`. Nothing from `research/scratch/demand-dgp/` is reused; I read two of its scripts only to check how its panel treated stockouts.
 - **Own clean (`k01_clean.py`).**
   - Deduplication keeps the latest `Load_Timestamp`.

@@ -549,7 +549,7 @@ Recurring events not listed for the window:
 
 ## Artefacts
 
-All files are in `/home/pavan/Desktop/mks/research/scratch/events-calendar/`.
+All files are in `research/scratch/events-calendar/` (working files, not included in the repository).
 
 **Inputs and checks**
 - `events_tidy.csv`: the 68 events, parsed: days, scope split, sub_type, pct, window flags.

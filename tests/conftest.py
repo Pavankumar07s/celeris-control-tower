@@ -18,7 +18,9 @@ from celeris.config import PROJECT_ROOT, RAW_FILES, Paths
 from celeris.demand.stage import run_demand
 from celeris.io import hash_files, read_raw_csv
 
-RESEARCH = PROJECT_ROOT / "research" / "scratch"
+# Reference outputs of the forensic investigations (research/*.md), copied from their working files so that the
+# cross-check tests run in a fresh clone; provenance and SHA-256 in tests/fixtures/reference/README.md.
+RESEARCH = PROJECT_ROOT / "tests" / "fixtures" / "reference"
 
 
 @dataclass(frozen=True)

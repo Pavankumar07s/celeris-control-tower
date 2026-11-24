@@ -14,7 +14,8 @@ not repeated:
 
 **Terms.**
 
-- A *series* is one SKU in one region. History has 3,083 series and the forecast window has 3,068.
+- A *series* is one SKU in one region. History has 3,083 series and the forecast window has 3,068, of which 10 are
+  cold starts with no history. The dashboard's "3,093 series in view" counts the 3,083 history series and those 10.
 - A *cell* is one series in one month.
 - *Shipped units* are what the ERP recorded. *Unconstrained demand* is what customers requested; it differs from shipped
   units only when supply ran short.
@@ -25,7 +26,12 @@ not repeated:
 - *WAPE* is Σ|actual − forecast| / Σ actual, and *bias* is Σ(forecast − actual) / Σ actual. Both are computed over the
   cells of a selection, never as an average of per-series values.
 - An *origin* is the last month of data a backtest forecast may use. A *fold* is one origin together with the 19 months
-  forecast from it.
+  forecast from it. Backtest WAPE and bias are pooled over the scored cells of the four decision folds, as the dashboard
+  shows them, unless they are marked as a mean of the folds (section 9.1 explains the two statistics).
+- *Cycle-aware naive* is the simplest benchmark that knows the ordering calendar: a flat 24-month level placed on each
+  customer's ordering cycle, with no seasonality.
+- The *in-hindsight floor* (the "oracle" in the pipeline's files) is the error of a forecaster that knew each series'
+  true level over the forecast horizon. It measures the order noise that no honest forecast can remove.
 
 ---
 
@@ -72,7 +78,7 @@ numeric reconciliation, panel structure and zeros, stock-outs, lifecycle and mas
 calendar, the demand generator, and the structure of the test file. A separate skeptic tried to refute each report.
 The surviving findings, with corrections, are merged in `research/DATA_DOSSIER.md`. The pipeline turns each finding
 into a rule and asserts the count the dossier established (check `expected` in `dq_report.json`). If a count moves,
-the build fails.
+the build fails. This pins the pipeline to this extract, on purpose (section 3).
 
 ### 2.1 Record_ID is a grid
 
@@ -101,7 +107,7 @@ All counts are from `outputs/quality/dq_report.json`. Each check's `affected` eq
 |---|---|---|---|---|
 | K1 | Exact duplicate load | 2,946 records | Keep one copy | exact |
 | K2 | Superseded re-load (restatement) | 736 records | Keep the latest `Load_Timestamp` (business rule 2). Never sum versions. The latest load equals `Shipped_Units` on 17 of 17 restated stock-out months (`ORC-RESTATEMENT-LATEST`). | exact |
-| K3 | Date written in 7 formats | 9,967 raw rows (9,821 records) | Normalise to `YYYY-MM`; anything unknown raises | format |
+| K3 | Date written in one of 6 non-standard formats (7 with `YYYY-MM`) | 9,967 raw rows (9,821 records) | Normalise to `YYYY-MM`; anything unknown raises | format |
 | K4 | Year typo `2062` | 30 raw rows | Swap the last two digits; confirmed by the load timestamp | exact |
 | K5 | `Month` column holds the load month | 246 raw rows | Drop raw Year / Month and recompute them from `Date` (business rule 1) | exact |
 | K6 | Region label variants (case, abbreviation, whitespace, punctuation, wording) | 6,199 raw rows (6,117 records) | Map to the canonical label. Read every file as text, so the region `NA` does not become a missing value. | format |
@@ -183,6 +189,15 @@ Scheduled off-phase zeros are structure, not anomalies, and are not registered.
 - every fix is a named rule with an asserted count;
 - every changed cell is written to a fix log;
 - runs are deterministic.
+
+**The asserted counts pin the pipeline to this extract.** `EXPECTED` in `src/celeris/config.py` holds 192 forensic
+counts, for example `train.date_nonstandard_raw: 9_967` and `grid.cells: 245_548`. `celeris.quality.checks.expect`
+stops the build when any of them differs. This is deliberate for a forensic, reproducible submission: the rules are
+exact, so a moved count means a broken rule, and two runs on this extract give byte-identical outputs. The price is that
+the pipeline runs on this extract only. A rolling production run on new months would first need those counts
+re-baselined for each new extract, or turned into monitored thresholds: checks that report the count and warn when it
+leaves a tolerance, tracked month to month in the data-quality report, instead of stopping the build. No code was
+changed for this submission.
 
 The cleaning stage is `src/celeris/cleaning/`. Its steps run in this order:
 
@@ -336,7 +351,8 @@ cell. Each cell gets exactly one method (`DEM-UC-METHODS`):
 - For Electrical Assemblies the gap is **+44.8 % in 2021 and +29.2 % in 2022**. The semiconductor shortage constrained
   every Electrical Assemblies cell from 2021-03 to 2022-09, but the file lists only some of them.
 - **Lost sales** (never shipped) total 106,925 units and USD 109.9 M. Of that, 2021 and 2022 hold 85,298 units
-  (USD 93.2 M), and Electrical Assemblies holds 80,664 units (USD 91.5 M).
+  (USD 93.2 M), and Electrical Assemblies holds 80,664 units (USD 91.5 M). The exact sums are 106,924.5 and 80,663.5
+  units, because imputed semiconductor shortfalls are fractional; check `DEM-UC-UPLIFT` truncates the total to 106,924.
 
 ### 5.2 Ordering cycles
 
@@ -442,6 +458,17 @@ Two tests were run.
   moves from 4 to 2, and Precision's PMI from 3 to 2. Chassis and Thermal select only utilisation in 2023–2026, because
   the calm years have too little variation in their earlier drivers to pass the threshold.
 
+- **By correlation in each era** (the dashboard's Macro view, from `macro_leadlag.csv`). A driver of the 2026-10 model
+  counts as stable when its correlation with the family's macro index, at its lag, keeps its sign and has |r| of at
+  least 0.5 in both 2019–2022 and 2023–2026. Five families pass: Electrical (new orders @2 and PMI @2), Hydraulic
+  (PMI @2 and new orders @2), Powertrain (new orders @1), Precision (PMI @2) and Thermal (PMI @2). Brake and Chassis do
+  not: none of their drivers keeps |r| ≥ 0.5 with one sign in both eras (Brake auto production @1 falls from 0.76 to
+  0.40, Chassis auto production @2 from 0.70 to 0.14).
+
+The three tests answer different questions, so their counts differ and are always quoted with their definition: "same
+indicator and lag at every decision origin" gives four families (Brake, Chassis, Electrical, Powertrain); "correlation
+holds in both eras" gives five (Electrical, Hydraulic, Powertrain, Precision, Thermal).
+
 **Conclusion.** The lag of the leading driver is stable wherever the data can identify it. The minor drivers cannot be
 identified on half the history. The model refits the full history at every origin.
 
@@ -461,8 +488,8 @@ Per-SKU EV coefficients were tested and rejected as noise (dossier 4.8). In the 
 history is 90.32 (`outputs/clean/macro_clean.csv`). EV SKUs therefore get a hump early in the window and ICE SKUs a
 shallow dip.
 
-Removing the EV term raises backtest WAPE + |bias| from 26.76 % to 28.92 %. Estimating the coefficients on data from
-2023 onward only gives 27.53 % (`outputs/backtest/experiments.csv`). The forecast holds 306,974 units for EV SKUs,
+Removing the EV term raises backtest WAPE + |bias| (mean of the four folds, the decision score) from 26.76 % to
+28.92 %. Estimating the coefficients on data from 2023 onward only gives 27.53 % (`outputs/backtest/experiments.csv`). The forecast holds 306,974 units for EV SKUs,
 343,280 for ICE SKUs and 2,154,945 for Universal SKUs.
 
 ### 6.4 Lifecycle and event features
@@ -498,8 +525,8 @@ flat rate per month.
 
 Here, 98.7 % of zero months are scheduled by a calendar cycle. A flat rate is wrong in both kinds of month: it puts
 demand into off-phase months, where the order will be 0, and it puts too little into the order month, which carries two
-or three months of demand for B, Q and T customers. All five methods score 51.3–51.6 % WAPE, no better than the flat
-12-month mean (51.6 %). The cycle-aware naive scores 31.2 % with the same flat-level idea.
+or three months of demand for B, Q and T customers. All five methods score 51.2–51.6 % WAPE, no better than the flat
+12-month mean (51.6 %). The cycle-aware naive scores 31.1 % with the same flat-level idea.
 
 ### 7.3 The structural model
 
@@ -543,7 +570,7 @@ The LightGBM model is a direct multi-horizon model (`src/celeris/models/gbm.py`)
 - **Features:** 32, never raw indicator levels or identifiers.
 - **Training:** 3 seeds × 300 rounds.
 
-It scores 26.73 % WAPE with bias +1.5 %. Its most important features are the prior / level ratio, the family and the
+It scores 26.7 % WAPE with bias +1.5 %. Its most important features are the prior / level ratio, the family and the
 macro multiplier (`gbm_importance.csv`). It learns period-specific errors from 2021–2024 that do not carry over to
 later periods.
 
@@ -591,16 +618,16 @@ customers, missing rows, stock-outs). It then asserts that the origin's structur
 features do not change. `tests/test_demand_asof.py::test_state_at_an_origin_ignores_later_data` does the same for the
 demand state.
 
-### 8.3 Noise floor
+### 8.3 The in-hindsight floor and the noise floor
 
 A forecast cannot be better than the randomness of orders. Two floors are measured for each fold
 (`summary.json` → `noise_floor`):
 
-- the **oracle**: the structural model with each series' level refitted on its own horizon, a forecaster who knew the
-  future level;
+- the **oracle**, shown on the dashboard as the *in-hindsight floor*: the structural model with each series' level
+  refitted on its own horizon, a forecaster who knew the future level;
 - the **negative-binomial floor**: the expected absolute deviation of the order noise alone.
 
-| Origin | Final WAPE | Oracle WAPE | NB noise floor | Final above oracle |
+| Origin | Final WAPE | In-hindsight floor (oracle) WAPE | NB noise floor | Final above the in-hindsight floor |
 |---|---|---|---|---|
 | 2021-10 (stress) | 32.25 % | 27.04 % | 22.13 % | yes |
 | 2022-10 | 28.32 % | 25.00 % | 22.21 % | yes |
@@ -608,7 +635,7 @@ A forecast cannot be better than the randomness of orders. Two floors are measur
 | 2024-10 | 25.06 % | 22.85 % | 22.27 % | yes |
 | 2025-03 | 25.07 % | 23.00 % | 22.27 % | yes |
 
-Every fold scores above its oracle (`BT-LEAKAGE-ORACLE`). A score below the oracle would signal leakage.
+Every fold scores above its in-hindsight floor (`BT-LEAKAGE-ORACLE`). A score below it would signal leakage.
 
 **Honesty note on tuning.** The model started from the dossier's recommended values. The experiments of
 [`modelling.md`](modelling.md) section 6 then ran on the same four folds, under a declared rule: a variant replaces the
@@ -622,9 +649,8 @@ below.
 After the first submission, one round of improvements was run under a rule declared before any experiment
 ([`modelling.md`](modelling.md) section 11; lab notebook [`optimisation_log.md`](optimisation_log.md)). A change is kept
 only if it lowers series × month WAPE + |bias| at 3 or more of the 4 decision origins, by more than 0.0005 on average,
-does not make aggregates worse, and does no harm at three **confirmation origins** (2023-03, 2024-03, 2025-01) that are
-looked at only after a candidate has passed on the decision origins. The 2021-10 stress fold was watched, never
-decisive.
+does not make aggregates worse, and does no harm at three **confirmation origins** (2023-03, 2024-03, 2025-01), declared
+with the rule. The 2021-10 stress fold was watched, never decisive.
 
 - **Adopted (one change): a converged factor fit with averaged macro driver sets.** The first submission stopped the
   factor fit after six iterations. That left the EV coefficient at 0.018–0.029 per index point instead of its fixed
@@ -639,8 +665,15 @@ decisive.
   recent launches, cumulative rounding, a horizon-aware LightGBM blend, and a looser SKU macro prior (better on the
   decision folds through bias moves of both signs, worse at 2 of 3 confirmation origins).
 
-The converged fit is in-sample on the decision folds, where it was chosen, but out of sample on the three
-confirmation origins.
+**How independent the confirmation origins are.** They were declared before the first experiment, and the rejected
+level, macro and other settings (E1–E3) were scored on the decision origins only. But they did not stay unseen. They
+were scored for the converged fit alone (E4) after it had failed the decision rule, and they were used in the
+diagnoses that followed. A prototype of the adopted estimator had also been scored at all seven origins before the
+estimator was declared. The adopted change was designed after those results were seen ([`optimisation_log.md`](optimisation_log.md),
+protocol note and section 3). So the confirmation origins are a consistency check, not an untouched hold-out, and the
+adopted fit is in-sample on the decision folds and partly seen on the confirmation origins. What supports it is that it
+repairs a defect (a fit that had not converged) rather than tuning a setting, and that WAPE fell at all seven origins
+and at the stress fold.
 
 ---
 
@@ -648,41 +681,53 @@ confirmation origins.
 
 ### 9.1 Model ladder
 
-Means over the four decision folds, at SKU × region × month (`summary.json` → `ladder`; per-fold values in
-[`modelling.md`](modelling.md) 5.1):
+At SKU × region × month, on the 225,942 scored cells of the four decision folds:
 
-| Model | WAPE | Bias | WAPE + abs(bias) |
-|---|---|---|---|
-| Last-12-month mean (`naive`) | 51.62 % | −3.2 % | 56.88 % |
-| 6-month moving average | 52.42 % | −0.6 % | 58.27 % |
-| Seasonal naive | 38.70 % | −3.8 % | 44.54 % |
-| Croston | 51.49 % | −5.0 % | 56.48 % |
-| SBA | 51.26 % | −9.7 % | 60.99 % |
-| TSB | 51.45 % | −5.7 % | 57.11 % |
-| ADIDA | 51.59 % | −1.1 % | 56.22 % |
-| IMAPA | 51.62 % | −1.2 % | 56.21 % |
-| Cycle-aware naive | 31.24 % | −3.2 % | 35.15 % |
-| Global LightGBM | 26.73 % | +1.5 % | 28.20 % |
-| Ensemble (structural + LightGBM) | 26.19 % | +0.8 % | 27.02 % |
-| **Structural = final (submitted)** | **26.11 %** | **+0.2 %** | **26.76 %** |
-| Oracle (noise floor, not a forecast) | 23.57 % | −0.1 % | 23.70 % |
+| Model | WAPE (pooled) | Bias (pooled) | WAPE (mean of folds) | WAPE + abs(bias) (mean of folds) |
+|---|---|---|---|---|
+| Last-12-month mean (`naive`) | 51.57 % | −3.2 % | 51.62 % | 56.88 % |
+| 6-month moving average | 52.39 % | −0.5 % | 52.42 % | 58.27 % |
+| Seasonal naive | 38.62 % | −3.7 % | 38.70 % | 44.54 % |
+| Croston | 51.43 % | −5.0 % | 51.49 % | 56.48 % |
+| SBA | 51.20 % | −9.7 % | 51.26 % | 60.99 % |
+| TSB | 51.40 % | −5.6 % | 51.45 % | 57.11 % |
+| ADIDA | 51.56 % | −1.1 % | 51.59 % | 56.22 % |
+| IMAPA | 51.58 % | −1.2 % | 51.62 % | 56.21 % |
+| Cycle-aware naive | 31.13 % | −3.3 % | 31.24 % | 35.15 % |
+| Global LightGBM | 26.68 % | +1.5 % | 26.73 % | 28.20 % |
+| Ensemble (structural + LightGBM) | 26.15 % | +0.8 % | 26.19 % | 27.02 % |
+| **Structural = final (submitted)** | **26.07 %** | **+0.2 %** | **26.11 %** | **26.76 %** |
+| In-hindsight floor (oracle, not a forecast) | 23.54 % | −0.1 % | 23.57 % | 23.70 % |
+
+**Two statistics, explained once.** *Pooled* sums the absolute errors and the actuals over all scored cells of the four
+folds, then divides: Σ|actual − forecast| / Σ actual over 225,942 cells. This is what the dashboard shows
+(`dashboard/public/data/meta.json` → `backtest.ladder`; the same sums are in `outputs/backtest/metrics.csv`), and the
+documents quote it. The *mean of folds* computes WAPE in each fold and averages the four values; `summary.json` →
+`ladder` stores it, and the decision rules of this project (the ensemble rule, the experiments of section 9.3 and the
+optimisation round of section 8.4) were applied to WAPE + |bias| as a mean of folds. On the ladder the two differ by
+at most 0.11 points, because the four folds carry similar volumes: seasonal naive 38.6 % pooled against 38.7 % as a
+mean of folds, cycle-aware naive 31.1 % against 31.2 %, the in-hindsight floor 23.5 % against 23.6 %; the final model
+reads 26.1 % either way. On slices whose volume changes from fold to fold they can differ more: Middle East & Africa
+34.2 % against 34.4 %, cold starts 65.3 % against 68.2 % (section 9.4).
 
 Each step adds one idea. Placing a flat level on the ordering cycle removes 20 WAPE points against the flat mean.
-Modelling latent demand with its drivers removes 5 more. The final model is 2.5 points above the oracle. Per fold
+Modelling latent demand with its drivers removes 5 more. The final model is 2.5 points above the in-hindsight floor
+(26.07 % against 23.54 %; the dashboard prints "2.6 points", the difference of the two rounded figures 26.1 % and
+23.5 %). Per fold
 (2022-10, 2023-10, 2024-10, 2025-03) the final model scores 28.32 %, 26.00 %, 25.06 % and 25.07 % WAPE with bias
 −0.8 %, −0.2 %, +0.9 % and +0.8 % (`summary.json` → `ladder` → `by_origin`).
 
 ### 9.2 Accuracy at every level of the hierarchy
 
-WAPE after summing actuals and forecasts to the node and month; mean of the four folds (`metrics.csv`,
-`origin = mean`, `slice_type = all`):
+WAPE after summing actuals and forecasts to the node and month, pooled over the four decision folds as on the
+dashboard's "accuracy by aggregation level" (`metrics.csv`, `slice_type = all`, sums over the four origins):
 
 | Model | Series | SKU | Family × region | Family | Region | Total |
 |---|---|---|---|---|---|---|
-| Seasonal naive | 38.70 % | 25.01 % | 12.79 % | 10.87 % | 9.18 % | 8.32 % |
-| Cycle-aware naive | 31.24 % | 21.00 % | 11.67 % | 9.17 % | 9.66 % | 7.44 % |
-| **Final** | **26.11 %** | **14.69 %** | **5.29 %** | **3.08 %** | **2.76 %** | **1.78 %** |
-| Oracle | 23.57 % | 12.81 % | 4.66 % | 2.65 % | 2.58 % | 1.61 % |
+| Seasonal naive | 38.62 % | 24.93 % | 12.74 % | 10.84 % | 9.16 % | 8.32 % |
+| Cycle-aware naive | 31.13 % | 20.90 % | 11.63 % | 9.17 % | 9.65 % | 7.49 % |
+| **Final** | **26.07 %** | **14.65 %** | **5.25 %** | **3.05 %** | **2.73 %** | **1.75 %** |
+| In-hindsight floor | 23.54 % | 12.79 % | 4.63 % | 2.62 % | 2.55 % | 1.59 % |
 
 ### 9.3 What each component is worth
 
@@ -705,14 +750,15 @@ phase-out changes little overall, but on rows within 11 months of end of life it
 
 For the final model at series × month, WAPE ranges:
 
-- across families: 25.0 % (Brake & Safety) to 28.2 % (Electrical);
-- across regions: 23.2 % (Europe) to 34.4 % (MEA, the youngest and smallest region);
-- across channels: 25.0 % (Aftermarket) to 28.7 % (Export).
+- across families: 25.0 % (Brake & Safety) to 28.1 % (Electrical);
+- across regions: 23.1 % (Europe) to 34.2 % (MEA, the youngest and smallest region);
+- across channels: 24.9 % (Aftermarket) to 28.6 % (Export).
 
-By horizon it moves only from 25.7 % (1–3 months ahead) to 26.7 % (13–19 months). Bias stays within ±1.6 % on every
-family, region, channel and horizon bucket. The tables are in [`modelling.md`](modelling.md) 5.4.
+By horizon it moves only between 25.4 % (4–6 months ahead; 25.6 % at 1–3 months) and 26.7 % (13–19 months). Bias
+stays within ±1.6 % on every family, region, channel and horizon bucket (`metrics.csv`, pooled over the four folds).
+The tables, as means of the folds, are in [`modelling.md`](modelling.md) 5.4.
 
-Cold starts of each fold score 68.2 % WAPE with +15.2 % bias (4,320 cells). They have no history and no known cycle,
+Cold starts of each fold score 65.3 % WAPE with +9.3 % bias, pooled over 4,320 cells. They have no history and no known cycle,
 so a large error is expected. Their share of volume is small.
 
 ---
@@ -732,7 +778,8 @@ columns; parameters in `outputs/forecast/uncertainty.json`):
 | `cv_common` | error shared by every row (period-level bias) | 0.019 |
 
 The parameters are first estimated by the method of moments on backtest residuals. They are then scaled
-(split-conformal) so that P10–P90 covers 80 % of actuals at row, family × region × month and total × month level.
+(split-conformal) so that, on the four decision folds, P10–P90 covers 80 % of monthly actuals at row, family × region ×
+month and total × month level (in sample; out-of-sample checks in section 10.3).
 
 ### 10.2 Ranges that add up
 
@@ -753,6 +800,9 @@ total:
 | Sum of row quantiles (wrong) | 1,789,909 | 2,805,160 | 3,919,913 |
 | Aggregate formula | 2,732,594 | 2,805,160 | 2,878,467 |
 
+The mean, 2,805,160, is the sum of the unrounded row means. The submission total, 2,805,199, is the sum of the rounded
+rows.
+
 Point forecasts are coherent by construction, because every aggregate is a bottom-up sum of the submitted integers.
 The forecast stage asserts that the monthly sums at total, family, region, channel and family × region level equal
 `outputs/forecast/aggregates.csv` and the submission total (`FC-HIERARCHY`,
@@ -772,7 +822,11 @@ Share of backtest actuals inside P10–P90 (`summary.json` → `coverage`):
 | Stress fold 2021-10 (never used) | 72.6 % | 60.3 % | 50.3 % | 21.1 % |
 
 Calibrated in sample, the targets are met. Out of sample, the bands are slightly wide for the recent folds and too
-narrow for the turbulent 2022-10 fold. Bands calibrated on calm years do not cover a shock year like 2021. SKU × month
+narrow for the turbulent 2022-10 fold. The 19-month total itself cannot be checked at 80 %: the backtest has only four
+19-month totals, and all four fall inside their bands (`coverage` → `horizon_total`). Family × region 19-month totals
+are covered 97.0 % of the time, so at that level the bands are wide. The total's band (−2.6 % / +2.6 % around the
+mean) also leaves out what the backtest cannot measure: the amplitude of the macro hump and new account losses
+(section 14). Bands calibrated on calm years do not cover a shock year like 2021. SKU × month
 coverage is 75 %, because the error model has no component shared by a SKU's regions (section 14).
 
 ---
@@ -787,7 +841,7 @@ Counts from `outputs/clean/test_grid.parquet` and units from `outputs/forecast/f
 | Lost accounts (16 series) | 304 | exactly 0 |
 | After end of life: PTC-005 from 2027-06, PMP-003 from 2027-09, THM-001 from 2028-01 | 72 + 54 + 30 = 156 | exactly 0 (business rule 5). The end-of-life month itself still sells. |
 | End-of-life phase-out (6 months before end of life) | 108 | latent demand × 0.90 … 0.42; 4,004 units |
-| New launches via `Replaces_SKU`: PTC-029 (replaces PTC-005, EV, from 2027-03), PMP-020 (replaces PMP-003, EV, from 2027-06), THM-012 (replaces THM-001, Universal, from 2027-10) | 117 rows, 10 series | cross-sectional prior level (family, tier × region, channel, powertrain) × launch ramp; one month of demand per month (cycle unknown); 4,058 units |
+| Planned launches, each named as a successor in `Replaces_SKU`: PTC-029 (replaces PTC-005, EV, from 2027-03), PMP-020 (replaces PMP-003, EV, from 2027-06), THM-012 (replaces THM-001, Universal, from 2027-10) | 117 rows, 10 series | cross-sectional prior level (family, tier × region, channel, powertrain) × launch ramp; one month of demand per month (cycle unknown); 4,058 units |
 | Just-launched / young series | 119 / 356 rows | level blended with the prior (2 pseudo-months) |
 | Helios Auto Parts, India | 1,235 | programme step × 1.240 (measured); 78,929 units |
 | Orion Driveline, North America, 2027-07/08 retooling shutdown | 62 series, 124 shutdown rows | latent demand × 0.144 (the measured Nexon 2023 strike), no catch-up. Orders: 3,779 units (2027-06), 714 (2027-07), 574 (2027-08), 3,425 (2027-09). |
@@ -796,17 +850,26 @@ Counts from `outputs/clean/test_grid.parquet` and units from `outputs/forecast/f
 | Year-end before the 2027 and 2028 price rises | Tier-1, Aftermarket, Direct OEM, Export | ordinary channel × month pattern; no pre-buy, because no rise was announced in advance |
 | Macro indicators | every row | the supplied paths for 2026-11..2028-05, at each SKU's lags |
 
-**How `Replaces_SKU` is used.** It sets the successor's timing, which meets the predecessor's phase-out, and its
-assumed price: the predecessor's 2026 price × the median successor / predecessor price ratio. It does not set the
-level. Successors do not inherit the predecessor's regions, customers or channels; 0 of 10 do (dossier 5.4). A test on
-the historical successor series of the decision folds supports this choice (242 cells): the prior gives 38.2 % WAPE and
-+7.0 % bias (`predictions.parquet`), and a predecessor-based level was more biased when the two were compared
-([`modelling.md`](modelling.md) 5.5).
+**What `Replaces_SKU` is and is not used for.** In the model it sets one thing: the successor's assumed price, the
+predecessor's 2026 price × the median successor / predecessor price ratio of the historical pairs
+(`models/forecast_stage.py`). It also pairs predecessor and successor for display: the Lifecycle view's hand-over
+panels, the anomaly register and the exception inbox. The timing comes from the master's own dates: each successor's
+launch falls inside its predecessor's last months (PTC-029 from 2027-03, PTC-005 ends 2027-05; PMP-020 from 2027-06,
+PMP-003 ends 2027-08; THM-012 from 2027-10, THM-001 ends 2027-12). The link does **not** set the level, which comes
+from the cross-sectional prior. Two pieces of evidence point that way. Successors do not inherit the predecessor's
+regions, customers or channels (0 of 10 series do, dossier 5.4). And on the historical successor cells of the
+decision folds (242 cells), a level taken from the predecessor was far more biased than the prior when the routes were
+compared on the first submission's fit, and the prior was slightly better than a 50/50 blend of the two on WAPE +
+|bias| in that comparison. With the adopted fit the prior scores 38.2 % WAPE and +7.0 % bias on those cells (pooled,
+`predictions.parquet`), and the predecessor and blend routes were not re-run, so whether the blend would now do better
+is not known ([`modelling.md`](modelling.md) 5.5). The sample is small; the dossier's larger test on 30 successor series
+also favours the prior.
 
 **Totals.**
 
 - The forecast totals 2,805,199 units, ×1.039 the last 19 months of unconstrained demand (2,699,398 units,
-  2025-04..2026-10).
+  2025-04..2026-10). That history total includes 212 cells whose demand is unknown and filled for display
+  (`demand_filled`); on the known cells alone it is 2,687,867 units, and the ratio ×1.044.
 - The first 12 months are ×1.048 the same months a year earlier. The level then eases as the macro hump fades.
 - Hydraulic Systems (×1.093) and Precision Machined Parts (×1.087) lead, driven by PMI and utilisation. Brake & Safety
   and Thermal are nearly flat (×1.014 each).
@@ -822,15 +885,15 @@ the historical successor series of the decision folds supports this choice (242 
 | Exact rules with asserted counts | Outlier filters, magnitude thresholds | Every error has an exact signature. Units equal `Shipped_Units` on 5,761 of 5,761 rows. A magnitude rule would "fix" the 507 genuine one-off orders. |
 | Keep the latest load; never sum versions | Sum or average duplicates | Business rule 2. The latest load matches `Shipped_Units` on 17 of 17 restated stock-out months. |
 | Target = unconstrained demand | Shipped units | Business rule 7. Shipments understate Electrical Assemblies demand by 44.8 % in 2021. |
-| Forecast latent demand, then place it on the cycle | Intermittent-demand methods | Zeros are scheduled. Intermittent methods: 51.3–51.6 % WAPE. Cycle-aware naive: 31.2 %. |
-| Structural multiplicative model | Black-box model alone | It scores better (26.11 % vs 26.73 % for LightGBM), stays nearly unbiased (+0.2 % vs +1.5 %), and explains each row. |
+| Forecast latent demand, then place it on the cycle | Intermittent-demand methods | Zeros are scheduled. Intermittent methods: 51.2–51.6 % WAPE. Cycle-aware naive: 31.1 %. |
+| Structural multiplicative model | Black-box model alone | It scores better (26.1 % vs 26.7 % for LightGBM), stays nearly unbiased (+0.2 % vs +1.5 %), and explains each row. |
 | Ensemble only by a rule fixed in advance | Learned weights, or keeping LightGBM because it is "ML" | The ensemble improved 0 of 4 folds; the rule needs 3. |
-| A converged factor fit with averaged macro driver sets | A fixed six-iteration fit with one driver set per family (the first submission) | The six-iteration fit stopped the EV coefficient short of its fixed point; the converged fit passed the declared keep rule on the decision and the confirmation origins (section 8.4). |
-| Arithmetic ratio-of-sums levels over 24 months | Log means; 18, 36 or 48 months | Log means bias aggregates down. 24 months scores best (26.76 % vs 27.06 %, 26.81 %, 26.97 %). |
-| Submit the conditional mean, rounded to nearest | Median, shaded mean, floor | Shading by ×0.985 lowers WAPE by 0.1 points but moves bias to −1.32 % (score 27.31 %). |
+| A converged factor fit with averaged macro driver sets | A fixed six-iteration fit with one driver set per family (the first submission) | The six-iteration fit stopped the EV coefficient short of its fixed point. The converged fit with averaged driver sets passed the declared keep rule on the decision origins and on the confirmation origins, which were declared in advance but partly seen during the round (section 8.4). WAPE fell at all seven origins. |
+| Arithmetic ratio-of-sums levels over 24 months | Log means; 18, 36 or 48 months | Log means bias aggregates down. 24 months scores best (WAPE + abs(bias), mean of folds: 26.76 % vs 27.06 %, 26.81 %, 26.97 %). |
+| Submit the conditional mean, rounded to nearest | Median, shaded mean, floor | Shading by ×0.985 lowers WAPE by 0.1 points but moves bias to −1.32 % (WAPE + abs(bias) 27.31 %, mean of folds). |
 | Mask real events from estimation; never delete them | Drop or winsorise | Events stay visible in history and the dashboard. Training uses only cells that represent normal demand. |
 | Measure event multipliers with the customer *at the time* | Latest customer per series | 23 customer switches. Using the latest customer would put the wrong series in an event's scope. |
-| Variance components for ranges | Summing row quantiles; quantile regression per row | Ranges add up at every level; P10–P90 is calibrated to 80 %. |
+| Variance components for ranges | Summing row quantiles; quantile regression per row | Ranges add up at every level; P10–P90 is calibrated to cover 80 % of backtest months in sample (section 10.3). |
 | Dashboard reads only an exported bundle | Numbers typed into the app | The export refuses a bundle whose totals disagree with `submission.csv` (`tests/test_export_bundle.py::test_forecast_totals_equal_submission`). |
 
 ---
@@ -883,20 +946,24 @@ requested demand.
 - **One-off orders cannot be placed in a month.** Their expected volume is spread over Direct OEM and Tier-1 orders.
   That removes about 1 point of negative bias but costs about 0.1 point of row WAPE.
 - **No new account events are forecast.** Losses, switches and cycle changes inside the window are not predicted. The
-  test file shows no switch. If losses continued at their historical rate, about 0.7 % of volume would disappear
+  test file shows no switch, and the data suggest, without proving it, that the generator schedules no losses there
+  (dossier 4.15 rates this plausible). If losses continued at their historical rate, about 0.7 % of volume would disappear
   ([`modelling.md`](modelling.md) section 10).
 - **Interval coverage is uneven across folds** (section 10.3), and there is no SKU-shared error component.
-- **Cold starts** rest on a cross-sectional prior (fold WAPE 68.2 %, bias +15.2 %).
+- **Cold starts** rest on a cross-sectional prior (backtest WAPE 65.3 %, bias +9.3 %).
 - **LightGBM did not earn its place** with this history length.
-- **The dashboard is not deployed yet.** Its two earlier data issues (aggregate ranges without the common-error term,
-  backtest pooling over the stress fold) were fixed on 24 Nov 2026. See "Gaps" in
-  [`requirements_traceability.md`](requirements_traceability.md#gaps).
+- **The optimisation round's confirmation origins were partly seen** before the adopted change was declared, so they
+  are a consistency check, not a clean hold-out (section 8.4).
+- **The pipeline is pinned to this extract.** Its 192 asserted counts stop the build on any other extract until they
+  are re-baselined or turned into monitored thresholds (section 3).
 
 **Next steps**, in order of expected value:
 
 1. A hierarchical level model (SKU effect × region effect × series factor) that shrinks small and Q / B-cycle series
-   toward their SKU and region. Level noise accounts for most of the 2.5 points to the oracle.
+   toward their SKU and region. Level noise accounts for most of the 2.5 points to the in-hindsight floor.
 2. A SKU-shared error component and better separation of utilisation from new orders. Both would tighten the hump
    months and lift SKU × month coverage from 75 %.
 3. Better launch priors, using the successor's family and powertrain mix in each region.
-4. Deploy the dashboard as a static site, with a scheduled re-run of `make all` when new months arrive.
+4. Scheduled re-runs on new months, feeding the deployed dashboard (<https://pavankumar07s.github.io/celeris-control-tower/>). First re-baseline the asserted
+   counts (`EXPECTED`) for each new extract or turn them into monitored thresholds (section 3); as built, a run on a
+   new extract stops at the first count that moved, by design.

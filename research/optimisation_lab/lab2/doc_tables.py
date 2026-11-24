@@ -1,7 +1,17 @@
 """Markdown tables for docs/modelling.md from the regenerated outputs."""
+# Paths are relative to the repository (research/optimisation_lab/lab2 -> lab.py one level up). CELERIS_OUTPUTS
+# points at another outputs/ tree; CELERIS_LAB_SNAPSHOT at the first submission's outputs, kept with the lab's working
+# files (not included in the repository).
+import os as _os
+from pathlib import Path as _Path
+LAB2_DIR = _Path(__file__).resolve().parent
+LAB_DIR = LAB2_DIR.parent
+REPO = LAB_DIR.parents[1]
+OUT = _os.environ.get("CELERIS_OUTPUTS", str(REPO / "outputs"))
+SNAP = _os.environ.get("CELERIS_LAB_SNAPSHOT", str(REPO / "research" / "scratch" / "snap"))
 import json
 import numpy as np, pandas as pd
-O = "/home/pavan/Desktop/mks-modelopt/outputs"
+O = OUT
 s = json.load(open(f"{O}/backtest/summary.json"))
 m = pd.read_csv(f"{O}/backtest/metrics.csv")
 DEC = ["2022-10", "2023-10", "2024-10", "2025-03"]

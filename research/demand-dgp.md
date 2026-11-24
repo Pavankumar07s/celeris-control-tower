@@ -331,5 +331,3 @@ What the experiment shows:
 6. **Exact generator values of the regional noise CV** (estimates 0.226 to 0.342 include some mean-model error).
 7. **Level of young EV SKUs** (hold-out bias of a raw 24-month level -12.6 %): ramp and EV-index slope interact; for the lifecycle lens.
 8. **Unlisted regional seasonal effects** (Asia Pacific October 0.90, Latin America January 0.79, India October 1.14): stable for seven years, so they are modelled, but they have no entry in the events calendar and cannot be explained from it.
-
-Housekeeping: `graphify update .` (requested by the home-level CLAUDE.md after code changes) was not run from this sub-task, because it writes outside the permitted workspace and five other agents share the machine; it should be run once by the orchestrating session.

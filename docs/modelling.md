@@ -17,16 +17,19 @@ at every origin and placed on each customer's ordering cycle. Over four rolling 
 0.3124 / -3.2 % for the cycle-aware naive, 0.3870 / -3.8 % for seasonal naive, 0.5162 / -3.2 % for the last-12-month mean
 and 0.51-0.52 for every intermittent-demand method. The in-hindsight oracle of the same cells (the noise floor) is
 0.2356, so about 2.5 WAPE points separate us from a forecaster who knew each series' future level. Aggregates are
-tight: 0.0308 at family x month and 0.0178 at total x month. The global LightGBM and the equal-weight ensemble did not
-pass the ensemble rule (better in 0 of 4 folds) and are reported as a negative result. P10-P90 bands were calibrated to
-80 % coverage at row, family x region x month and total x month level on the backtests. The submission totals
+tight: 0.0308 at family x month and 0.0178 at total x month. (All backtest figures here are means over the four
+decision folds; the dashboard pools the folds' cells, which moves seasonal naive to 0.3862, cycle-aware naive to 0.3113
+and the oracle to 0.2354, `dashboard/public/data/meta.json`.) The global LightGBM and the equal-weight ensemble did not
+pass the ensemble rule (better in 0 of 4 folds) and are reported as a negative result. P10-P90 bands were calibrated,
+in sample, to cover 80 % of backtest months at row, family x region x month and total x month level. The submission totals
 2,805,199 units (x1.039 the last 19 months of unconstrained demand) and USD 2.52 bn of revenue.
 
 **Optimisation round (section 11).** The first submission (WAPE 0.2633, bias -0.2 %, score 0.2729) stopped its
 factor backfit after six iterations, which left the EV beta well short of its fixed point, and picked one of several
 near-tied macro driver sets per family. The factor fit now iterates to convergence and averages the near-tied driver
-sets; this passed the declared keep rule (better at 3 of 4 decision origins and at 3 of 3 held-back confirmation
-origins, mean gain 0.0053 and 0.0081) and is the only change that did; every other candidate (level estimators,
+sets; this passed the declared keep rule (better at 3 of 4 decision origins and at 3 of 3 confirmation origins, mean
+gain 0.0053 and 0.0081; the confirmation origins were declared in advance but partly seen during the round, so they
+are a consistency check, not a clean hold-out) and is the only change that did; every other candidate (level estimators,
 macro and other settings, a launch-prior calibration, rounding, a horizon-aware GBM blend, a looser SKU prior) was
 rejected.
 
@@ -225,9 +228,12 @@ the 4 decision folds (dossier 6.3 #4). Learned weights are not used.
   uplift), so the reported numbers of the final configuration are in-sample with respect to these two discrete
   choices; their gains are 0.001-0.002 of WAPE + |bias|. The ensemble rule (>= 3 of 4 folds) comes from the dossier and
   was fixed in advance. The stress fold 2021-10 was never used for any decision. The optimisation round (section 11)
-  added three **confirmation origins** (2023-03, 2024-03, 2025-01) that no decision looked at before a candidate had
-  passed on the four decision folds; the one adopted change (converged, driver-averaged factor fit) is in-sample on
-  the decision folds but out of sample on these three, where it gains 0.008 of WAPE + |bias| on average.
+  added three **confirmation origins** (2023-03, 2024-03, 2025-01), declared with its rule. They were meant to be
+  looked at only for a candidate that had passed on the four decision folds, but they were also scored for the
+  converged fit alone (E4) after it had failed, used in the diagnoses, and seen for a prototype of the adopted
+  estimator before it was declared. The one adopted change (converged, driver-averaged factor fit) is therefore
+  in-sample on the decision folds and partly seen on the confirmation origins, where it gains 0.008 of WAPE + |bias|
+  on average; those origins are a consistency check, not an untouched hold-out.
 
 ## 5. Backtest results
 
@@ -378,13 +384,14 @@ Series launched after the origin are cold starts of that fold: 4,320 cells over 
 +15.2 % (mean of folds; pooled 0.653 / +9.3 %; first submission 0.674 / +10.9 %, pooled 0.646 / +4.2 %) with the
 cross-sectional prior x launch ramp. The over-forecast is systematic (all cold starts are tail-tier SKUs, which run
 below the mature-series prior); an as-of calibration of the prior on recent launches was tried and rejected because
-its size varies too much by cohort (section 11, E6). Among them, 19 series of the three historical successor SKUs
+its size varies too much by cohort (section 11, E6). Among them, 14 series of the three historical successor SKUs
 (ELA-015, HYD-021, PTC-028; 242 cells) let us test the predecessor route (post-hoc on the first submission's
 `predictions.parquet`): prior-based 0.407 / +1.8 % (WAPE + |bias| 0.425), predecessor's recent level x ramp 0.414 /
 -12.4 % (0.538), geometric 50/50 blend 0.352 / -8.2 % (0.434); with the converged fit the prior-based route scores
 0.382 / +7.0 % (0.452) on the same cells (the predecessor routes were not re-run). The prior is kept; the sample is
 small and the dossier's larger test agrees (prior 0.19 vs predecessor 0.40 on 30 successor series). `Replaces_SKU`
-therefore sets timing (predecessor phase-out meets the successor ramp) and the assumed price, not the level.
+therefore sets only the successor's assumed price, not its level; the timing comes from the master's launch dates,
+which fall in the predecessor's last months (predecessor phase-out meets the successor ramp).
 
 ### 5.6 The global GBM: a negative result
 
@@ -421,7 +428,7 @@ All numbers are means over the four decision folds of `experiments.csv` / `summa
 adopted (converged, driver-averaged) fit. Rule: a variant replaces the default only if it lowers the mean WAPE + |bias|
 by more than 0.0005. The decisions were taken in the first round on the six-iteration fit; re-run on the adopted fit
 they all stand, and the one variant the rule now flags (SKU prior sd 0.12, better at 4 of 4 decision folds) was
-tested on the held-back confirmation origins and rejected (section 11, E12).
+tested on the confirmation origins and rejected (section 11, E12).
 
 | # | Question | Variants (mean WAPE + abs(bias)) | Decision and evidence |
 |---|---|---|---|
@@ -596,9 +603,9 @@ for cold starts; `cv_group` 0.042; `cv_common` 0.019 (first submission: 0.88; 0.
   gain came with the noise of picking one of two near-tied macro driver sets, which averaging the sets removed
   (section 11). Convergence takes 18-36 iterations (cap 40) and makes each fit several times slower; the backtest stage runs its
   fits in worker processes to compensate (section 11, runtime).
-- **Cold starts** rest on a cross-sectional prior (log sd about 0.5 around it); `Replaces_SKU` only fixes their timing
-  (the predecessor's phase-out meets the successor's ramp) and their price, because successors do not inherit regions,
-  customers or channels (dossier 5.4).
+- **Cold starts** rest on a cross-sectional prior (log sd about 0.5 around it); `Replaces_SKU` only sets their price
+  (their timing comes from the master's launch dates, where the predecessor's phase-out meets the successor's ramp),
+  because successors do not inherit regions, customers or channels (dossier 5.4).
 - **Hidden stock-outs** (about 310 undetectable months) slightly understate levels; their volume is about 0.05 %.
 
 ### 10.1 Where accuracy could still be gained
@@ -626,13 +633,22 @@ points above the pure negative-binomial noise floor (0.2223). Roughly in order o
 
 Full notebook: `docs/optimisation_log.md`; scripts and result tables: `research/optimisation_lab/` (`lab2/` for the
 third batch). **Protocol, declared before any experiment**: decision origins 2022-10, 2023-10, 2024-10, 2025-03;
-**confirmation origins 2023-03, 2024-03, 2025-01**, looked at only for a candidate that had already passed; the
+**confirmation origins 2023-03, 2024-03, 2025-01**, to be looked at only for a candidate that had already passed; the
 2021-10 stress origin watched, never decisive. **Keep rule**: lower series x month WAPE + |bias| at >= 3 of 4 decision
 origins, mean gain > 0.0005, no harm on the confirmation origins (mean not worse, not worse at 2 of 3), aggregates not
 worse. Secondary view, declared before the factor-fit decision: the same scores without the rows of accounts lost
-inside the horizon (not forecastable; no losses are scheduled in the test window). Every estimator was declared in
-the notebook before it was evaluated (one disclosed exception: a predecessor's prototype of E5a had been scored at all
-seven origins before it was logged; the package implementation was declared and evaluated afresh).
+inside the horizon (not forecastable; the data suggest that none are scheduled in the test window, an inference that
+dossier 4.15 rates plausible, from the generator's pattern of losses in train and a test file with no customer
+change). Every estimator was declared in the notebook before it was evaluated (one disclosed exception: a prototype of
+E5a from an earlier, unlogged run had been scored at all seven origins before it was declared; the package
+implementation was declared and evaluated afresh).
+
+**How independent the confirmation origins are.** The rejected settings of E1-E3 were scored on the decision origins
+only. The confirmation origins did not stay unseen, though: they were scored for E4 after it had failed the decision
+rule (and at 2024-03 for its driver-switch margins), used in the E4 slices and the diagnoses of step 2, E6 and step 5,
+and seen for the E5a prototype above; E5a was designed after those results (`docs/optimisation_log.md`, protocol
+note). They are a consistency check, not an untouched hold-out. What supports the adopted change is that it repairs a
+fit that had not converged, and that WAPE fell at all seven origins and at the stress origin.
 
 | # | Hypothesis | Score delta at 2022-10 / 2023-10 / 2024-10 / 2025-03 (mean, wins); confirmation | Decision |
 |---|---|---|---|

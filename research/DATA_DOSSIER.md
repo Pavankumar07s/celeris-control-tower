@@ -1,7 +1,7 @@
 # Celeris demand forecasting: DATA DOSSIER
 
 Authoritative merge of the 10 forensic investigations, their 10 skeptic reviews and the 3 methods reports in
-`/home/pavan/Desktop/mks/research/`. Written 2026-11-23 for the engineering team, who should be able to build from it without
+`research/`. Written 2026-11-23 for the engineering team, who should be able to build from it without
 re-investigating. Where a skeptic refuted or corrected a finding, the corrected version is used and the correction is
 named. Where reports disagreed, I either ran my own check (scripts in `research/scratch/dossier/`) or list the conflict in
 section 9. Nothing here comes from outside those reports and those checks.
@@ -841,7 +841,7 @@ Implied multipliers against the last-12-month level (MI; MI.v variants in bracke
     - **T9** output contract: 58,219 rows, P10 <= P50 <= P90, hierarchy adds up.
     - **T10** reproducibility: two runs give identical hashes.
 
-### 7.2 Reusable artefacts to lift (all under `/home/pavan/Desktop/mks/research/scratch/`)
+### 7.2 Reusable artefacts to lift (all under `research/scratch/`; working files, not included in the repository)
 
 | Purpose | Path |
 |---|---|

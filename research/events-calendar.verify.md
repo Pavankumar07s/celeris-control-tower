@@ -1,7 +1,7 @@
 # Skeptic review of lens `events-calendar`
 
-**Reviewed:** `/home/pavan/Desktop/mks/research/events-calendar.md`.
-**Scripts and logs:** `/home/pavan/Desktop/mks/research/scratch/events-calendar-verify/` (`vp00` and `vc01`..`vc14`, with `logs_vc*.txt`).
+**Reviewed:** `research/events-calendar.md`.
+**Scripts and logs:** `research/scratch/events-calendar-verify/` (working files, not included in the repository; `vp00` and `vc01`..`vc14`, with `logs_vc*.txt`).
 
 ## Bottom line
 

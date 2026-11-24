@@ -1,10 +1,20 @@
 """Before (shipping snapshot) vs after (worktree outputs/backtest) for the final model."""
+# Paths are relative to the repository (research/optimisation_lab/lab2 -> lab.py one level up). CELERIS_OUTPUTS
+# points at another outputs/ tree; CELERIS_LAB_SNAPSHOT at the first submission's outputs, kept with the lab's working
+# files (not included in the repository).
+import os as _os
+from pathlib import Path as _Path
+LAB2_DIR = _Path(__file__).resolve().parent
+LAB_DIR = LAB2_DIR.parent
+REPO = LAB_DIR.parents[1]
+OUT = _os.environ.get("CELERIS_OUTPUTS", str(REPO / "outputs"))
+SNAP = _os.environ.get("CELERIS_LAB_SNAPSHOT", str(REPO / "research" / "scratch" / "snap"))
 import json, sys
 import numpy as np, pandas as pd
 pd.set_option("display.width", 250); pd.set_option("display.max_rows", 200)
-B = "/tmp/claude-1000/-home-pavan-Desktop-mks/6e1cc0fc-f52b-4777-9b57-6e118178c7b1/scratchpad/snap/backtest_shipping"
-A = "/home/pavan/Desktop/mks-modelopt/outputs/backtest"
-master = pd.read_csv("/home/pavan/Desktop/mks-modelopt/outputs/clean/sku_master_clean.csv", usecols=["sku_id", "powertrain_application"])
+B = f"{SNAP}/backtest_shipping"
+A = f"{OUT}/backtest"
+master = pd.read_csv(f"{OUT}/clean/sku_master_clean.csv", usecols=["sku_id", "powertrain_application"])
 DEC = ["2022-10", "2023-10", "2024-10", "2025-03"]
 def ladder(path):
     s = json.load(open(f"{path}/summary.json"))

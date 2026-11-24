@@ -2,7 +2,9 @@
 
 Every number in ``EXPECTED`` is a forensic count from ``research/DATA_DOSSIER.md`` (section given in the comment). The
 pipeline asserts each of them (``celeris.quality.checks.expect``), so a regression in any rule fails the build instead of
-silently changing the cleaned data.
+silently changing the cleaned data. This deliberately pins the pipeline to the audited extract: a new extract (for
+example next month's) stops at the first count that moved. A rolling production run would first re-baseline these
+counts for each extract or turn them into monitored thresholds (docs/methodology.md, section 3).
 """
 
 from __future__ import annotations

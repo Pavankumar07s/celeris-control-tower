@@ -2,7 +2,7 @@
 
 **Headline.** `test.csv` is a clean, complete generator grid: 58,219 rows = 3,068 series (595 SKUs) x up to 19 months (2026-11..2028-05), one row per (Date, SKU_ID, Region), written in generator order (SKU ascending, then the SKU's own region order, then month). 3,058 series continue from train with customer, channel, description and BU **identical to the last train month for every one of them** — `Customer_Name` is constant inside every test series, so there is **no customer switch at the start of or inside the forecast window**; 10 series are cold starts of the 3 planned launches (rows begin exactly in the `Launch_Date` month: 15 / 12 / 8 rows); the 25 train-only series are the 6 discontinued SKUs. Rows *after* EOL are present for the 3 "EOL Announced" SKUs (156 rows, must be 0), and the 16 lost accounts are present with all 19 rows (304 rows, 0). Altogether **8,842 test rows (15.19%) are structural zeros** (8,382 off-phase rows of the ordering cycle + 304 + 156). Two things are new relative to the other lenses: (i) the region order in the file reveals **two SKU tiers** — a core block of 100 SKUs (the first 8–24 numbers of each family: all six regions in one fixed order, Latin America at about half the level of the other regions, 44% "annual-shutdown" cycles) and a 501-SKU tail (random region subsets, equal regional levels, MEA x0.48, 55% monthly) — and the planned launches belong to the tail; (ii) cycle changes, customer switches and account losses each occur only inside a bounded window of the *training* period (month index 37–58, 42–76, 75–84 of 94), which is why none is visible or expected in the test window. On the metric: the row-level noise floor is about 23% WAPE; a level-only, phase-aware forecast scores 26.3% (bias -0.05%) on the last 19 months against 49.8% for a cycle-blind mean (lost accounts excluded in both); shading the forecast towards the median (-3.5%) buys only 0.13–0.26 row-WAPE points and costs 0.4–0.9 points on family / region aggregates, so the submission should stay close to the mean.
 
-All numbers were computed by the scripts in `/home/pavan/Desktop/mks/research/scratch/test-structure/` (`t01`..`t16`). Raw CSVs were read with `dtype=str, keep_default_na=False`. Keys come from the Record_ID decode of the `dates-dups` / `labels-keys` lenses (re-checked here: SKU 100%, non-blank Region 100%, 30 `2062` date typos), clean and unconstrained units from the `stockouts-unconstrained` lens (re-checked here on the last 24 months: all 71,099 self-reconciling rows are unchanged), one-off flags from `numeric-reconcile`. The ordering cycle was inferred independently here (22 candidate masks, last 36 months) and agrees with the `panel-missing-zeros` lens for **3,083 of 3,083** series.
+All numbers were computed by the scripts in `research/scratch/test-structure/` (working files, not included in the repository; `t01`..`t16`). Raw CSVs were read with `dtype=str, keep_default_na=False`. Keys come from the Record_ID decode of the `dates-dups` / `labels-keys` lenses (re-checked here: SKU 100%, non-blank Region 100%, 30 `2062` date typos), clean and unconstrained units from the `stockouts-unconstrained` lens (re-checked here on the last 24 months: all 71,099 self-reconciling rows are unchanged), one-off flags from `numeric-reconcile`. The ordering cycle was inferred independently here (22 candidate masks, last 36 months) and agrees with the `panel-missing-zeros` lens for **3,083 of 3,083** series.
 
 ---
 
@@ -311,7 +311,7 @@ Non-exclusive flags: historical cycle change 27 series (1.16% of volume, all at 
 
 ---
 
-## Artefacts (all in `/home/pavan/Desktop/mks/research/scratch/test-structure/`)
+## Artefacts (all in `research/scratch/test-structure/`; working files, not included in the repository)
 
 | File | Content |
 |---|---|
@@ -329,7 +329,7 @@ Non-exclusive flags: historical cycle change 27 series (1.16% of volume, all at 
 | `reference_naive_submission.csv` | structure-only sanity benchmark in submission format (2,704,000 units) |
 | `panel_ts.parquet`, `train_keys_attrs.parquet` | working panel (245,548 grid cells) and train keys with attributes |
 | `t01_test_profile.py` .. `t16_noise_floor.py` | scripts, one per analysis step, each under a minute |
-| `graphify-out/` | code graph of these scripts, produced by `graphify update .` in this directory as the repository instructions require after code changes (236 KB; safe to delete) |
+| `graphify-out/` | code graph of these scripts (`graphify update .`; 236 KB; safe to delete) |
 
 ## Open questions, ranked by likely impact on forecast accuracy
 

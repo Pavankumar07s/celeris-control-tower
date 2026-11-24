@@ -2,8 +2,8 @@
 
 Installed on 24 Nov 2026 at the team owner's instruction ("use this first") with
 `npx claude-code-templates@latest --skill creative-design/ui-ux-pro-max` → `.claude/skills/ui-ux-pro-max/` (SKILL.md, three
-read-only search scripts, CSV rule databases). The scripts were inspected before use: standard library only, they read the
-CSVs and print; no network, no writes. Load it with the Skill tool as `ui-ux-pro-max`, or query it directly:
+read-only search scripts, CSV rule databases; a local copy, not included in the repository). The scripts were inspected before use: standard library only, they read the
+CSVs and print; no network, no writes. Query it directly:
 
 ```bash
 .venv/bin/python -s -E .claude/skills/ui-ux-pro-max/scripts/search.py "<keywords>" --design-system -f markdown

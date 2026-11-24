@@ -1,6 +1,6 @@
 # Verification of lens `lifecycle-master` (skeptic review)
 
-Reviewer: independent skeptic. Every number below comes from my own code, run on the raw CSVs. I did not use the investigator's scripts or artefacts. The one exception is that I read `sku_master_clean.csv` to measure the spread of the per-SKU betas it publishes. Scripts are in `/home/pavan/Desktop/mks/research/scratch/lifecycle-master-verify/` (`v01`–`v19`, shared helpers in `vlib.py`).
+Reviewer: independent skeptic. Every number below comes from my own code, run on the raw CSVs. I did not use the investigator's scripts or artefacts. The one exception is that I read `sku_master_clean.csv` to measure the spread of the per-SKU betas it publishes. Scripts are in `research/scratch/lifecycle-master-verify/` (working files, not included in the repository; `v01`–`v19`, shared helpers in `vlib.py`).
 
 **My own cleaning (independent of `train_rough.parquet`).**
 - Dedup on Record_ID, keeping the latest Load_Timestamp. Dates and labels parsed again.
@@ -315,7 +315,7 @@ This reproduces the investigator's table: −73 / −67 / −53 / −43 and −9
 7. **All 16 lost-account onsets fall inside 2025-04..2026-01,** which looks like a generator placement window. That supports forecasting 0 for them and expecting no new losses in test.
 8. **The 3 future successor pairs share no customer or channel** with their predecessors in any common region (0 / 10), which is stronger than the historical 4 / 21 customer matches. Predecessor region levels, e.g. PTC-005 LatAm 7.7 against a prior of about 41, should carry little weight.
 
-## Files (all in `/home/pavan/Desktop/mks/research/scratch/lifecycle-master-verify/`)
+## Files (all in `research/scratch/lifecycle-master-verify/`; working files, not included in the repository)
 
 | File | Content |
 |---|---|

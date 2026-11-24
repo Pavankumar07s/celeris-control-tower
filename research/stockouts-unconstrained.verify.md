@@ -4,7 +4,7 @@
 
 **Tally:** 7 confirmed, 2 partially confirmed, 0 refuted. One sub-item was not checked: the D4 likelihood detector, which is register-only and changes no data.
 
-Scripts are in `/home/pavan/Desktop/mks/research/scratch/stockouts-unconstrained-verify/`:
+Scripts are in `research/scratch/stockouts-unconstrained-verify/` (working files, not included in the repository):
 
 | Script | What it does |
 |---|---|

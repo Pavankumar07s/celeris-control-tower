@@ -2,7 +2,7 @@
 
 **Bottom line.** The numeric diagnosis holds up. I rebuilt it from the RAW files with my own code and got the same state counts, price table, block definitions and stockout validation as the investigator, all exact. **One finding needs a correction that matters for the forecast: the one-off orders (F15).** The count of 438 reproduces exactly, but about 60 of them (14 %) are doubtful. The proposed fix, "replace by the median of the 6 neighbouring orders", gives wrong values when the neighbouring months are themselves constrained or follow a cycle. The worst case sits at the forecast origin: PMP-040 Latin America, 2026-09 and 2026-10. Two smaller corrections apply to F12 (pack-block revenue) and F6 (how stable the imputation bias is). I found no refutations.
 
-**Method.** Scripts: `/home/pavan/Desktop/mks/research/scratch/numeric-reconcile-verify/s00_profile.py … s21_strict_rule.py`.
+**Method.** Scripts: `research/scratch/numeric-reconcile-verify/s00_profile.py … s21_strict_rule.py` (working files, not included in the repository).
 - They read only `data/raw/train.csv`, `inventory_stockouts.csv`, `sku_master.csv` and `test.csv`.
 - Nothing from `research/scratch/numeric-reconcile/` was used, and the rough-clean parquet was not used either.
 - Each script parses the raw text itself: 7 date formats, label variants, SKU variants.

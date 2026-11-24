@@ -2,7 +2,7 @@
 
 **Headline.** `Record_ID` is not an opaque ERP key: it is the generator's running row counter over a complete (SKU -> region -> month) grid of **245,548 cells = 3,083 series**, and it decodes SKU, Region and Date *exactly* (SKU 248,248/248,248 raw rows, Region 247,503/247,503 non-blank rows, Date 248,218/248,248 — the 30 exceptions are the `2062-MM` typos, where Record_ID is right and `Date` is wrong). With it every blank Region (745 raw rows / 737 IDs) and blank Product_Family (1,252 / 1,228) is recovered with zero residual ambiguity, the **982 missing rows are enumerated exactly** (ID gaps = exactly 0.4% of the grid), and after decoding there is exactly one row per Date-SKU-Region (244,566 unique keys, 0 collisions). All label noise is pure formatting (31 Region variants -> 6, 17 channel -> 4, 2,659 SKU_ID -> 598, 220 customer -> 12; 0 wrong-value labels, 0 over-merges, 0 unmapped). Real key-level events are few and clean: **23 customer switches** (one per series, each a permanent level shift of x0.45 to x2.44, none listed in the events calendar), **0 channel changes**, **16 lost accounts** (series that fall to a permanent zero 10–19 months before the end of train, all of them in test), plus two master-data conflicts (PMP-004 Business_Unit, BSS-018 Launch_Date) and 156 test rows that lie after an announced EOL.
 
-All numbers below were computed by the scripts in `/home/pavan/Desktop/mks/research/scratch/labels-keys/` (raw CSVs read with `dtype=str, keep_default_na=False`). Unit figures use numerically-coerced raw `Units_Sold` (unit/currency errors not fixed), so medians are used wherever a level is quoted.
+All numbers below were computed by the scripts in `research/scratch/labels-keys/` (working files, not included in the repository; raw CSVs read with `dtype=str, keep_default_na=False`). Unit figures use numerically-coerced raw `Units_Sold` (unit/currency errors not fixed), so medians are used wherever a level is quoted.
 
 ---
 
@@ -264,7 +264,7 @@ The tails are explicit `Units_Sold = 0` rows (e.g. PMP-022 / India: 59, 72, 73, 
 
 ---
 
-## Artefacts (all in `/home/pavan/Desktop/mks/research/scratch/labels-keys/`)
+## Artefacts (all in `research/scratch/labels-keys/`; working files, not included in the repository)
 
 | File | Content |
 |---|---|
@@ -291,4 +291,3 @@ The tails are explicit `Units_Sold = 0` rows (e.g. PMP-022 / India: 59, 72, 73, 
 5. **Magnitude of the Orion Driveline | North America shutdown (2027-07..08, 62 series)** — the Nexon strike analogue gives x0.13 (medians) to x0.21 (sums) on raw units; re-estimate on cleaned, de-seasonalised units.
 6. **Imputation of quantity-less cells**: 982 missing rows (16 at 2026-10), 391 LatAm ERP-window blanks and the other blank `Units_Sold` values — choose one imputation so lags and rolling features are consistent.
 7. **BSS-018**: accept 2025-02 as the true launch (4 series) — low impact, but it must be explained in the anomaly register.
-8. Not run here: `graphify update .` (asked for by `/home/pavan/CLAUDE.md` after code changes). No graph exists for this project (`/home/pavan/graphify-out` holds no `graph.json`, `/home/pavan/Desktop/mks/graphify-out` does not exist), building one would write outside this lens's workspace and scan `.venv` while five other agents share the machine. The orchestrating session should run it once from the project root when the pipeline code exists.

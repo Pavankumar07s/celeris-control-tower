@@ -717,7 +717,7 @@ Rules:
 - No literature was found on calendar-anchored B2B ordering cycles. The treatment in section 4.2 is reasoning from
   ADIDA, renewal processes and this project's own data findings.
 - LightGBM numeric settings in section 3.3 are starting values from general practice, not from a cited source.
-- Section 5's simulation depends on a variance fit in another agent's working log, which that agent rates as
+- Section 5's simulation depends on a variance fit in another lens's working log, which that lens rates as
   provisional. Re-run it once the final clean panel exists.
 - Chronos-2 speed on this CPU and GPU was not measured, and nothing was installed or downloaded.
 
@@ -803,6 +803,4 @@ Rules:
 
 Local evidence used: `docs/problem_statement.md`, `docs/evaluation_criteria.md`, `research/panel-missing-zeros.md`,
 `research/stockouts-unconstrained.md`, `research/lifecycle-master.md`, `research/scratch/demand-dgp/logs/07.log` and
-`09c.log`; simulation script at
-`/tmp/claude-1000/-home-pavan-Desktop-mks/6e1cc0fc-f52b-4777-9b57-6e118178c7b1/scratchpad/calc/mae_bias.py`
-(scratch, not part of the project).
+`09c.log`; simulation script `calc/mae_bias.py` (working files, not included in the repository).

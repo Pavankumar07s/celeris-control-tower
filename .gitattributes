@@ -1,0 +1,4 @@
+# `git archive` (and so `make source-zip`) leaves out the second copy of the dashboard data bundle.
+# dashboard/dist/data is the copy a reviewer needs to open the built site without Node; dashboard/public/data is only
+# the build input and is rewritten by `make export` / `make all` (and by `make dashboard` before every build).
+dashboard/public/data export-ignore

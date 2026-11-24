@@ -1,8 +1,18 @@
 """New soft-cap fit (frozen settled rows) must reproduce the old one bit for bit."""
+# Paths are relative to the repository (research/optimisation_lab/lab2 -> lab.py one level up). CELERIS_OUTPUTS
+# points at another outputs/ tree; CELERIS_LAB_SNAPSHOT at the first submission's outputs, kept with the lab's working
+# files (not included in the repository).
+import os as _os
+from pathlib import Path as _Path
+LAB2_DIR = _Path(__file__).resolve().parent
+LAB_DIR = LAB2_DIR.parent
+REPO = LAB_DIR.parents[1]
+OUT = _os.environ.get("CELERIS_OUTPUTS", str(REPO / "outputs"))
+SNAP = _os.environ.get("CELERIS_LAB_SNAPSHOT", str(REPO / "research" / "scratch" / "snap"))
 import sys, time
 import numpy as np
-sys.path.insert(0, "/tmp/claude-1000/-home-pavan-Desktop-mks/6e1cc0fc-f52b-4777-9b57-6e118178c7b1/scratchpad/lab")
-sys.path.insert(0, "/tmp/claude-1000/-home-pavan-Desktop-mks/6e1cc0fc-f52b-4777-9b57-6e118178c7b1/scratchpad/lab2")
+sys.path.insert(0, str(LAB_DIR))
+sys.path.insert(0, str(LAB2_DIR))
 import lab, old_cap
 import celeris.features.macro as M
 from celeris.models.structural import StructuralConfig, fit_structural, predict

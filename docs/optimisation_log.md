@@ -2,7 +2,9 @@
 
 Running notebook of the optimisation round on the frozen rolling-origin backtest (worktree `model-opt`, base commit
 9255a0f). Appended after every experiment so the work can be resumed. Numbers are series x month WAPE / bias against
-unconstrained demand, "score" = WAPE + |bias|.
+unconstrained demand, "score" = WAPE + |bias|. Scripts named `lab/x.py` are in `research/optimisation_lab/`, `lab2/x.py`
+in `research/optimisation_lab/lab2/`; their prediction caches and snapshots are working files, not included in the
+repository.
 
 ## 0. Protocol (declared before any experiment)
 
@@ -12,6 +14,12 @@ unconstrained demand, "score" = WAPE + |bias|.
   origins): **2023-03 (50), 2024-03 (62), 2025-01 (72)**. Caveat: 2025-01 shares 17 of its 19 target months with
   2025-03, so it is a weak confirmation; 2023-03 and 2024-03 sit five months from any decision origin and are the
   informative ones.
+  *Deviation, recorded at release (25 Nov 2026).* The rule "looked at only when confirming a candidate that already
+  passed" was not kept throughout. The confirmation origins were also scored for the converged fit alone (E4), which
+  had failed the decision rule, and for its driver-switch margins (2024-03); they appear in the E4 slices and in the
+  diagnoses of step 2, E6 and step 5; and a prototype of the adopted estimator had been scored on them before it was
+  declared (section 3). The adopted estimator (E5a) was designed after those results were seen. The
+  confirmation origins are therefore a consistency check, not an untouched hold-out.
 - **Keep rule.** A change is kept only if (a) it lowers the series-level score in at least 3 of the 4 decision origins,
   (b) the mean gain over the decision origins exceeds 0.0005 (the noise threshold already used in `docs/modelling.md`),
   (c) it does not raise the mean score over the confirmation origins (and does not hurt 2 of 3 of them), and (d)
@@ -29,7 +37,7 @@ unconstrained demand, "score" = WAPE + |bias|.
 | mean | 0.26326 | -0.15 % | 0.27286 | 0.23664 |
 | stress 2021-10 | 0.36176 | +3.26 % | 0.39436 | 0.27644 |
 
-## 1. Error decomposition (decision origins; scripts in the session scratchpad `lab/decomp.py`, `slices.py`, `series_reg*.py`)
+## 1. Error decomposition (decision origins; scripts `lab/decomp.py`, `slices.py`, `series_reg*.py`)
 
 Method. `A` = shipping structural model. `oracle` = A rescaled per series by sum actual / sum forecast on its own
 horizon (the existing noise floor). Oracle swaps: a hindsight fit as of 2026-10 (all data) provides each factor
@@ -130,8 +138,8 @@ bias +0.5 pp) and is flat at 2025-03. Next: a profile-likelihood Newton step for
 so the fit converges in a few iterations, then evaluate the converged estimator as one candidate.
 
 
-### E4 (continued, by the second analyst). Why the backfit does not converge
-Recovered from the predecessor's caches (not logged before the hand-over): `lab/cand.py` evaluated, at the decision
+### E4 (continued). Why the backfit does not converge
+Recovered from the lab's caches (these runs had not been logged when they were made): `lab/cand.py` evaluated, at the decision
 origins, C1 = 8 iterations with a profile-likelihood EV step (segment levels profiled out) and a profile holiday step
 (region x calendar-month factor profiled out), C2 = Bayesian model averaging over family driver sets
 (`lab/bma.py`), and C1+C2:
@@ -188,7 +196,8 @@ Why the recent folds get worse (`lab/slicev.py`): the converged fit removes the 
 series almost unchanged. At 2023-03, 2024-10, 2025-01 and 2025-03 the Universal series are over-forecast by +1.0 to
 +1.8 % in both fits; the EV under-forecast used to offset that, so removing it raises the total bias. Of that
 positive bias, accounts lost inside the horizon contribute +0.30 / +0.40 / +0.48 pp (2024-10 / 2025-01 / 2025-03;
-not forecastable, and the generator schedules no losses in the test window, dossier 4.15 / 9.1 #6) and Direct OEM /
+not forecastable; the data suggest that no losses are scheduled in the test window, an inference rated plausible in
+dossier 4.15, see also 9.1 #6) and Direct OEM /
 Export series most of the rest (+1.7 to +2.7 % at the three recent origins). The level-window hypothesis ("levels
 estimated on a window where the old EV beta was baked in") does not apply: levels are re-estimated inside the same
 fit with the new factors; the shift is in the EV SKUs only. One fold-specific cost of discrete driver selection: at
@@ -215,9 +224,9 @@ GBM depends on the structural member, so the test must be redone on the converge
 confirmation origins, before anything is kept.
 
 ---------------------------------------------------------------------------------------------------------------------
-## 3. Third analyst (continuation from b7a96b4)
+## 3. Continuation (from b7a96b4)
 
-Hand-over finding not logged by the predecessor: the scratchpad `lab/results.csv` holds a prototype "conv_bma"
+Finding not logged by the earlier run: the lab's result table `lab/results.csv` holds a prototype "conv_bma"
 (converged fit + `lab/bma2.py`: every sign-consistent family driver set of at most three indicators, lags by
 coordinate search, weight `exp(-(RSS + 9k)/2)`, best four sets with weight >= 1 % of the best) already evaluated at
 all seven origins before any declaration (score 0.29108 / 0.26283 / 0.25898 / 0.25705 decision, 0.27044 / 0.25968 /
@@ -261,8 +270,8 @@ three at 2025-03. The scores are within 0.0002 of the prototype's at the confirm
 better); the converged fit alone did not. Candidate for the factor fit; step 2 (recent over-forecast) next.
 
 ### Step 2. The recent over-forecast, re-diagnosed on the converged + averaged fit (`lab2/diag.py`, `ana*.py`)
-Bias with / without the rows of accounts lost inside the horizon (`final_lost_tail`; not forecastable, none scheduled in
-the test window), score in brackets:
+Bias with / without the rows of accounts lost inside the horizon (`final_lost_tail`; not forecastable; the data suggest
+none are scheduled in the test window, dossier 4.15), score in brackets:
 
 | origin | bias all rows | bias excl. lost | score all | score excl. lost |
 |---|---|---|---|---|
@@ -309,7 +318,7 @@ over-corrects (cold starts +5.4 % -> -6.4 %, young launches +2.0 % -> -1.3 %, to
 young / cold-start over-forecast is real but its size varies by cohort more than an as-of ratio can predict.
 
 ### Step 3. Decision on the factor fit
-Scores excluding the rows of accounts lost inside the horizon (secondary view, declared in the task brief) give the
+Scores excluding the rows of accounts lost inside the horizon (secondary view, declared before this decision) give the
 same verdict: avg vs shipping 0.29092 / 0.26157 / 0.25353 / 0.24890 vs 0.29843 / 0.27342 / 0.25084 / 0.25324
 (3 of 4, mean -0.00525), confirmation 0.27046 / 0.25963 / 0.25318 vs 0.28116 / 0.26916 / 0.25716 (3 of 3, mean
 -0.00807). **Decision: adopt the converged fit with model-averaged driver sets** (E4 + E5a): it passes the keep

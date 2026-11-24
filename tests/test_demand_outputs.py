@@ -215,8 +215,8 @@ def test_test_grid_keeps_test_order(test_grid: pd.DataFrame) -> None:
 
 
 def test_research_crosschecks(pipeline_run, test_grid: pd.DataFrame) -> None:
-    table = RESEARCH / "panel-missing-zeros" / "series_table.csv"
-    mask = RESEARCH / "panel-missing-zeros" / "test_phase_mask.csv"
+    table = RESEARCH / "panel-missing-zeros" / "series_table.csv.gz"
+    mask = RESEARCH / "panel-missing-zeros" / "test_phase_mask.csv.gz"
     if not (table.exists() and mask.exists()):
         pytest.skip("research artefacts absent")
     state = pipeline_run.csv("series_state.csv")

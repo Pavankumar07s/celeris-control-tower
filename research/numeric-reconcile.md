@@ -214,7 +214,7 @@ Top 15 by excess units (file `oneoff_orders.csv` has all 438):
 5. Assert: units non-negative integers; `revenue == units × price` within 0.005; state counts equal the table in finding 1; `units == Shipped_Units` for stockout rows.
 6. Flag one-offs (finding 15) after correction, never before.
 
-## Artefacts (all in `/home/pavan/Desktop/mks/research/scratch/numeric-reconcile/`)
+## Artefacts (all in `research/scratch/numeric-reconcile/`; working files, not included in the repository)
 
 - `14_build_diagnosis.py` — standalone final build (needs only `data/interim/train_rough.parquet` and the raw stockout file).
 - `row_diagnosis.parquet` — all 244,566 Record_IDs: series/month, raw values, canonical list and invoice price, `issue`, `wrong_field`, `units_fix`, `price_fix`, `revenue_fix`, `units_status`, local levels, `oneoff_candidate`.

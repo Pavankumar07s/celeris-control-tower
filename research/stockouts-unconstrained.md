@@ -289,7 +289,7 @@ Source counts: as shipped 235,337; missing 45,542; S1 5,830; S5 1,925; S2 1,034;
 
 ---
 
-## Artefacts (all in `/home/pavan/Desktop/mks/research/scratch/stockouts-unconstrained/`)
+## Artefacts (all in `research/scratch/stockouts-unconstrained/`; working files, not included in the repository)
 
 | File | Content |
 |---|---|
@@ -313,5 +313,3 @@ Source counts: as shipped 235,337; missing 45,542; S1 5,830; S5 1,925; S2 1,034;
 4. **Why two listing rates (0.69 semiconductor vs 0.79 operational)?** Statistically distinct (pooled operational CI 0.746 .. 0.822). It only changes the hidden-month estimate (413; 650 if 0.70 applied).
 5. **Undetected hidden operational stockouts (about 310 months).** Not identifiable at useful precision; about 5.4k units. Robust loss is the mitigation.
 6. **Official clean vs my working clean.** The 343 unlisted India pack-of-10 cells (+/-5 units each) and the 331 blank ERP cells need the official treatment before the unconstrained series is final.
-
-Housekeeping: the project instruction to run `graphify update .` after code changes was not executed. No graph exists for this project (`/home/pavan/Desktop/mks/graphify-out` is absent and `/home/pavan/graphify-out` holds no `graph.json`), the command would write outside my assigned workspace, and six agents were running in parallel. The main session can run it once at the end if wanted.

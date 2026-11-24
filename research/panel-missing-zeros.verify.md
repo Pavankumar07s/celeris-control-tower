@@ -20,7 +20,7 @@ accumulation rule, the 0.5 catch-up after a shutdown and the 0.29 cycle-aware ba
 **Tally:** 10 confirmed, 5 partially confirmed, 0 refuted, 0 not checked (the MEA-opening ramp curve inside F3 was not
 re-derived).
 
-Method: my scripts are in `/home/pavan/Desktop/mks/research/scratch/panel-missing-zeros-verify/`. `k01`..`k17` were
+Method: my scripts are in `research/scratch/panel-missing-zeros-verify/` (working files, not included in the repository). `k01`..`k17` were
 written by the interrupted first skeptic; I read and re-ran them. `k18`..`k21` are new. Shared base: `k01_build.py`
 builds my own deduplicated 245,548-cell panel and my own unit cleaning (`kpanel.parquet`). `k02` gives the
 unconstrained mask. `k04` runs a free single change-point fit and assigns each cell its regime. I did not reuse any
@@ -317,7 +317,7 @@ investigator script or artefact as input. I opened their `test_phase_mask.csv`, 
    known only to +-5. Use `Shipped_Units` where listed (42 rows); this is a cross-lens point.
 7. The phase-out begins at h = 5 (0.92) and h = 4 (0.83), not only in the last four months (see correction 1).
 
-## Scripts (all in `/home/pavan/Desktop/mks/research/scratch/panel-missing-zeros-verify/`)
+## Scripts (all in `research/scratch/panel-missing-zeros-verify/`; working files, not included in the repository)
 
 `k01_build.py` (panel, dedup, cleaning) -> `k02_cycles.py` (masks, lost accounts) -> `k03_testmask.py` -> `k04_determinism.py`
 (change points, determinism, rolling origin) -> `k05_accumulate.py` -> `k06_stockouts.py` -> `k07_missing_blank.py` ->

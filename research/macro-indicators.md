@@ -395,7 +395,7 @@ In the window, PMI, UTIL and EV are well above their last-12-month means early o
 
 ## Artefacts
 
-All files are in `/home/pavan/Desktop/mks/research/scratch/macro-indicators/`.
+All files are in `research/scratch/macro-indicators/` (working files, not included in the repository).
 
 **Final, written or re-run in this pass:**
 - `m01_macro_clean.py` -> **`macro_clean.csv`** (113 months, cleaned) and **`macro_change_log.csv`** (56 changed cells + 1 dropped row: rule, classification, confidence, raw line).

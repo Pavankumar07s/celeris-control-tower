@@ -1,6 +1,7 @@
 """Cross-checks against the forensic research artefacts and hide-and-recover tests of the Record_ID decode (T8).
 
-Research files are read only here, never by the package, and the tests skip when they are absent.
+The reference files are copies of the forensic lenses' outputs in ``tests/fixtures/reference`` (provenance in its
+README). They are read only by tests, never by the package, and a test skips if its file is absent.
 """
 
 from __future__ import annotations

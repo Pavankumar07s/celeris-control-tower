@@ -12,8 +12,8 @@
 > bar for layout and typography only. `docs/design_system.md` is the canonical as-built statement.
 
 > **MANDATORY — read section 9 first.** The team owner supplied a specific skill, `dashboard-designer`, and asked that
-> the dashboard be designed with it. It is installed at `.claude/skills/dashboard-designer/SKILL.md` (project) and
-> `~/.claude/skills/dashboard-designer/SKILL.md` (user). Section 9 maps its rules onto this dashboard and adds a
+> the dashboard be designed with it. Its local copy (`.claude/skills/dashboard-designer/SKILL.md`) is not included in
+> the repository. Section 9 maps its rules onto this dashboard and adds a
 > 16-point gate that every view must pass.
 
 Research note, 24 Nov 2026. The team owner asked us to "search the internet for the best dashboard skill". This note reads the best public agent skills, rule files and design guides for dashboards and front-ends, plus the two local skills (`dataviz`, `artifact-design`). It merges what they prescribe into one rule set for the adopted **Editorial Precision** direction (`research/scratch/design-editorial/spec.md`).
@@ -377,7 +377,7 @@ How to use it: take the screenshots listed in the header row of each group (Chro
 
 ## 7. How the local skills apply here
 
-**`dataviz`** (local, loaded with the Skill tool). Its rules are the chart standard for this app, and spec §6 already follows them. The parts most likely to be broken during implementation:
+**`dataviz`** (a local copy). Its rules are the chart standard for this app, and spec §6 already follows them. The parts most likely to be broken during implementation:
 
 - One axis, always.
 - The palette validator: run `scripts/validate_palette.js` on the family palette in both modes before shipping. Spec §3.3 reports passing values; re-run it if any hex changes.
@@ -452,13 +452,13 @@ Design guides and data-viz references
 - https://bankunderground.co.uk/2019/11/19/build-your-own-fancharts-in-r/
 - https://echarts.apache.org/handbook/en/best-practices/aria/
 
-Local skills: `dataviz` (SKILL.md and references: anti-patterns, marks-and-anatomy, interaction, choosing-a-form) and `artifact-design`, loaded through the Skill tool on 24 Nov 2026.
+Local skills: `dataviz` (SKILL.md and references: anti-patterns, marks-and-anatomy, interaction, choosing-a-form) and `artifact-design`, consulted on 24 Nov 2026 (local copies, not included in the repository).
 
 ---
 
 ## 9. The team owner's skill: `dashboard-designer` (mandatory)
 
-Source: `.claude/skills/dashboard-designer/SKILL.md` in this repository (community skill, MIT; supplied by the team owner on
+Source: `.claude/skills/dashboard-designer/SKILL.md`, a local copy not included in the repository (community skill, MIT; supplied by the team owner on
 24 Nov 2026 with the instruction to use it for the dashboard design). Read the file itself; this section says how each of
 its rules applies to the Celeris control tower. Where it and the Editorial Precision design system agree — which is nearly
 everywhere — follow both. Where they differ, the notes below say which wins and why.
@@ -551,12 +551,13 @@ app was chosen so the demo has no server, no cold start and full control of the 
 
 ## 11. UI/UX Pro Max — installed by the team owner, to be applied FIRST
 
-The team owner installed the `ui-ux-pro-max` skill (`.claude/skills/ui-ux-pro-max/`) and said "use this first".
+The team owner installed the `ui-ux-pro-max` skill (`.claude/skills/ui-ux-pro-max/`, a local copy not included in the
+repository) and said "use this first".
 **Read `research/dashboard-skill-ui-ux-pro-max.md` before anything else in this file**: it records what the skill
 recommends for this product (data-dense, drill-down analytics dashboard; its palette, typography and chart rules), how
 each recommendation is adopted or reconciled with the Editorial Precision system, and an 18-point gate (accessibility,
 interaction, responsive layout at 1440 / 1024 / 768 / 375 px, motion, style and charts) that every view must pass before
-the other checklists. Load the skill with the Skill tool (`ui-ux-pro-max`) and query it for anything not covered.
+the other checklists. Query its search script for anything not covered.
 
 ---
 

@@ -1,6 +1,6 @@
 PY ?= .venv/bin/python
 
-.PHONY: all clean-data demand anomalies features backtest forecast submission export dashboard dashboard-dev test test-all install
+.PHONY: all clean-data demand anomalies features backtest forecast submission export dashboard dashboard-dev test test-all install source-zip
 
 ## all: run every registered pipeline stage in order (clean, demand, anomalies, features, backtest, forecast, ...)
 all:
@@ -58,3 +58,11 @@ test-all:
 ## install: editable install of the package into the project virtualenv (no dependency changes)
 install:
 	uv pip install --python $(PY) -e . --no-deps
+
+## source-zip: zip of the committed tree (HEAD) for the portal's source upload -> dist_zip/celeris_source.zip (git-ignored).
+##   Leaves out dashboard/public/data, the duplicate of dashboard/dist/data (.gitattributes, export-ignore); data/raw and
+##   other untracked files are never included. Commit first: uncommitted changes are not in the zip.
+source-zip:
+	mkdir -p dist_zip
+	git archive --worktree-attributes --format=zip -9 -o dist_zip/celeris_source.zip HEAD
+	@ls -l dist_zip/celeris_source.zip

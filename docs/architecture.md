@@ -17,12 +17,17 @@ lens reports beside it.
 4. **Deterministic.** Fixed seeds, stable sort orders, no wall-clock values inside data files. Two runs give identical
    output hashes (`outputs/quality/manifest.json`), whatever the number of backtest worker processes (`--workers`,
    `$CELERIS_WORKERS`, default 3; see "Run time and memory" below).
-5. **Assert the forensics.** Counts established in the dossier (245,548 grid cells, 244,566 records, 982 missing rows, …)
-   are hard assertions or tests, so a regression in a rule is caught immediately.
+5. **Assert the forensics.** Counts established in the dossier (245,548 grid cells, 244,566 records, 982 missing rows, …;
+   192 entries in `EXPECTED`, `config.py`) are hard assertions or tests, so a regression in a rule is caught immediately.
+   This pins the pipeline to this extract on purpose: a new extract stops at the first count that moved. A rolling
+   monthly run would first re-baseline `EXPECTED` or turn the assertions into monitored thresholds
+   (`docs/methodology.md` section 3).
 6. **Every change is explained.** Each modified cell has a row in the fix log (rule, raw value, before, after, evidence);
    each excluded or re-interpreted demand point has a row in the anomaly register (type, cause, action).
 7. **Errors vs real events.** Data errors are fixed. Real events are kept in the cleaned history and either modelled or
    masked from training, never silently deleted.
+8. **Missing inputs are explained.** If `data/raw` lacks any of the seven files, `python -m celeris <stage>` prints which
+   files are missing and where they go, and exits with status 2 before anything runs (`tests/test_cli.py`).
 
 ## Layout
 
@@ -46,13 +51,16 @@ src/celeris/
                            options --raw-dir, --out-dir, --bundle-dir, --workers
 tests/                     pytest suite (schema, invariants, oracle, rule fixtures, corruption-recovery, idempotence, contract);
                            `make test` deselects `@pytest.mark.slow` (about 3 min), `make test-all` adds the end-to-end
-                           test that runs `all` twice (about 24 min in total)
+                           test that runs `all` twice (about 24 min in total); `fixtures/reference/` holds the forensic
+                           lenses' outputs that the cross-check tests compare against (provenance in its README)
 outputs/                   everything the pipeline writes (see below)
 dashboard/                 static web app; reads only `dashboard/public/data/*` written by `celeris export`
 docs/                      problem statement, jury criteria, this file, methodology
-research/                  forensic reports and skeptic reviews (evidence of process; not used at runtime)
+research/                  forensic reports and skeptic reviews (evidence of process; not used at runtime); their working
+                           files, research/scratch/, are not included in the repository
 Makefile                   all; one target per stage (clean-data, demand, anomalies, features, backtest, forecast or
-                           submission, export); dashboard, dashboard-dev; test, test-all; install
+                           submission, export); dashboard, dashboard-dev; test, test-all; install; source-zip (the
+                           portal upload, from git archive; .gitattributes leaves out dashboard/public/data)
 ```
 
 Part A lives in `src/celeris/cleaning/`: one module per dossier step (`keys` 1, `dedup` 2, `record_id` 3, `grid` 4,

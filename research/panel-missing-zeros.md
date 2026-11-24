@@ -27,7 +27,7 @@ series, 27 / 27 cycle changes (same from -> to, same month), 16 / 16 lost accoun
 rows, accumulation factor identical on 49,260 / 49,260 rows.** Numbers below are the second-pass values; where the two
 passes differ by a few cells the reason is stated. First-pass statements that changed are listed in "Corrections".
 Month index `midx` = 0 for 2019-01 ... 93 for 2026-10. All scripts and artefacts are in
-`/home/pavan/Desktop/mks/research/scratch/panel-missing-zeros/`.
+`research/scratch/panel-missing-zeros/` (working files, not included in the repository).
 
 ---
 
@@ -494,7 +494,7 @@ points worse than the phase-aware one on B series and 106 points worse on Q seri
 5. Counts that moved by a few cells because of how launch-ramp zeros are assigned: on-phase zeros 269 (first pass 251),
    off-phase non-zeros 224 (227), lost-account cells 204 (212 quoted), spill without any record 38 (40).
 
-## Artefacts (all in `/home/pavan/Desktop/mks/research/scratch/panel-missing-zeros/`)
+## Artefacts (all in `research/scratch/panel-missing-zeros/`; working files, not included in the repository)
 
 | file | content |
 |---|---|
@@ -537,7 +537,3 @@ points worse than the phase-aware one on B series and 106 points worse on Q seri
    unconstrained history near the forecast origin (for example CSS-011 MEA 2026-09).
 8. A statistical curiosity without forecast impact: 23 of the 38 two-on / one-off series launched after 2019 outside the
    MEA opening start on their off-month (12.7 expected). Not seen for B or Q; possibly chance.
-
-Note: CLAUDE.md asks for `graphify update .` after code changes. This project has no `graphify-out` directory
-(`/home/pavan/Desktop/mks/graphify-out` does not exist and `/home/pavan/graphify-out` holds no graph), and this task
-restricts file creation to the research folders, so no graph was built or updated.

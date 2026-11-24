@@ -1,8 +1,8 @@
 # Skeptic review of lens `test-structure`
 
-Reviewed report: `/home/pavan/Desktop/mks/research/test-structure.md` (15 findings).
-I recomputed every finding from `/home/pavan/Desktop/mks/data/raw/*.csv` (`dtype=str, keep_default_na=False`) with new code in
-`/home/pavan/Desktop/mks/research/scratch/test-structure-verify/`. I did not import or read any script or artefact in `research/scratch/test-structure/`.
+Reviewed report: `research/test-structure.md` (15 findings).
+I recomputed every finding from `data/raw/*.csv` (`dtype=str, keep_default_na=False`) with new code in
+`research/scratch/test-structure-verify/` (working files, not included in the repository). I did not import or read any script or artefact in `research/scratch/test-structure/`.
 
 **My own base data.** `v00_panel.py` builds the panel from scratch:
 - dates from Load_Timestamp month minus 1, which agrees with my own Date-text tokeniser on 100% of rows;
@@ -329,7 +329,7 @@ The ranking is the same as the report's: 24 months is best.
 5. **The phase-out evidence is thin.** It rests on 23 series from 6 SKUs, all tail, while the 3 EOL-announced SKUs are core. The tier difference in level and cycle does not by itself imply a different phase-out, but the dashboard should present the factors with their confidence intervals (above).
 6. **Minor.** I count 435 distinct region orders once the 3 test-only SKUs are included (the report says 432, other lenses 433). Event series share an SKU across sets 3 times, which is chance level.
 
-## Scripts (all in `/home/pavan/Desktop/mks/research/scratch/test-structure-verify/`)
+## Scripts (all in `research/scratch/test-structure-verify/`; working files, not included in the repository)
 
 | Script | Purpose |
 |---|---|

@@ -29,9 +29,13 @@ research/scratch/
 # provided dataset: kept out of version control until the team decides whether to publish it
 data/raw/
 
-# tooling caches
+# tooling caches and local assistant configuration (never part of the submission)
 graphify-out/
 *.egg-info/
+.claude/
+
+# source zip for the portal upload (make source-zip)
+dist_zip/
 
 # dev-only stand-in forecasts for dashboard development
 outputs/_provisional/

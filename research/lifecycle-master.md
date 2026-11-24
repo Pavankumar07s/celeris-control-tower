@@ -172,7 +172,7 @@ Rows by rule in `lifecycle_test_rules.csv`: normal 57,302; lost_account_zero 304
 ---
 
 ## Artefacts
-All in `/home/pavan/Desktop/mks/research/scratch/lifecycle-master/`.
+All in `research/scratch/lifecycle-master/` (working files, not included in the repository).
 
 | File | Content |
 |---|---|
@@ -197,4 +197,3 @@ All in `/home/pavan/Desktop/mks/research/scratch/lifecycle-master/`.
 5. **Per-SKU ramp τ.** Evidence of spread (2.75–6.5) but no way to estimate τ for a SKU with 3–7 months of history; matters for 18 series.
 6. **Cold-start level.** Six historical pairs give a successor/predecessor ratio of 0.74–1.69; the prior's P10–P90 band is ×0.58–×1.71. Only 117 rows, about 4,100 units.
 7. **Ordering cycle of cold-start series** (monthly 83%, bimonthly 9.5%, quarterly 7.7% across active series) is unknowable in advance; forecasting the monthly mean is the WAPE-safe choice.
-8. **Not run:** `graphify update .` — `/home/pavan/graphify-out` holds no `graph.json`, and this lens was restricted to its own scratch folder.

@@ -1,8 +1,8 @@
 # Skeptic review of lens `labels-keys`
 
-Reviewed report: `/home/pavan/Desktop/mks/research/labels-keys.md` (14 findings).
-Everything below was recomputed from `/home/pavan/Desktop/mks/data/raw/*.csv` (`dtype=str, keep_default_na=False`) with fresh code in
-`/home/pavan/Desktop/mks/research/scratch/labels-keys-verify/` (`vcommon.py`, `v01`..`v18`). I wrote my own canonicalisers, date parser,
+Reviewed report: `research/labels-keys.md` (14 findings).
+Everything below was recomputed from `data/raw/*.csv` (`dtype=str, keep_default_na=False`) with fresh code in
+`research/scratch/labels-keys-verify/` (working files, not included in the repository; `vcommon.py`, `v01`..`v18`). I wrote my own canonicalisers, date parser,
 Record_ID decoder, de-duplication and a rough units clean; none of the investigator's scripts were imported. Their deliverable artefacts
 were only compared with my results at the end (`v16_artefacts.py`).
 
@@ -183,7 +183,6 @@ That clean reproduces the numeric lens's error counts (293 x10, 75 x100, 614 pri
 
 ## Not done
 
-- `graphify update .` (asked for by `/home/pavan/CLAUDE.md` after code changes) was not run: no graph exists for this project (`/home/pavan/Desktop/mks/graphify-out` is absent, `/home/pavan/graphify-out` holds no graph), and creating one would write outside the two locations this review is allowed to touch.
 - Region position inside a SKU's region list as a level signal: a regression with SKU and region effects gives inconsistent position effects (5th position -0.19 +- 0.03, 6th 0.00 +- 0.04); no usable rule, not pursued.
 
 ## Scripts (run order)

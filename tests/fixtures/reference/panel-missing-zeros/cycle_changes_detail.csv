@@ -1,0 +1,28 @@
+sku,region,change,viterbi_change,first_new_behaviour,cal_month,cust,chan
+PTC-058,Latin America,Q0>M,2022-01,2022-02,2,['Solaris Automotive'],Aftermarket
+ELA-078,Latin America,Q0>M,2022-03,2022-03,3,['Solaris Automotive'],Aftermarket
+HYD-024,Latin America,Q1>M,2022-02,2022-03,3,['Helios Auto Parts'],Tier-1 Distributor
+BSS-050,North America,Q1>M,2022-04,2022-04,4,['Solaris Automotive'],Direct OEM
+BSS-082,Asia Pacific,M>Q2,2022-05,2022-05,5,['Quantum Drive Systems'],Direct OEM
+CSS-020,North America,M>B1,2022-04,2022-05,5,['Orion Driveline'],Direct OEM
+BSS-014,Europe,Q0>M,2022-06,2022-06,6,['Helios Auto Parts'],Direct OEM
+CSS-060,Latin America,Q2>M,2022-06,2022-07,7,['Crestline Manufacturing'],Tier-1 Distributor
+ELA-086,Latin America,Q2>M,2022-06,2022-07,7,['Vantara Auto'],Direct OEM
+PMP-040,India,Q1>M,2022-07,2022-07,7,['Vantara Auto'],Tier-1 Distributor
+PTC-007,North America,M>B1,2022-06,2022-07,7,['Orion Driveline'],Tier-1 Distributor
+PTC-082,Europe,M>Q2,2022-06,2022-07,7,['Helios Auto Parts'],Tier-1 Distributor
+HYD-037,Europe,M>B0,2022-07,2022-08,8,['Meridian Assembly'],Tier-1 Distributor
+ELA-058,Europe,Q1>M,2022-11,2022-12,12,['Vantara Auto'],Direct OEM
+ELA-068,Asia Pacific,M>B0,2022-11,2022-12,12,['Meridian Assembly'],Aftermarket
+HYD-016,Latin America,M>Q2,2022-12,2023-01,1,['Apex Tier One'],Direct OEM
+THM-044,Latin America,Q2>M,2022-12,2023-01,1,['Orion Driveline'],Tier-1 Distributor
+PMP-074,India,Q0>M,2023-04,2023-05,5,['Quantum Drive Systems'],Direct OEM
+BSS-019,India,Q1>M,2023-05,2023-06,6,['Meridian Assembly'],Aftermarket
+BSS-069,Asia Pacific,Q1>M,2023-05,2023-06,6,['Crestline Manufacturing'],Tier-1 Distributor
+BSS-073,North America,M>B1,2023-04,2023-07,7,['Orion Driveline'],Aftermarket
+BSS-008,India,M>B0,2023-07,2023-08,8,['Meridian Assembly'],Tier-1 Distributor
+CSS-059,Asia Pacific,Q0>M,2023-07,2023-08,8,['Crestline Manufacturing'],Direct OEM
+PMP-083,Latin America,Q1>M,2023-08,2023-09,9,['Apex Tier One'],Direct OEM
+ELA-053,India,Q2>M,2023-09,2023-10,10,['Crestline Manufacturing'],Direct OEM
+ELA-035,Europe,Q0>M,2023-10,2023-11,11,['Quantum Drive Systems'],Direct OEM
+PMP-009,Asia Pacific,Q2>M,2023-11,2023-11,11,['Orion Driveline'],Aftermarket

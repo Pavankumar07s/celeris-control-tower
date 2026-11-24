@@ -74,7 +74,7 @@ The same steps as Make targets:
 
 Requirements:
 
-- Node 20 or later (built with Node 24);
+- Node 20.19 or later (Vite 7 requires `^20.19.0 || >=22.12.0`; built with Node 24);
 - the project's Python virtualenv for the export.
 
 The export needs these pipeline outputs:
@@ -136,10 +136,11 @@ Start-up loads about 0.64 MB of gzipped data plus about 0.32 MB of JavaScript (E
   scored cells of the selection, never as an average of series WAPEs. Actuals are unconstrained demand.
 - **Backtest scoring** pools the **four decision folds** that chose the model (origins Oct 2022, Oct 2023, Oct 2024,
   Mar 2025) on the **cells every model forecast**. The Oct 2021 stress fold (COVID and the chip shortage) is replayed in
-  the time machine but never pooled, and a model with missing predictions is never credited with zero error. The ladder
-  then agrees with `summary.json` (our model 26.1 %, the global GBM 26.7 %, seasonal naive 38.6 %; the in-hindsight floor
-  reads 23.5 % pooled over the cells, against 23.6 % as the mean of the four folds in `summary.json`), and the Overview,
-  the brief and Forecast & accuracy cite the same floor.
+  the time machine but never pooled, and a model with missing predictions is never credited with zero error. Pooled
+  over the cells, our model (26.1 %) and the global GBM (26.7 %) read as in `summary.json`, which averages the four
+  folds; the other figures differ by up to 0.1 point: seasonal naive 38.6 % (38.7 % as the mean of the folds),
+  cycle-aware naive 31.1 % (31.2 %), the in-hindsight floor 23.5 % (23.6 %). The Overview, the brief and Forecast &
+  accuracy cite the same pooled floor.
 - **Missing rows are not zeros.** Months where rebuilt cells cluster carry hollow rings, and their demand is the
   pipeline's fill. Cells whose shipments are unknown (ERP blanks) are kept out of the lost-sales gap.
 - **Forecast totals equal `submission.csv`** (2,805,199 units in 58,219 rows). The export refuses to write a bundle that
@@ -156,7 +157,7 @@ Start-up loads about 0.64 MB of gzipped data plus about 0.32 MB of JavaScript (E
 | **Demand explorer** (history) | A navigator that drills family → SKU → region → customer, with a breadcrumb. The timeline (orders or latent demand, continued into the forecast by default; columns for one series, click a month for its lineage). Seasonality by year; zero-month calendar (scheduled vs unexplained zeros); series card (lifecycle, customers over time, ordering cycle, demand class). A planned launch with no history still shows its forecast. | Why does this series look the way it does? Are its zeros scheduled, missing or lost? |
 | **Anomaly monitor** (history) | "78% of flagged cells were real business, not errors". Flagged points on the timeline: rose hollow diamonds for data errors (corrected, or units unknown and kept out of fitting), jade triangles for real events, each on its value, the largest annotated. Flags by type on one shared bar scale (cells and episodes counted apart); the register with type, scope, period, reason, action, confidence and impact, each row expandable to the full reason, evidence and action (keyboard and touch, not only hover); group by cause; CSV. | Which unusual numbers were mistakes and which were real business, and what was done with each? |
 | **Stock-outs & lost sales** (history) | 106,925 units ($109.9M) of demand never shipped; Electrical Assemblies 75 % of it. Lost vs back-ordered by month first, at full width; the shipped vs unconstrained demand timeline as compact context; lost sales by year, family, region and reason; shortfall heatmap family × month; back-order mechanics; the largest lost-sales series (a row opens it in the explorer). | How much demand did supply constraints hide, where, and what did it cost? |
-| **Macro lead / lag** (history) | "Five of seven families have a leading indicator that holds in both eras" (one family selected: its own pair, e.g. "Vehicle orders lead Electrical Assemblies by two months"); hero 5 of 7 families with a stable driver; every correlation names its statistic and period. Rate indicators change in points, levels in %. Family × indicator correlation matrix (model drivers outlined); lag profile by era; a model-free check on one standardised axis; indicator paths into the window; the EV shift indexed to 2023 = 100; per-SKU sensitivities as a dot plot with a table twin. | Which public indicator should I watch for each family, with how many months of warning, and is that stable? |
+| **Macro lead / lag** (history) | "Five of seven families have a leading indicator that holds in both eras" (one family selected: its own pair, e.g. "Vehicle orders lead Electrical Assemblies by two months"); hero 5 of 7 families with a stable driver (a driver of the model whose correlation at its lag keeps its sign and \|r\| ≥ 0.5 in 2019–22 and in 2023–26; the by-origin test of `methodology.md` 6.2, same indicator and lag at every decision origin, counts four families); every correlation names its statistic and period. Rate indicators change in points, levels in %. Family × indicator correlation matrix (model drivers outlined); lag profile by era; a model-free check on one standardised axis; indicator paths into the window; the EV shift indexed to 2023 = 100; per-SKU sensitivities as a dot plot with a table twin. | Which public indicator should I watch for each family, with how many months of warning, and is that stable? |
 | **Forecast & accuracy** (prediction) | "Our model beats all three benchmarks, the best by 5.0 points" (always against the best benchmark of the selection; differences taken from the printed values); hero WAPE 26.1 % on its benchmark ladder. The forecast continuing the history; the **backtest time machine** (replay any origin, the 2021 stress test included). **WAPE and bias by family, region and channel** as dot-range rows on one scale (our model, seasonal naive, the in-hindsight floor); bias heatmap family × region; **WAPE or bias by horizon 1–19** (toggle); month / quarter / year table with coherent P10 / P50 / P90 and a CSV; the **forecast X-ray** waterfall; forecast value added with the challengers (global GBM, ensemble) and the intermittent methods; interval calibration; accuracy by aggregation level. | How good is the forecast, against which benchmarks, where is it weakest, and can the band be trusted? Why is this number what it is? |
 | **Lifecycle** (prediction) | "Three SKUs hand over to successors in 2027"; successors reach 49 % of their predecessors' monthly volume by May 2028. Grouped Gantt (life so far, inside the window, launch and end-of-life marks, successor links); one handover panel per predecessor → successor with business-rule-5 checks; recent launches still ramping. | Which SKUs appear or disappear in the window, and do their forecasts respect business rule 5? |
 | **What-if** (prediction) | A scenario builder (presets such as PMI −3 from Jan 2027, indicator, shift, period, remove window events, one orange Apply) kept in the URL. Latent demand changes by exp(Σ β · Δindicator(t − lag)) per SKU and channel group, then flows through each series' ordering cycle; structural zeros stay zero. The scenario (violet) against the base forecast and its band; P90 cover, revenue and rows changed; impact by family; effect by month. | What happens to the plan if the economy turns, and where does it land? |
@@ -201,6 +202,9 @@ Global controls, all kept in the URL hash, so any view with its filters is a sha
 
 ## Deploy the static build
 
+The submitted dashboard is live at <https://pavankumar07s.github.io/celeris-control-tower/>: `dashboard/dist`, as built and committed, served from the repository's
+`gh-pages` branch.
+
 `vite.config.ts` uses `base: "./"`, and navigation uses the URL hash, so `dist/` works from any sub-path without
 server rewrites:
 
@@ -224,7 +228,7 @@ dashboard/src/
   App.tsx                shell: rail, masthead, filter bar, lazy views, theme (storage, system or the theme= link)
   app/                   context (AppState, VIEWS), hooks (useSelection, useElementWidth, useMedia)
   styles/                tokens.css (light / dark), base, shell, components
-  assets/fonts/          self-hosted Source Serif 4, IBM Plex Sans and Mono (OFL)
+  assets/fonts/          self-hosted Source Serif 4, IBM Plex Sans and Mono (SIL OFL 1.1; licences in docs/third_party/)
   data/                  bundle types, loader, in-memory model, aggregations, breakdowns, quantile engine, formatting
   charts/                ECharts wrapper, theme read from the CSS tokens, the shared timeline, annotation overlay
   components/            shell (rail, masthead, footer), filter bar, Lede / Figure, Module / Key, controls, tables,
