@@ -8,6 +8,7 @@ import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtSignedPct, monthLong, monthName, m
 import { seriesMatches, type Filters, type Measure, type Model } from "../data/model";
 import type { ExceptionFile } from "../data/types";
 import { LinkButton, MoreLink } from "../components/controls";
+import { lastOrderPhrase, lostFacts } from "./inbox";
 
 /** The backtest ladder as every view cites it: pooled over the scored origins on the cells every model forecast.
  *  The noise floor is the in-hindsight oracle on those same cells (one variable for the Overview, the brief and
@@ -20,6 +21,7 @@ export function ladderFacts(m: Model) {
     final: find(bt.final) ?? find("final"),
     naive: find("naive"),
     snaive: find("seasonal_naive"),
+    cycle: find("cycle_aware"),
     floor: oracle ? oracle.wape : bt.noise_floor,
     origins: (bt.scored_origins ?? bt.origins).length,
   };
@@ -100,6 +102,50 @@ export function largestShift(filters: Filters, mixes: MixShares[]): { dim: MixSh
   return best;
 }
 
+/** The largest event inside the forecast window for the selection (the brief's Risk and the Overview watch list). */
+export function riskFact(m: Model, X: ExceptionFile, rows: number[]) {
+  const events = rows.filter((i) => X.rule[i] === "window_event");
+  if (!events.length) return null;
+  const byGroup = new Map<string, number[]>();
+  for (const i of events) byGroup.set(X.group[i], [...(byGroup.get(X.group[i]) ?? []), i]);
+  const [group, list] = [...byGroup.entries()].sort((p, q) => Math.abs(q[1].reduce((a, i) => a + X.impact_units[i], 0)) - Math.abs(p[1].reduce((a, i) => a + X.impact_units[i], 0)))[0];
+  const units = list.reduce((a, i) => a + X.impact_units[i], 0);
+  const usd = list.reduce((a, i) => a + X.revenue_at_risk[i], 0);
+  const [who, where] = group.replace(/^EV-\d+\s*/, "").split("|").map((x) => x.trim());
+  const id = group.match(/^(EV-\d+)/)?.[1];
+  const ei = id ? m.dims.events.id.indexOf(id) : -1;
+  const desc = ei >= 0 ? m.dims.events.description[ei].toLowerCase() : "event";
+  const what = /retooling shutdown/.test(desc) ? "retooling shutdown" : /shutdown/.test(desc) ? "shutdown" : /strike/.test(desc) ? "strike" : "event";
+  const s0 = Math.min(...list.map((i) => X.start[i]));
+  const s1 = Math.max(...list.map((i) => X.end[i]));
+  return { who, where: where ?? "", what, units, usd, n: list.length, span: monthSpan(m.months[s0], m.months[Math.min(s1, m.nMonths - 1)]) };
+}
+
+/** The exception cases of the selection: count, revenue at risk and the largest case (the brief's Act, the
+ *  Overview watch list; the same rows the rail badge and the inbox tabs count). */
+export function actFact(m: Model, X: ExceptionFile, rows: number[]) {
+  if (!rows.length) return null;
+  const usd = rows.reduce((a, i) => a + X.revenue_at_risk[i], 0);
+  const top = rows.reduce((a, i) => (X.revenue_at_risk[i] > X.revenue_at_risk[a] ? i : a), rows[0]);
+  const s = X.series[top];
+  const whoText = s >= 0 ? `${m.dims.skus.id[m.sSku[s]]} in ${m.dims.regions[m.sRegion[s]]}` : `${m.dims.families.name[X.family[top]]} in ${m.dims.regions[X.region[top]]}`;
+  const whoNode: ReactNode =
+    s >= 0 ? (
+      <>
+        <span className="id">{m.dims.skus.id[m.sSku[s]]}</span> in {m.dims.regions[m.sRegion[s]]}
+      </>
+    ) : (
+      whoText
+    );
+  const rule = X.rules[X.rule[top]]?.title ?? X.rule[top];
+  const ruleWords = X.rule[top] === "lost_account" ? "a lost account" : `${/^[aeiou]/i.test(rule) ? "an" : "a"} ${rule.toLowerCase()}`;
+  const lost = X.rule[top] === "lost_account" ? lostFacts(X.cause[top]) : null;
+  return { n: rows.length, usd, top, topUsd: X.revenue_at_risk[top], whoText, whoNode, ruleWords, lost };
+}
+
+/** Lost units as a share of unconstrained demand: one variable for the Overview figure, the brief and the watch list. */
+export const lostShare = (lostUnits: number, h: HistoryAgg): number => lostUnits / Math.max(1, sum(h.demand));
+
 export function briefing(c: Ctx): BriefItem[] {
   const { m, h, fc } = c;
   const out: BriefItem[] = [];
@@ -142,58 +188,33 @@ export function briefing(c: Ctx): BriefItem[] {
   if (c.exc) {
     const X = c.exc;
     const rows = exceptionRowsIn(m, c.filters, X);
-    // RISK: the largest event inside the forecast window
-    const events = rows.filter((i) => X.rule[i] === "window_event");
-    if (events.length) {
-      const byGroup = new Map<string, number[]>();
-      for (const i of events) byGroup.set(X.group[i], [...(byGroup.get(X.group[i]) ?? []), i]);
-      const [group, list] = [...byGroup.entries()].sort((p, q) => Math.abs(q[1].reduce((a, i) => a + X.impact_units[i], 0)) - Math.abs(p[1].reduce((a, i) => a + X.impact_units[i], 0)))[0];
-      const units = list.reduce((a, i) => a + X.impact_units[i], 0);
-      const usd = list.reduce((a, i) => a + X.revenue_at_risk[i], 0);
-      const [who, where] = group.replace(/^EV-\d+\s*/, "").split("|").map((s) => s.trim());
-      const id = group.match(/^(EV-\d+)/)?.[1];
-      const ei = id ? m.dims.events.id.indexOf(id) : -1;
-      const desc = ei >= 0 ? m.dims.events.description[ei].toLowerCase() : "event";
-      const what = /retooling shutdown/.test(desc) ? "retooling shutdown" : /shutdown/.test(desc) ? "shutdown" : /strike/.test(desc) ? "strike" : "event";
-      const s0 = Math.min(...list.map((i) => X.start[i]));
-      const s1 = Math.max(...list.map((i) => X.end[i]));
+    // RISK: the largest event inside the forecast window (one variable with the Overview watch list)
+    const r = riskFact(m, X, rows);
+    if (r) {
       out.push({
         tag: "Risk",
         tone: "warn",
         body: (
           <>
-            The <b>{who}</b> {what} ({where ? `${where}, ` : ""}
-            {monthSpan(m.months[s0], m.months[Math.min(s1, m.nMonths - 1)])}) {units >= 0 ? "removes" : "adds"} <b>{fmtInt(Math.abs(units))} units</b> ({fmtMoney(usd, 1)}) of demand across {list.length} series.
+            The <b>{r.who}</b> {r.what} ({r.where ? `${r.where}, ` : ""}
+            {r.span}) {r.units >= 0 ? "removes" : "adds"} <b>{fmtInt(Math.abs(r.units))} units</b> ({fmtMoney(r.usd, 1)}) of demand across {r.n} series.
           </>
         ),
       });
     }
-    // ACT
-    if (rows.length) {
-      const usd = rows.reduce((a, i) => a + X.revenue_at_risk[i], 0);
-      const top = rows.reduce((a, i) => (X.revenue_at_risk[i] > X.revenue_at_risk[a] ? i : a), rows[0]);
-      const s = X.series[top];
-      const who = s >= 0 ? (
-        <>
-          <span className="id">{m.dims.skus.id[m.sSku[s]]}</span> in {m.dims.regions[m.sRegion[s]]}
-        </>
-      ) : (
-        <>
-          {m.dims.families.name[X.family[top]]} in {m.dims.regions[X.region[top]]}
-        </>
-      );
-      const since = X.cause[top].match(/since (\d{4}-\d{2})/)?.[1];
-      const rule = X.rules[X.rule[top]]?.title ?? X.rule[top];
+    // ACT (one variable with the Overview watch list, the rail badge and the inbox: cases)
+    const a = actFact(m, X, rows);
+    if (a) {
       out.push({
         tag: "Act",
         tone: "crit",
         body: (
           <>
             <b>
-              {fmtInt(rows.length)} exception{rows.length === 1 ? "" : "s"}
+              {fmtInt(a.n)} {a.n === 1 ? "case" : "cases"}
             </b>{" "}
-            need a planner, with <b>{fmtMoney(usd, 1)}</b> of revenue at risk. The largest is {X.rule[top] === "lost_account" ? "a lost account" : `${/^[aeiou]/i.test(rule) ? "an" : "a"} ${rule.toLowerCase()}`}: {who}
-            {X.rule[top] === "lost_account" && since ? <>, silent since {monthLong(since)}</> : null}. <MoreLink onClick={() => c.go("exceptions")}>Open the inbox</MoreLink>
+            need a planner, with <b>{fmtMoney(a.usd, 1)}</b> of revenue at risk. The largest is {a.ruleWords}: {a.whoNode}
+            {a.lost ? <>, {lastOrderPhrase(a.lost).replace(/^Last/, "last")}</> : null}. <MoreLink onClick={() => c.go("exceptions")}>Open the inbox</MoreLink>
           </>
         ),
       });
@@ -208,7 +229,7 @@ export function briefing(c: Ctx): BriefItem[] {
       tag: "Zeros",
       body: (
         <>
-          <b>{fmtPct(structural / zeros, structural / zeros >= 0.995 ? 2 : 1)}</b> of the {fmtInt(zeros)} zero series-months in the last 24 months are scheduled ordering-cycle off-months or lost-account tails, not missing demand. <MoreLink onClick={() => c.go("explorer", { lens: "latent" })}>Latent-demand lens</MoreLink>
+          <b>{fmtPct(structural / zeros, structural / zeros >= 0.995 ? 2 : 1)}</b> of the {fmtInt(zeros)} zero series-months of the last 24 months ({monthSpan(m.months[m.asOf - 23], m.months[m.asOf])}) are scheduled ordering-cycle off-months or lost-account tails, not missing demand. <MoreLink onClick={() => c.go("explorer", { lens: "latent" })}>Latent-demand lens</MoreLink>
         </>
       ),
     });
@@ -216,31 +237,32 @@ export function briefing(c: Ctx): BriefItem[] {
 
   // LOST SALES
   if (c.lost && c.lost.u > 0) {
-    // cells with unknown shipments (ERP blanks) carry demand but no shipments: keep them out of the uplift
-    const uplift = sum(h.demand) / (sum(h.shipped) + sum(h.unknownDemand)) - 1;
+    // one base with the Overview figure and Stock-outs: lost units as a share of unconstrained demand
+    const share = lostShare(c.lost.u, h);
     const y0 = m.months[0].slice(0, 4);
     const y1 = m.months[m.asOf].slice(0, 4);
     out.push({
       tag: "Lost sales",
       body: (
         <>
-          Stock-outs cost <b>{fmtInt(c.lost.u)} units</b> ({fmtMoney(c.lost.usd, 1)}) that never shipped in {y0}–{y1}. Unconstrained demand runs <b>{fmtSignedPct(uplift, 2)}</b> above shipments, and the forecast is unconstrained. <MoreLink onClick={() => c.go("stockouts")}>Stock-outs</MoreLink>
+          Stock-outs cost <b>{fmtInt(c.lost.u)} units</b> ({fmtMoney(c.lost.usd, 1)}) that never shipped in {y0}–{y1}, <b>{fmtPct(share, 2)}</b> of unconstrained demand; the forecast is unconstrained, so it plans for them. <MoreLink onClick={() => c.go("stockouts")}>Stock-outs</MoreLink>
         </>
       ),
     });
   }
 
   // ACCURACY
-  const { final, naive, snaive, floor, origins } = ladderFacts(m);
+  const { final, naive, snaive, cycle, floor, origins } = ladderFacts(m);
   if (final && (naive || snaive)) {
     out.push({
       tag: "Accuracy",
       body: (
         <>
           Across {origins} backtest origins at a 19-month horizon, WAPE is <b>{fmtPct(final.wape)}</b>
-          {snaive && <>, against {fmtPct(snaive.wape)} for seasonal naive</>}
+          {cycle && <>, against {fmtPct(cycle.wape)} for cycle-aware naive (the best benchmark)</>}
+          {snaive && <>{cycle ? "," : ", against"} {fmtPct(snaive.wape)} for seasonal naive</>}
           {naive && <> and {fmtPct(naive.wape)} for naive</>}
-          {floor !== null && <>; the noise floor is about {fmtPct(floor)}</>}. <MoreLink onClick={() => c.go("forecast")}>Accuracy by segment</MoreLink>
+          {floor !== null && <>; the in-hindsight floor is {fmtPct(floor)}</>}. <MoreLink onClick={() => c.go("forecast")}>Accuracy by segment</MoreLink>
         </>
       ),
     });

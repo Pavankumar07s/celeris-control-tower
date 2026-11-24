@@ -8,7 +8,30 @@
 import type { BacktestFile } from "../data/types";
 import { seriesMatches, type Filters, type Model } from "../data/model";
 import { fmtInt, fmtPct, fmtPctAbs, fmtSignedPct, monthLong } from "../data/format";
-import { type SelectionWords, type Template } from "./headlines";
+import { joinList, type SelectionWords, type Template } from "./headlines";
+
+// ---- printed precision: every difference on screen is the difference of the printed values -------------------
+/** A rate as printed by fmtPct (one decimal of a percent), back as a number of percent: 0.26275 -> 26.3. */
+export const shownPct = (x: number): number => Number((x * 100).toFixed(1));
+/** Points between two printed rates (a − b), rounded first: 38.6 − 26.3 = 12.3, never 12.348 -> "12.3" by luck. */
+export const ptsBetween = (a: number, b: number): number => Math.round((shownPct(a) - shownPct(b)) * 10) / 10;
+/** The same difference as a fraction, for fmtPts. */
+export const fracBetween = (a: number, b: number): number => ptsBetween(a, b) / 100;
+/** "12.3 points" from two rates, rounded first. */
+export const ptsText = (a: number, b: number): string => `${Math.abs(ptsBetween(a, b)).toFixed(1)} points`;
+/** Largest-remainder rounding of shares that add to 1, to one decimal of a percent: the printed parts add to 100.0. */
+export function shares100(parts: number[]): number[] {
+  const tenths = parts.map((p) => (Number.isFinite(p) ? p * 1000 : 0));
+  const base = tenths.map(Math.floor);
+  let left = Math.round(tenths.reduce((a, b) => a + b, 0)) - base.reduce((a, b) => a + b, 0);
+  const order = tenths.map((t, i) => [t - Math.floor(t), i] as const).sort((a, b) => b[0] - a[0]);
+  for (const [, i] of order) {
+    if (left <= 0) break;
+    base[i] += 1;
+    left--;
+  }
+  return base.map((b) => b / 1000);
+}
 
 export const CHAIN = ["naive", "seasonal_naive", "cycle_aware"] as const;
 export const INTERMITTENT = ["croston", "sba", "tsb", "adida", "imapa", "moving_average"] as const;
@@ -17,7 +40,7 @@ export const CHALLENGERS = ["gbm", "ensemble"] as const;
 const LABELS: Record<string, string> = {
   naive: "Naive",
   seasonal_naive: "Seasonal naive",
-  cycle_aware: "Cycle-aware",
+  cycle_aware: "Cycle-aware naive",
   croston: "Croston",
   sba: "SBA",
   tsb: "TSB",
@@ -259,28 +282,67 @@ export interface AccuracyFacts {
   bias: number;
   weakest: (SegRow & { dim: SegDim }) | null;
   segCount: number;
+  /** The benchmark chain scored on the selection's cells (finite only), and the strongest (lowest WAPE) of them. */
+  bench: { md: string; label: string; w: number }[];
+  best: { md: string; label: string; w: number } | null;
+}
+
+/** The strongest benchmark of the chain on the selection: the one an honest headline must beat. */
+export function bestBenchmark(bench: { md: string; label: string; w: number }[]): { md: string; label: string; w: number } | null {
+  const ok = bench.filter((b) => Number.isFinite(b.w));
+  // ties on the printed value go to the earlier (simpler) benchmark
+  return ok.length ? ok.reduce((a, b) => (shownPct(b.w) < shownPct(a.w) ? b : a)) : null;
 }
 
 const pts = (x: number) => `${(Math.abs(x) * 100).toFixed(1)} points`;
-const ok = (f: AccuracyFacts) => f.cells > 0 && Number.isFinite(f.final) && Number.isFinite(f.snaive);
+const ok = (f: AccuracyFacts) => f.cells > 0 && Number.isFinite(f.final) && f.best !== null;
+const lc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+const cap1 = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const countW = (n: number) => ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] ?? String(n);
 
 export const ACCURACY_TEMPLATES = {
-  /** "Our model beats seasonal naive by 12.7 points of WAPE" (the selection's name leads when filtered). */
+  /** Against the BEST benchmark of the selection (never a cherry-picked weak one):
+   *  "Our model beats the best benchmark, cycle-aware naive, by 4.8 points" / "ELA-008 in India: our model
+   *  edges naive, the best benchmark here, by 0.4 points".  Seasonal naive is named alone only when it is
+   *  the strongest.  Points are the difference of the printed WAPEs. */
   headline: {
     id: "forecast.headline",
-    when: (f) => ok(f) && f.final < f.snaive,
-    text: (f) => (f.sel.all ? `Our model beats seasonal naive by ${pts(f.snaive - f.final)} of WAPE` : `${f.sel.name}: our model beats seasonal naive by ${pts(f.snaive - f.final)}`),
-    fallback: (f) =>
-      !ok(f)
-        ? `${f.sel.all ? "The selection" : f.sel.name} has no backtest history to score`
-        : `${f.sel.all ? "Seasonal naive" : `${f.sel.name}: seasonal naive`} beats our model by ${pts(f.final - f.snaive)}`,
+    when: (f) => ok(f) && ptsBetween((f.best as { w: number }).w, f.final) > 0,
+    text: (f) => {
+      const b = f.best as { md: string; label: string; w: number };
+      const d = ptsBetween(b.w, f.final);
+      const verb = d < 1 ? "edges" : "beats";
+      const by = `by ${ptsText(b.w, f.final)}`;
+      if (b.md === "seasonal_naive") return f.sel.all ? `Our model ${verb} seasonal naive, the best benchmark, ${by}` : `${f.sel.name}: our model ${verb} seasonal naive, the best benchmark here, ${by}`;
+      // all series: a two-line headline that still states the margin over the best; the standfirst names it
+      const n = f.bench.length;
+      const all = n >= 2 && f.bench.every((x) => ptsBetween(x.w, f.final) > 0);
+      if (f.sel.all) return all ? `Our model beats all ${countW(n)} benchmarks, the best by ${ptsText(b.w, f.final)}` : `Our model ${verb} the best benchmark, ${lc(b.label)}, ${by}`;
+      return `${f.sel.name}: our model ${verb} ${lc(b.label)}, the best benchmark here, ${by}`;
+    },
+    fallback: (f) => {
+      if (!ok(f)) return `${f.sel.all ? "The selection" : f.sel.name} has no backtest history to score`;
+      const b = f.best as { md: string; label: string; w: number };
+      const d = ptsBetween(b.w, f.final);
+      if (d === 0) return `${f.sel.all ? "Our model" : `${f.sel.name}: our model`} ties ${lc(b.label)}, the best benchmark, at ${fmtPct(f.final)}`;
+      return `${f.sel.all ? cap1(b.label) : `${f.sel.name}: ${lc(b.label)}`} beats our model by ${ptsText(f.final, b.w)}`;
+    },
   },
   /** Pooled scope, the three numbers, bias, the weakest segment against its own floor. */
   standfirst: {
     id: "forecast.standfirst",
     when: ok,
     text: (f) => {
-      const head = `Over ${f.origins} backtest origins and ${f.cells.toLocaleString("en-US")} scored series-months, the forecast misses by **${fmtPct(f.final)}** of volume against **${fmtPct(f.snaive)}** for seasonal naive, with a bias of **${fmtSignedPct(f.bias)}**.`;
+      const best = f.best;
+      const against =
+        best && best.md !== "seasonal_naive" && Number.isFinite(f.snaive)
+          ? `against **${fmtPct(best.w)}** for ${lc(best.label)} and ${fmtPct(f.snaive)} for seasonal naive`
+          : Number.isFinite(f.snaive)
+            ? `against **${fmtPct(f.snaive)}** for seasonal naive`
+            : best
+              ? `against **${fmtPct(best.w)}** for ${lc(best.label)}`
+              : "";
+      const head = `Over ${f.origins} backtest origins and ${f.cells.toLocaleString("en-US")} scored series-months, the forecast misses by **${fmtPct(f.final)}** of volume ${against}, with a bias of **${fmtSignedPct(f.bias)}**.`;
       const w = f.weakest;
       const tail = w
         ? ` ${w.label} is its weakest ${w.dim} at **${fmtPct(w.w)}**${Number.isFinite(w.floor) ? `, ${w.w - w.floor < 0.08 ? "close to" : "against"} the ${fmtPct(w.floor)} that even an in-hindsight forecast would miss there` : ""}.`
@@ -306,7 +368,7 @@ export const SEGMENT_TEMPLATES = {
     when: (s) => s.rows.length >= 2,
     text: (s) => {
       const w = s.rows[0];
-      const beat = s.rows.filter((r) => r.w < r.ws).length;
+      const beat = s.rows.filter((r) => shownPct(r.w) < shownPct(r.ws)).length;
       const tail = beat === s.rows.length ? `every ${s.dim} beats seasonal naive` : `${beat} of ${s.rows.length} ${plural(s.dim)} beat seasonal naive`;
       return `${w.label} is the hardest ${s.dim} at ${fmtPct(w.w)}; ${tail}`;
     },
@@ -320,16 +382,35 @@ export interface HorizonFacts {
   firstLabel: string;
   lastLabel: string;
   gapToFloor: number | null;
+  /** Our model's WAPE at every horizon (null where nothing was scored) and the label of each horizon. */
+  values?: (number | null)[];
+  labels?: string[];
 }
+/** Half a point: an interior peak or dip smaller than this is noise, not a shape worth a headline. */
+const SHAPE_TOL = 0.005;
 export const HORIZON_TEMPLATES = {
-  /** "Error grows from 26.9% one month ahead to 29.3% at 19 months". */
+  /** "Error grows from 26.9% one month ahead to 29.3% at 19 months" only when the curve has no interior peak or
+   *  dip; otherwise "Error peaks 5 months ahead at 25.6%, against 21.0% at 1 month and 22.4% at 19". */
   title: {
     id: "forecast.horizon",
     when: (h) => h.first !== null && h.last !== null,
     text: (h) => {
       const a = h.first as number;
       const b = h.last as number;
-      if (Math.abs(b - a) < 0.01) return `Error holds near ${fmtPct((a + b) / 2)} from ${h.firstLabel} to ${h.lastLabel} ahead`;
+      const pts = (h.values ?? []).map((v, i) => [v, i] as const).filter((x): x is readonly [number, number] => x[0] !== null && Number.isFinite(x[0]));
+      if (pts.length >= 3 && h.labels) {
+        const hi = pts.reduce((x, y) => (y[0] > x[0] ? y : x));
+        const lo = pts.reduce((x, y) => (y[0] < x[0] ? y : x));
+        const interior = (p: readonly [number, number]) => p[1] !== pts[0][1] && p[1] !== pts[pts.length - 1][1];
+        if (interior(hi) && hi[0] - Math.max(a, b) > SHAPE_TOL) {
+          // a rising curve with its high point inside the window reads as growth to a peak, not a spike
+          const late = hi[1] >= pts[0][1] + 0.6 * (pts[pts.length - 1][1] - pts[0][1]);
+          if (late && b - a > SHAPE_TOL) return `Error grows from ${fmtPct(a)} ${h.firstLabel} ahead to a ${fmtPct(hi[0])} peak at ${h.labels[hi[1]]}`;
+          return `Error peaks ${h.labels[hi[1]]} ahead at ${fmtPct(hi[0])}, against ${fmtPct(a)} at ${h.firstLabel} and ${fmtPct(b)} at ${h.lastLabel}`;
+        }
+        if (interior(lo) && Math.min(a, b) - lo[0] > SHAPE_TOL) return `Error is lowest ${h.labels[lo[1]]} ahead at ${fmtPct(lo[0])}, against ${fmtPct(a)} at ${h.firstLabel} and ${fmtPct(b)} at ${h.lastLabel}`;
+      }
+      if (shownPct(a) === shownPct(b) || Math.abs(b - a) < SHAPE_TOL) return `Error holds near ${fmtPct((a + b) / 2)} from ${h.firstLabel} to ${h.lastLabel} ahead`;
       return `Error ${b > a ? "grows" : "falls"} from ${fmtPct(a)} ${h.firstLabel} ahead to ${fmtPct(b)} at ${h.lastLabel}`;
     },
     fallback: () => "Backtest error by forecast horizon",
@@ -344,18 +425,18 @@ export interface HorizonBiasFacts {
 }
 const hzLabel = (f: HorizonBiasFacts, i: number) => (f.fine ? `${f.xs[i]} month${f.xs[i] === "1" ? "" : "s"}` : `${f.xs[i]} months`);
 export const HORIZON_BIAS_TEMPLATES = {
-  /** "Bias stays within ±2% at every horizon; the largest is −1.6% at 14 months". */
+  /** "Bias is at most 1.6% either way at any horizon; the largest, −1.6%, is 14 months ahead" (the bound is the
+   *  printed extreme, never a rounder, looser number). */
   title: {
     id: "forecast.horizonBias",
     when: (f) => f.bias.some((v) => v !== null),
     text: (f) => {
       const idx = f.bias.map((v, i) => [v, i] as const).filter((x): x is readonly [number, number] => x[0] !== null);
       const [worst, wi] = idx.reduce((a, b) => (Math.abs(b[0]) > Math.abs(a[0]) ? b : a));
-      const lim = Math.max(1, Math.ceil(Math.abs(worst) * 100));
       const lean = idx.every(([v]) => v > 0) ? "over-forecasts at every horizon" : idx.every(([v]) => v < 0) ? "under-forecasts at every horizon" : null;
       return lean && Math.abs(worst) > 0.02
         ? `Our model ${lean}, most at ${hzLabel(f, wi)}, ${fmtSignedPct(worst)}`
-        : `Bias stays within ±${lim}% at every horizon; the largest is ${fmtSignedPct(worst)} at ${hzLabel(f, wi)}`;
+        : `Bias is at most ${fmtPctAbs(worst)} either way at any horizon; the largest, ${fmtSignedPct(worst)}, is ${hzLabel(f, wi)} ahead`;
     },
     fallback: () => "Backtest bias by forecast horizon",
   },
@@ -363,29 +444,69 @@ export const HORIZON_BIAS_TEMPLATES = {
 
 export interface BiasFacts {
   cells: { fam: string; reg: string; bias: number }[];
+  /** The family / region the filters select (the heatmap rings them); the title then speaks about them. */
+  selFam?: string | null;
+  selReg?: string | null;
+}
+/** Cells that tie with the extreme on the printed value, named as "X in A and in B" / "X in A and Y in B". */
+function whoMost(cells: { fam: string; reg: string; bias: number }[]): { words: string; sign: number; value: number; n: number } {
+  const worst = cells.reduce((x, y) => (Math.abs(y.bias) > Math.abs(x.bias) ? y : x));
+  const shown = (b: number) => fmtSignedPct(b, 1);
+  const ties = cells.filter((c) => shown(c.bias) === shown(worst.bias));
+  const fams = [...new Set(ties.map((c) => c.fam))];
+  const words =
+    fams.length === 1
+      ? `${fams[0]} in ${joinList(ties.map((c) => c.reg)).replace(/ and /, " and in ")}`
+      : joinList(ties.map((c) => `${c.fam} in ${c.reg}`));
+  return { words, sign: Math.sign(worst.bias), value: worst.bias, n: ties.length };
 }
 export const BIAS_TEMPLATES = {
-  /** "Bias stays within ±5% in 38 of 42 cells; X in Y over-forecasts most, +9%". */
+  /** All cells: "Bias is at most 3.3% in any family × region cell; Electrical Assemblies in India and in Middle
+   *  East & Africa under-forecast most".  Under a family and region filter the selected cell leads: "Hydraulic
+   *  Systems in Europe: bias −0.9%; the largest cell, …, is −3.3%". */
   title: {
     id: "forecast.bias",
     when: (b) => b.cells.length >= 2,
     text: (b) => {
-      const within = b.cells.filter((c) => Math.abs(c.bias) <= 0.05).length;
-      const worst = b.cells.reduce((x, y) => (Math.abs(y.bias) > Math.abs(x.bias) ? y : x));
-      const lead = within === b.cells.length ? `Bias stays within ±5% in every cell` : `Bias stays within ±5% in ${within} of ${b.cells.length} cells`;
-      return `${lead}; ${worst.fam} in ${worst.reg} ${worst.bias > 0 ? "over" : "under"}-forecasts most, ${fmtSignedPct(worst.bias, 1)}`;
+      const most = whoMost(b.cells);
+      const dir = `${most.sign > 0 ? "over" : "under"}-forecast${most.n === 1 ? "s" : ""} most`;
+      if (b.selFam && b.selReg) {
+        const me = b.cells.find((c) => c.fam === b.selFam && c.reg === b.selReg);
+        if (me) {
+          const shown = (x: number) => fmtSignedPct(x, 1);
+          if (shown(Math.abs(me.bias)) === shown(Math.abs(most.value))) {
+            const others = b.cells.filter((c) => c !== me && shown(Math.abs(c.bias)) === shown(Math.abs(most.value)));
+            const name = (c: { fam: string; reg: string }) => (c.fam === me.fam ? c.reg : `${c.fam} in ${c.reg}`);
+            return `${me.fam} in ${me.reg}: bias ${shown(me.bias)}, the largest of any family × region cell${others.length ? `, tied with ${joinList(others.map(name))}` : ""}`;
+          }
+          return `${me.fam} in ${me.reg}: bias ${shown(me.bias)}; the largest cell, ${most.words}, is ${shown(most.value)}`;
+        }
+      }
+      if (b.selFam || b.selReg) {
+        const mine = b.cells.filter((c) => (b.selFam ? c.fam === b.selFam : c.reg === b.selReg));
+        if (mine.length >= 2) {
+          const lo = mine.reduce((x, y) => (y.bias < x.bias ? y : x));
+          const hi = mine.reduce((x, y) => (y.bias > x.bias ? y : x));
+          const name = (c: { fam: string; reg: string }) => (b.selFam ? c.reg : c.fam);
+          return `${b.selFam ?? b.selReg}: bias runs from ${fmtSignedPct(lo.bias, 1)} (${name(lo)}) to ${fmtSignedPct(hi.bias, 1)} (${name(hi)})`;
+        }
+      }
+      return `Bias is at most ${fmtPctAbs(most.value, 1)} in any family × region cell; ${most.words} ${dir}`;
     },
     fallback: () => "Backtest bias by family and region",
   },
 } satisfies Record<string, Template<BiasFacts>>;
 
 export const CAL_TEMPLATES = {
-  /** "The P10–P90 band holds 80.0% of monthly actuals per series, on its 80% target". */
+  /** "The P10–P90 band holds 80.0% of monthly actuals per series, on its 80% target" (the printed shares come
+   *  from shares100, so below + inside + above = 100.0 on screen). */
   title: {
     id: "forecast.calibration",
     when: (c: CalRow | null) => !!c && Number.isFinite(c.inside),
     text: (c) => {
-      const r = c as CalRow;
+      const r0 = c as CalRow;
+      const [, inside] = shares100([r0.below, r0.inside, r0.above]);
+      const r = { ...r0, inside };
       const d = r.inside - 0.8;
       const verdict = Math.abs(d) <= 0.02 ? "on its 80% target" : d < 0 ? `${pts(d)} short of its 80% target` : `${pts(d)} above its 80% target`;
       return `The P10–P90 band holds ${fmtPct(r.inside)} of monthly actuals per series, ${verdict}`;
@@ -415,13 +536,13 @@ export const FVA_TEMPLATES = {
     when: (f) => f.steps.length >= 2 && f.steps.every((s) => Number.isFinite(s.w)),
     text: (f) => {
       const last = f.steps[f.steps.length - 1];
-      const every = f.steps.every((s, i) => i === 0 || s.w < f.steps[i - 1].w);
-      const gains = f.steps.slice(1).map((s, i) => ({ s, g: f.steps[i].w - s.w }));
+      const every = f.steps.every((s, i) => i === 0 || ptsBetween(f.steps[i - 1].w, s.w) > 0);
+      const gains = f.steps.slice(1).map((s, i) => ({ s, g: ptsBetween(f.steps[i].w, s.w) }));
       const big = gains.reduce((a, b) => (b.g > a.g ? b : a));
       const lead = every ? "Every step adds value" : "Not every step adds value";
       return Number.isFinite(f.floor)
-        ? `${lead}; our model sits ${pts(last.w - f.floor)} above the in-hindsight floor`
-        : `${lead}; ${big.s.label.toLowerCase()} adds the most, ${pts(big.g)}`;
+        ? `${lead}; our model sits ${ptsText(last.w, f.floor)} above the in-hindsight floor`
+        : `${lead}; ${big.s.label.toLowerCase()} adds the most, ${big.g.toFixed(1)} points`;
     },
     fallback: () => "Forecast value added, step by step",
   },

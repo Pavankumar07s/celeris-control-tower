@@ -55,6 +55,9 @@ export interface Theme {
   bandInk: string;
   bandInk2: string;
   shadowPop: string;
+  /** Type scale for canvas text (1 up to 1600px wide; grows to 1.5 on 4K at device scale 1), the same
+   *  factor as the CSS `--u` unit in tokens.css.  Chart font sizes go through `fz()`. */
+  fs: number;
 }
 
 /** Fallback values (the light theme) used when CSS variables are unavailable (tests, first paint). */
@@ -131,23 +134,74 @@ export function readTheme(name: ThemeName): Theme {
     bandInk: v("--band-ink"),
     bandInk2: v("--band-ink-2"),
     shadowPop: v("--shadow-pop"),
+    fs: typeScale(),
   };
+  FS = t.fs;
   return t;
+}
+
+/** The fluid type scale: 1 at or below 1600px of viewport, then +1 per 4800px (1.07 at 1920, 1.2 at 2560,
+ *  1.47 at 3840), capped at 1.5.  Mirrors `--u` in styles/tokens.css: clamp(1px, 1px + (100vw - 1600px) / 4800, 1.5px). */
+export function typeScale(): number {
+  if (typeof window === "undefined") return 1;
+  const w = window.innerWidth || 0;
+  return Math.round(Math.min(1.5, Math.max(1, 1 + (w - 1600) / 4800)) * 1000) / 1000;
+}
+let FS = 1;
+/** Scale a chart font size (px at the 1440px design) by the current type scale. */
+export function fz(px: number): number {
+  return Math.round(px * FS * 10) / 10;
+}
+/** Scale any chart dimension in px (grid margins, symbol sizes next to text) by the type scale. */
+export function fpx(px: number): number {
+  return Math.round(px * FS);
+}
+
+/** The height a chart gets on the current screen, from its design height at 1440px (`base`).
+ *  - At or below a 1600px viewport: exactly `base` (nothing changes at 1440 / 1280 / 1024 / 768 / 375).
+ *  - With `aspect` (wide time series): about width / aspect, never below base x the type scale and never above
+ *    min(2.2 x base, max(base, 55 % of the viewport height)), so a timeline keeps its 3:1 shape on a 2560px
+ *    screen and still fits under the headline.
+ *  - Otherwise: base x (1 + (viewport - 1600) / 2400), at most 1.6x, and never taller than 0.8 x the chart's width
+ *    (but never below base x the type scale, so rows of labels always fit). */
+export function chartHeight(base: number, width: number, aspect?: number): number {
+  if (typeof window === "undefined") return base;
+  const vw = window.innerWidth || 0;
+  if (vw <= 1600) return base;
+  const fs = typeScale();
+  const floor = base * fs;
+  if (aspect && width > 0) {
+    const ceil = Math.min(base * 2.2, Math.max(base, 0.55 * (window.innerHeight || 0)));
+    return Math.round(Math.max(floor, Math.min(width / aspect, Math.max(floor, ceil))));
+  }
+  const grow = base * Math.min(1.6, 1 + (vw - 1600) / 2400);
+  const cap = width > 0 ? Math.max(floor, width * 0.8) : grow;
+  return Math.round(Math.max(floor, Math.min(grow, cap)));
 }
 
 export const FONT = '"IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif';
 export const MONO = '"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace';
 
-/** Pick a readable label colour (ink or paper) for text drawn on a filled mark (heatmap cell, bar). */
+/** Pick a readable label colour for text drawn on a filled mark (heatmap cell, bar): the theme's ink or paper,
+ *  whichever has the higher WCAG contrast against the fill (so dark-theme extremes get dark text). */
 export function onFill(t: Theme, fill: string): string {
-  const rgb = parseColor(fill);
-  if (!rgb) return t.ink;
-  const lum = (c: number) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  const f = parseColor(fill);
+  const ink = parseColor(t.ink);
+  const paper = parseColor(t.paper);
+  if (!f || !ink || !paper) return t.ink;
+  const lum = (rgb: [number, number, number]) => {
+    const ch = (c: number) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * ch(rgb[0]) + 0.7152 * ch(rgb[1]) + 0.0722 * ch(rgb[2]);
   };
-  const L = 0.2126 * lum(rgb[0]) + 0.7152 * lum(rgb[1]) + 0.0722 * lum(rgb[2]);
-  return L > 0.36 ? "#121826" : "#FBFBF9";
+  const cr = (a: [number, number, number], b: [number, number, number]) => {
+    const x = lum(a);
+    const y = lum(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+  return cr(f, ink) >= cr(f, paper) ? t.ink : t.paper;
 }
 
 function parseColor(c: string): [number, number, number] | null {
@@ -193,7 +247,7 @@ export function categoryAxis(t: Theme, data: (string | number)[], extra: Record<
     data,
     axisLine: { show: true, lineStyle: { color: t.ruleStrong } },
     axisTick: { show: false },
-    axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9 },
+    axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 9 },
     splitLine: { show: false },
     ...extra,
   };
@@ -210,7 +264,7 @@ export function valueAxis(t: Theme, opts: { max?: number; min?: number; usd?: bo
     axisLabel: {
       color: t.ink3,
       fontFamily: FONT,
-      fontSize: 11.5,
+      fontSize: fz(11.5),
       formatter: (v: number) => (opts.percent ? `${Math.round(v * 100) < 0 ? "\u2212" : ""}${Math.abs(Math.round(v * 100))}%` : axisTick(v, opts.usd)),
     },
     splitLine: { lineStyle: { color: t.grid, width: 1, type: "solid" as const } },
@@ -219,7 +273,7 @@ export function valueAxis(t: Theme, opts: { max?: number; min?: number; usd?: bo
 
 /** Standard grid: room for y labels on the left; 92px on the right where end labels go. */
 export function gridStd(narrow = false, extra: Record<string, unknown> = {}) {
-  return narrow ? { left: 34, right: 58, top: 30, bottom: 30, ...extra } : { left: 46, right: 92, top: 30, bottom: 30, ...extra };
+  return narrow ? { left: 34, right: 58, top: 30, bottom: 30, ...extra } : { left: fpx(46), right: fpx(92), top: fpx(30), bottom: fpx(30), ...extra };
 }
 
 /** Floating tooltip surface (raised, 1px rule border, 8px radius, --shadow-pop).  Use with ttHead/ttRow. */
@@ -231,7 +285,7 @@ export function tooltipStyle(t: Theme) {
     borderColor: t.rule,
     borderWidth: 1,
     padding: [10, 12],
-    textStyle: { color: t.ink2, fontFamily: FONT, fontSize: 12 },
+    textStyle: { color: t.ink2, fontFamily: FONT, fontSize: fz(12) },
     extraCssText: `box-shadow:${t.shadowPop};border-radius:8px;`,
   };
 }
@@ -285,7 +339,7 @@ export function baseOption(t: Theme) {
   return {
     animation: false,
     animationDurationUpdate: 300,
-    textStyle: { fontFamily: FONT, color: t.ink3, fontSize: 11.5 },
+    textStyle: { fontFamily: FONT, color: t.ink3, fontSize: fz(11.5) },
     aria: { enabled: true, decal: { show: false } },
   };
 }
@@ -316,7 +370,7 @@ export function scaleLegend(
     inRange: { color: o.colors },
     text: [`${o.format(o.max)}${o.high ? ` ${o.high}` : ""}`, `${o.low ? `${o.low} ` : ""}${o.format(o.min)}`],
     textGap: 8,
-    textStyle: { color: t.ink3, fontFamily: FONT, fontSize: 11.5 },
+    textStyle: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5) },
   };
 }
 

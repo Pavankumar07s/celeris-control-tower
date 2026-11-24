@@ -30,9 +30,12 @@ export interface HealthFacts {
   approximate: number;
   unknown: number;
   files: number;
+  /** History cells repaired, from the cell flags (one definition with the Overview figure and the repairs
+   *  table): repaired = corrected + rebuilt + units unknown, a partition (each cell counted once). */
+  hist?: { cells: number; repaired: number; corrected: number; rebuilt: number; unknown: number };
 }
 
-export function healthFacts(q: QualityFile): HealthFacts {
+export function healthFacts(q: QualityFile, hist?: RepairRow): HealthFacts {
   const S = q.summary;
   const C = q.checks;
   const w = (s: string) => q.waterfall.find((x) => x.step.startsWith(s))?.value ?? 0;
@@ -61,15 +64,17 @@ export function healthFacts(q: QualityFile): HealthFacts {
     approximate: by.approximate ?? 0,
     unknown: by.unknown ?? 0,
     files: q.files.length,
+    hist: hist ? { cells: hist.cells, repaired: hist.touched, corrected: hist.fixed, rebuilt: hist.rebuilt, unknown: hist.unknown } : undefined,
   };
 }
 
 export const HEALTH_TEMPLATES = {
-  /** "Every blocking check now passes; 47 failed on the raw files". */
+  /** "Every blocking check now passes; 47 of the 90 failed on the raw files" (names its base: the blocking
+   *  checks, not all 116, whose raw failures the hero shows). */
   headline: {
     id: "health.headline",
     when: (f) => f.blockingFailAfter === 0 && f.blockingFailBefore > 0,
-    text: (f) => `Every blocking check now passes; ${fmtInt(f.blockingFailBefore)} failed on the raw files`,
+    text: (f) => `Every blocking check now passes; ${fmtInt(f.blockingFailBefore)} of the ${fmtInt(f.blocking)} failed on the raw files`,
     fallback: (f) => (f.blockingFailAfter > 0 ? `${cap(countWord(f.blockingFailAfter))} blocking ${plural(f.blockingFailAfter, "check")} still ${f.blockingFailAfter === 1 ? "fails" : "fail"} after cleaning` : `${fmtInt(f.passAfter)} of ${fmtInt(f.checks)} checks pass after cleaning`),
   },
   /** "248,248 raw rows became 245,548 grid cells ... The 8 checks still open are documented residuals ..." */
@@ -81,15 +86,22 @@ export const HEALTH_TEMPLATES = {
         f.open > 0
           ? ` The ${countWord(f.open)} ${plural(f.open, "check")} still open ${f.open === 1 ? "is a documented residual" : "are documented residuals"}${f.blockingFailAfter === 0 ? ", none of them blocking" : ""}: ${[f.openWarn ? `${countWord(f.openWarn)} ${plural(f.openWarn, "warning")}` : "", f.openInfo ? `${countWord(f.openInfo)} ${plural(f.openInfo, "note")}` : ""].filter(Boolean).join(" and ")}.`
           : " Every check passes after cleaning.";
-      return `**${fmtInt(f.raw)} raw rows** in train.csv became **${fmtInt(f.cells)} grid cells**, one per month, SKU and region: ${fmtInt(f.exactDupes + f.superseded)} duplicate loads were dropped and ${fmtInt(f.rebuilt)} missing rows rebuilt from the Record_ID grid, never zero-filled.${open}`;
+      const H = f.hist;
+      const rep = H && H.repaired > 0 ? ` In the history, **${fmtInt(H.repaired)} cells (${fmtPct(H.repaired / Math.max(1, H.cells))}) were repaired**: ${fmtInt(H.corrected)} values corrected, ${fmtInt(H.rebuilt)} rows rebuilt and ${fmtInt(H.unknown)} with units unknown, kept out of fitting.` : "";
+      return `**${fmtInt(f.raw)} raw rows** in train.csv became **${fmtInt(f.cells)} grid cells**, one per month, SKU and region: ${fmtInt(f.exactDupes + f.superseded)} duplicate loads were dropped and ${fmtInt(f.rebuilt)} missing rows rebuilt from the Record_ID grid, never zero-filled.${rep}${open}`;
     },
     fallback: (f) => `${fmtInt(f.checks)} data-quality checks ran on ${countWord(f.files)} input files.`,
   },
-  /** "90% of corrected cells were restored exactly; 332 could not be recovered". */
+  /** "90% of corrected cells were restored exactly; 331 ERP blanks keep their units unknown".  The unknown
+   *  count is the history's (one variable with the repairs table and the Overview); the fix log's own count
+   *  of blank cells is bridged in the module foot. */
   issuesTitle: {
     id: "health.issues",
     when: (f) => f.corrected > 0 && f.exact / f.corrected >= 0.5,
-    text: (f) => `${fmtPct(f.exact / f.corrected, 0)} of corrected cells were restored exactly${f.unknown > 0 ? `; ${fmtInt(f.unknown)} could not be recovered` : ""}`,
+    text: (f) => {
+      const unk = f.hist ? f.hist.unknown : f.unknown;
+      return `${fmtPct(f.exact / f.corrected, 0)} of corrected cells were restored exactly${unk > 0 ? `; ${fmtInt(unk)} keep their units unknown and stay out of fitting` : ""}`;
+    },
     fallback: () => "Every rule that changed data, by file",
   },
 } satisfies Record<string, Template<HealthFacts>>;
@@ -152,6 +164,8 @@ export function repairFacts(m: Model, segs: number[], dim: RepairFacts["dim"]): 
   const b = m.bit;
   const acc = new Map<number, RepairRow>();
   const total: RepairRow = { label: "Selection", idx: -1, cells: 0, fixed: 0, rebuilt: 0, unknown: 0, touched: 0, share: 0 };
+  // a partition, so the columns add up to the repaired total: a rebuilt row counts as rebuilt, a cell whose
+  // units stay unknown (an ERP blank) as unknown, and only the remaining fixes as "corrected"
   for (const g of segs) {
     const s = m.gSeries[g];
     const key = dim === "family" ? m.sFamily[s] : dim === "region" ? m.sRegion[s] : m.sSku[s];
@@ -162,9 +176,9 @@ export function repairFacts(m: Model, segs: number[], dim: RepairFacts["dim"]): 
     }
     for (let k = 0; k < m.gLen[g]; k++) {
       const fl = m.f[m.gOff[g] + k];
-      const fx = fl & b.numeric_fix ? 1 : 0;
       const mr = fl & b.missing_row ? 1 : 0;
-      const uk = fl & b.units_unknown ? 1 : 0;
+      const uk = !mr && fl & b.units_unknown ? 1 : 0;
+      const fx = !mr && !uk && fl & b.numeric_fix ? 1 : 0;
       r.cells++;
       r.fixed += fx;
       r.rebuilt += mr;
@@ -190,7 +204,7 @@ export const REPAIR_TEMPLATES = {
   even: {
     id: "health.repairs.even",
     when: (r) => r.rows.length > 2 && r.rows[r.rows.length - 1].share > 0 && r.rows[0].share / r.rows[r.rows.length - 1].share < 1.5,
-    text: (r) => `Repairs are spread evenly: every ${r.dim} has ${fmtPct(r.rows[r.rows.length - 1].share)}–${fmtPct(r.rows[0].share)} of its cells repaired`,
+    text: (r) => (fmtPct(r.rows[r.rows.length - 1].share) === fmtPct(r.rows[0].share) ? `Repairs are spread evenly: every ${r.dim} has ${fmtPct(r.rows[0].share)} of its cells repaired` : `Repairs are spread evenly: every ${r.dim} has ${fmtPct(r.rows[r.rows.length - 1].share)}–${fmtPct(r.rows[0].share)} of its cells repaired`),
     fallback: (r) => `Cells repaired by ${r.dim}`,
   },
   /** "Latin America carries the most repairs: 4.2% of its cells". */

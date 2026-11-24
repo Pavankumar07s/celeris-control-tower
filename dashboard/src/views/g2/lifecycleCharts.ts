@@ -2,7 +2,7 @@
 // one handover panel per predecessor -> successor pair.  Grammar: ink is the past, orange is the future; the
 // window is washed; ▲ launch, ■ end of life, ○ planned launch; the predecessor link is a hairline.
 import type { EChartsCoreOption } from "echarts/core";
-import { FONT, MONO, axisTick, baseOption, categoryAxis, esc, niceMax, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, valueAxis, type Theme, type TooltipItem } from "../../charts/theme";
+import { FONT, fz, MONO, axisTick, baseOption, categoryAxis, esc, niceMax, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, valueAxis, type Theme, type TooltipItem } from "../../charts/theme";
 import type { Model } from "../../data/model";
 import { fmtInt, monthLong, monthName } from "../../data/format";
 import type { Handover, LifeSku } from "../../insights/lifecycle";
@@ -76,7 +76,7 @@ export function ganttOption(t: Theme, m: Model, rows: GanttRow[], narrow: boolea
       axisLine: { show: true, lineStyle: { color: t.ruleStrong } },
       axisTick: { show: false },
       splitLine: { show: true, lineStyle: { color: t.grid, width: 1 } },
-      axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, formatter: (v: number) => (v % (narrow ? 36 : 12) === 0 ? (m.months[v]?.slice(0, 4) ?? "") : "") },
+      axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), formatter: (v: number) => (v % (narrow ? 36 : 12) === 0 ? (m.months[v]?.slice(0, 4) ?? "") : "") },
     },
     yAxis: {
       ...categoryAxis(t, cats),
@@ -85,9 +85,9 @@ export function ganttOption(t: Theme, m: Model, rows: GanttRow[], narrow: boolea
       axisLabel: {
         formatter: (_: string, i: number) => label(i),
         rich: {
-          id: { fontFamily: MONO, fontWeight: 500, fontSize: 12, color: t.ink },
-          st: { fontFamily: FONT, fontSize: 11.5, color: t.ink3 },
-          g: { fontFamily: FONT, fontSize: 12, fontWeight: 600, color: t.ink2, padding: [8, 0, 0, 0] },
+          id: { fontFamily: MONO, fontWeight: 500, fontSize: fz(12), color: t.ink },
+          st: { fontFamily: FONT, fontSize: fz(11.5), color: t.ink3 },
+          g: { fontFamily: FONT, fontSize: fz(12), fontWeight: 600, color: t.ink2, padding: [8, 0, 0, 0] },
         },
         margin: 10,
       },
@@ -174,7 +174,20 @@ export function ganttOption(t: Theme, m: Model, rows: GanttRow[], narrow: boolea
 
 /** One handover: predecessor history (ink), its run-off forecast (orange line to zero, ■ at EOL), the successor's
  *  forecast (orange-tint columns from launch).  Window washed, last-actual rule. */
-export function handoverOption(t: Theme, m: Model, h: Handover, narrow: boolean): EChartsCoreOption {
+/** The largest monthly value a handover panel draws (history, run-off or successor): the panels share one
+ *  y-scale built from the largest of these, so side-by-side panels compare honestly. */
+export function handoverPeak(m: Model, h: Handover): number {
+  const start = Math.max(0, m.asOf - 21);
+  let v = 1;
+  for (let i = start; i < m.nMonths; i++) {
+    if (h.predHist && i <= m.asOf) v = Math.max(v, h.predHist[i]);
+    if (h.predFc && i > m.asOf && (h.eol === null || i <= h.eol + 1)) v = Math.max(v, h.predFc[i - m.w0]);
+    if (h.succFc && i >= m.w0 && (h.launch === null || i >= h.launch)) v = Math.max(v, h.succFc[i - m.w0]);
+  }
+  return v;
+}
+
+export function handoverOption(t: Theme, m: Model, h: Handover, narrow: boolean, sharedPeak?: number): EChartsCoreOption {
   const start = Math.max(0, m.asOf - 21);
   const N = m.nMonths - 1;
   const labels = m.months.slice(start, N + 1);
@@ -191,7 +204,7 @@ export function handoverOption(t: Theme, m: Model, h: Handover, narrow: boolean)
     run.push(r);
     succ.push(h.succFc && i >= m.w0 && (h.launch === null || i >= h.launch) ? h.succFc[i - m.w0] : null);
   }
-  const vmax = Math.max(1, ...[...hist, ...run, ...succ].filter((v): v is number => v !== null));
+  const vmax = Math.max(1, sharedPeak ?? 0, ...[...hist, ...run, ...succ].filter((v): v is number => v !== null));
   const yMax = niceMax(vmax * 1.12);
   const div = m.asOf - start;
   const eolAt = h.eol !== null && h.eol >= start ? h.eol - start : -1;
@@ -200,9 +213,9 @@ export function handoverOption(t: Theme, m: Model, h: Handover, narrow: boolean)
     grid: { left: 40, right: 10, top: 14, bottom: 26 },
     xAxis: categoryAxis(t, labels, {
       boundaryGap: true,
-      axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11, margin: 8, interval: (i: number) => labels[i].endsWith("-01"), formatter: (v: string) => v.slice(0, 4) },
+      axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11), margin: 8, interval: (i: number) => labels[i].endsWith("-01"), formatter: (v: string) => v.slice(0, 4) },
     }),
-    yAxis: { ...valueAxis(t, { max: yMax }), axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11, formatter: (v: number) => axisTick(v) } },
+    yAxis: { ...valueAxis(t, { max: yMax }), axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11), formatter: (v: number) => axisTick(v) } },
     tooltip: {
       ...tooltipStyle(t),
       trigger: "axis",

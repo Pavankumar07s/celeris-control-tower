@@ -15,18 +15,24 @@ export interface KeyItem {
 
 /** Inline key above a chart.  `"sep"` inserts the hairline between the past and the future groups. */
 export function Key({ items, ariaLabel = "Key" }: { items: (KeyItem | "sep")[]; ariaLabel?: string }) {
+  // groups split at "sep": the hairline travels with the group it opens, so a wrapped key never starts a line with it
+  const groups: KeyItem[][] = [[]];
+  for (const it of items) {
+    if (it === "sep") groups.push([]);
+    else groups[groups.length - 1].push(it);
+  }
   return (
     <div className="key" role="list" aria-label={ariaLabel}>
-      {items.map((it, i) =>
-        it === "sep" ? (
-          <i key={`s${i}`} className="sep" aria-hidden="true" />
-        ) : (
-          <span key={i} role="listitem" title={it.title}>
-            <KeyMark kind={it.kind} color={it.color} />
-            {it.label}
-          </span>
-        ),
-      )}
+      {groups.filter((g) => g.length).map((g, gi) => (
+        <span key={gi} className="key-group" role="presentation">
+          {g.map((it, i) => (
+            <span key={i} role="listitem" title={it.title}>
+              <KeyMark kind={it.kind} color={it.color} />
+              {it.label}
+            </span>
+          ))}
+        </span>
+      ))}
     </div>
   );
 }
@@ -44,17 +50,21 @@ export function KeyMark({ kind, color = "var(--ink)" }: { kind: KeyKind; color?:
 }
 
 /** The standard key of the shared timeline (past group | future group). */
-export function timelineKey(opts: { latent?: boolean; fc?: boolean; band?: boolean; lost?: boolean; rebuilt?: boolean; columns?: boolean; extra?: KeyItem[] }): (KeyItem | "sep")[] {
-  const { latent = false, fc = true, band = true, lost = true, rebuilt = true, columns = false } = opts;
+export function timelineKey(opts: { latent?: boolean; fc?: boolean; band?: boolean; lost?: boolean; rebuilt?: boolean; columns?: boolean; extra?: KeyItem[]; present?: { shipped: boolean; lost: boolean; rebuilt: boolean } }): (KeyItem | "sep")[] {
+  const { latent = false, fc = true, band = true, columns = false, present } = opts;
+  // a key lists only marks the chart draws in its visible range (markPresence in charts/timeline.ts)
+  const lost = (opts.lost ?? true) && (present ? present.lost : true);
+  const rebuilt = (opts.rebuilt ?? true) && (present ? present.rebuilt : true);
+  const shippedLine = present ? present.shipped : true;
   const past: KeyItem[] = latent
     ? [{ kind: columns ? "box" : "line", color: "var(--ink)", label: "Latent monthly demand" }]
     : columns
       ? [{ kind: "box", color: "var(--ink)", label: "Shipped" }, ...(lost ? [{ kind: "box" as const, color: "var(--loss-fill)", label: "Lost to stock-outs" }] : [])]
       : [
           { kind: "line", color: "var(--ink)", label: "Unconstrained demand" },
-          { kind: "thin", color: "var(--ink-4)", label: "Shipped, where lower" },
+          ...(shippedLine ? [{ kind: "thin" as const, color: "var(--ink-4)", label: "Shipped, where lower" }] : []),
           ...(lost ? [{ kind: "box" as const, color: "var(--loss-fill)", label: "Lost to stock-outs" }] : []),
-          ...(rebuilt ? [{ kind: "ring" as const, color: "var(--ink)", label: "Months with rebuilt cells" }] : []),
+          ...(rebuilt ? [{ kind: "ring" as const, color: "var(--ink)", label: "Months with rebuilt or unknown cells" }] : []),
         ];
   const future: KeyItem[] = fc
     ? [

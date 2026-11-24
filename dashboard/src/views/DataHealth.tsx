@@ -11,17 +11,17 @@ import { useApp } from "../app/context";
 import { useSelection, useElementWidth } from "../app/hooks";
 import { EChart } from "../charts/EChart";
 import { eventTitle } from "../charts/timeline";
-import { FONT, baseOption, esc, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, type Theme } from "../charts/theme";
+import { FONT, fz, baseOption, esc, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, type Theme } from "../charts/theme";
 import { LinkButton, Segmented, StatusPill, CheckPill, Select } from "../components/controls";
 import { HeroFigure, Lede } from "../components/Figure";
 import { CheckCircle, WarnTriangle } from "../components/icons";
 import { LineageDrawer, cellOfExample, decodeCell, encodeCell, type CellRef } from "../components/Lineage";
 import { Module } from "../components/Module";
-import { ErrorState, Loading } from "../components/states";
+import { ErrorState, Loading, Notice } from "../components/states";
 import { BarTable, DataTable, type Column } from "../components/tables";
 import { fmtInt, fmtPct, fmtSigned, monthName, monthSpan } from "../data/format";
 import { useResource } from "../data/load";
-import type { Model } from "../data/model";
+import { NO_FILTERS, selectSegments, type Model } from "../data/model";
 import type { Check, QualityFile } from "../data/types";
 import { readableMonths } from "../insights/briefing";
 import { cap, countWord, plural, render, renderFirst } from "../insights/headlines";
@@ -38,7 +38,7 @@ const METHOD_WORD: Record<string, string> = {
   derived: "filled from the master or grid",
   dropped: "dropped, latest load kept",
   approximate: "approximate",
-  unknown: "not recoverable",
+  unknown: "units unknown",
 };
 const DIM_WORD: Record<string, string> = { accuracy: "Accuracy", completeness: "Completeness", conformity: "Conformity", consistency: "Consistency", uniqueness: "Uniqueness", validity: "Validity" };
 
@@ -47,6 +47,9 @@ function ruleTitle(q: QualityFile, file: string, rule: string): string {
   const r = q.issues.rows.find((x) => x.file === file && x.rule === rule);
   let t = r && r.title !== rule ? r.title : (q.checks.find((c) => c.file === file && c.check_id.includes(`-${rule}-`))?.title ?? rule);
   t = t.replace(/\s*\([^)]*\)\s*$/, "");
+  // method notes after a colon ("Blank regions: Record_ID decode vs Record_ID-free witness") read like code: the
+  // ledger shows the plain part; the method stays in the "How it was fixed" column and the example cell's lineage
+  if (/: .*(Record_ID|witness| vs )/.test(t)) t = t.split(": ")[0];
   return t;
 }
 
@@ -64,9 +67,12 @@ export default function DataHealth() {
   const cell = decodeCell(m, params.get("cell"));
   const openCell = (c: CellRef) => setParam({ cell: encodeCell(m, c) });
 
-  const facts = useMemo(() => (q.data ? healthFacts(q.data) : null), [q.data]);
+  // file-level facts use the whole history (the checks and rules cover whole files); the repairs table follows the filters
+  const allHist = useMemo(() => repairFacts(m, selectSegments(m, NO_FILTERS), "family").total, [m]);
+  const facts = useMemo(() => (q.data ? healthFacts(q.data, allHist) : null), [q.data, allHist]);
   const dim = filters.family === null ? "family" : filters.region === null ? "region" : "SKU";
   const repairs = useMemo(() => repairFacts(m, segs, dim), [m, segs, dim]);
+  const filtered = filters.family !== null || filters.sku !== null || filters.region !== null || filters.channel !== null || filters.customer !== null;
 
   if (q.loading)
     return (
@@ -99,6 +105,12 @@ export default function DataHealth() {
           />
         }
       />
+
+      {filtered && (
+        <Notice tone="info">
+          The checks, the rules and the row bridge cover whole files, so they do not change with the filters; the repairs table, the cell lists and the lineage follow your selection.
+        </Notice>
+      )}
 
       <div className="cols-5-7">
         <BridgeModule q={Q} f={f} />
@@ -181,8 +193,9 @@ function RepairsModule({ m, single, segs, onCell, repairs, onPick }: { m: Model;
     for (const g of segs)
       for (let k = 0; k < m.gLen[g]; k++) {
         const fl = m.f[m.gOff[g] + k];
-        const parts = [fl & b.numeric_fix ? "value corrected" : "", fl & b.missing_row ? "row rebuilt" : "", fl & b.units_unknown ? "units unknown" : ""].filter(Boolean);
-        if (parts.length) out.push({ t: m.gStart[g] + k, what: cap(parts.join(", ")), u: m.u[m.gOff[g] + k] });
+        // the same partition as the repairs table: rebuilt row, else units unknown, else value corrected
+        const what = fl & b.missing_row ? "Row rebuilt (missing from the extract)" : fl & b.units_unknown ? "Units unknown (ERP blank), kept out of fitting" : fl & b.numeric_fix ? "Value corrected" : "";
+        if (what) out.push({ t: m.gStart[g] + k, what, u: m.u[m.gOff[g] + k] });
       }
     return out.sort((a, b2) => b2.t - a.t);
   }, [single, segs, m]);
@@ -192,10 +205,10 @@ function RepairsModule({ m, single, segs, onCell, repairs, onPick }: { m: Model;
   return (
     <Module
       title={renderFirst([REPAIR_TEMPLATES.even, REPAIR_TEMPLATES.top], repairs).text}
-      dek={cells ? "Every history cell of the series with a corrected value, a rebuilt row or units that stay unknown, latest first. A row opens its lineage: raw value, rule and cleaned value." : `History cells of the selection with a numeric fix, a rebuilt row or units that stay unknown, by ${repairs.dim}${repairs.rows.length > shown.length ? `; the ${shown.length} most repaired of ${fmtInt(repairs.rows.length)} ${plurals}` : ""}. Click a row to filter.`}
+      dek={cells ? "Every history cell of the series with a corrected value, a rebuilt row or units that stay unknown, latest first. A row opens its lineage: raw value, rule and cleaned value." : `Repaired history cells of the selection by ${repairs.dim}: each counted once, as a corrected value, a rebuilt row or units that stay unknown${repairs.rows.length > shown.length ? `; the ${shown.length} most repaired of ${fmtInt(repairs.rows.length)} ${plurals}` : ""}. Click a row to filter.`}
       info={{
         what: "Where cleaning touched the history you are looking at: cells whose units, price or revenue were corrected, rows missing from the extract that were rebuilt, and ERP-migration orders whose size is unknown.",
-        how: "Counted from the flag word of every history cell of the selection (customer at the time). A cell counts once even if several flags apply.",
+        how: "Counted from the flag word of every history cell of the selection (customer at the time). Each cell counts once: a rebuilt row as rebuilt, an ERP blank as units unknown, any other numeric fix as corrected, so the three columns add up to the repaired cells (the same definition as the Overview figure).",
         source: "history.json (flags)",
       }}
     >
@@ -223,9 +236,9 @@ function RepairsModule({ m, single, segs, onCell, repairs, onPick }: { m: Model;
           cols={[
             { key: "l", label: dimName, kind: repairs.dim === "SKU" ? "id" : "label", value: (r) => r.label, width: "31%" },
             { key: "c", label: "Cells", kind: "num", value: (r) => fmtInt(r.cells), width: "13%", hideNarrow: true },
-            { key: "f", label: "Fixed", kind: "num", value: (r) => fmtInt(r.fixed), width: "13%" },
+            { key: "f", label: "Corrected", kind: "num", value: (r) => fmtInt(r.fixed), width: "13%" },
             { key: "m", label: "Rebuilt", kind: "num", value: (r) => fmtInt(r.rebuilt), width: "11%", hideNarrow: true },
-            { key: "u", label: "Unknown", kind: "num", value: (r) => fmtInt(r.unknown), width: "12%", hideNarrow: true },
+            { key: "u", label: "Units unknown", kind: "num", value: (r) => fmtInt(r.unknown), width: "12%", hideNarrow: true },
             { key: "b", label: "Share repaired", kind: "bar" },
             { key: "p", label: "%", kind: "num", value: (r) => fmtPct(r.share), width: "13%" },
           ]}
@@ -234,7 +247,7 @@ function RepairsModule({ m, single, segs, onCell, repairs, onPick }: { m: Model;
       {repairs.rows.length > 1 && !cells ? (
         <p className="g1-legend-line">
           <span>
-            All {fmtInt(repairs.rows.length)} {plurals}: <b>{fmtInt(repairs.total.cells)}</b> cells, <b>{fmtInt(repairs.total.fixed)}</b> fixed, <b>{fmtInt(repairs.total.rebuilt)}</b> rebuilt, <b>{fmtInt(repairs.total.unknown)}</b> unknown; <b>{fmtPct(repairs.total.share)}</b> repaired
+            All {fmtInt(repairs.rows.length)} {plurals}: <b>{fmtInt(repairs.total.touched)}</b> of <b>{fmtInt(repairs.total.cells)}</b> cells repaired (<b>{fmtPct(repairs.total.share)}</b>) = {fmtInt(repairs.total.fixed)} corrected + {fmtInt(repairs.total.rebuilt)} rebuilt + {fmtInt(repairs.total.unknown)} units unknown
           </span>
         </p>
       ) : repairs.rows.length || cells ? null : (
@@ -279,7 +292,7 @@ function IssuesModule({ q, f, m, onCell, all: showAll, onAll }: { q: QualityFile
       dek={`${fmtInt(nRules)} cleaning rules changed data in ${countWord(groups.filter((g) => g.rows.length).length)} of the ${countWord(groups.length)} input files, ranked by rows affected within each file. Click a rule to open an example cell with its raw value, rule and cleaned value.`}
       info={{
         what: "Issues by type and file: every cleaning rule that changed data, with the rows (records, or macro months) it touched, the cells it changed and how each value was recovered.",
-        how: "Distinct records per rule from the fix log. Convention fills (the price placeholder on zero rows) are not issues and are left out. 'Restored exactly' covers arithmetic identities and reformatting; 'filled from the master or grid' uses a second source; 'not recoverable' values stay unknown and are kept out of model fitting.",
+        how: "Distinct records per rule from the fix log. Convention fills (the price placeholder on zero rows) are not issues and are left out. 'Restored exactly' covers arithmetic identities and reformatting; 'filled from the master or grid' uses a second source; 'units unknown' values (ERP blanks) stay unknown and are kept out of model fitting.",
         source: "quality.json (issues, files) ← quality/fix_log.parquet",
       }}
     >
@@ -346,7 +359,7 @@ function IssuesModule({ q, f, m, onCell, all: showAll, onAll }: { q: QualityFile
                       <td className="how" title={r.action ? readableMonths(r.action) : undefined}>
                         {mt.unknown > 0 ? (
                           <StatusPill tone="warn" icon={<WarnTriangle size={11} />}>
-                            Not recoverable
+                            Units unknown
                           </StatusPill>
                         ) : (
                           mt.words
@@ -379,7 +392,8 @@ function IssuesModule({ q, f, m, onCell, all: showAll, onAll }: { q: QualityFile
           <b>{fmtInt(f.approximate)}</b> approximate
         </span>
         <span>
-          <b>{fmtInt(f.unknown)}</b> not recoverable, kept out of fitting
+          <b>{fmtInt(f.unknown)}</b> blank in the files with units unknown
+          {f.hist && f.hist.unknown !== f.unknown ? `; ${fmtInt(f.hist.unknown)} still unknown in the history after ${fmtInt(Math.abs(f.unknown - f.hist.unknown))} ${plural(Math.abs(f.unknown - f.hist.unknown), "was", "were")} restored from shipments, kept out of fitting` : ", kept out of fitting"}
         </span>
       </p>
     </Module>
@@ -420,7 +434,7 @@ function heatOption(q: QualityFile, m: Model, t: Theme, narrow: boolean): EChart
       data: months,
       axisLine: { show: true, lineStyle: { color: t.ruleStrong } },
       axisTick: { show: false },
-      axisLabel: { interval: (_: number, v: string) => v.endsWith("-01") && (!narrow || Number(v.slice(0, 4)) % 2 === 1), formatter: (v: string) => v.slice(0, 4), color: t.ink3, fontFamily: FONT, fontSize: 11.5, margin: 8 },
+      axisLabel: { interval: (_: number, v: string) => v.endsWith("-01") && (!narrow || Number(v.slice(0, 4)) % 2 === 1), formatter: (v: string) => v.slice(0, 4), color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 8 },
       splitLine: { show: false },
     },
     yAxis: {
@@ -429,7 +443,7 @@ function heatOption(q: QualityFile, m: Model, t: Theme, narrow: boolean): EChart
       inverse: true,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: 11.5, interval: 0, width: narrow ? 40 : 230, overflow: "truncate" },
+      axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), interval: 0, width: narrow ? 40 : 230, overflow: "truncate" },
       splitLine: { show: false },
     },
     visualMap: {
@@ -445,7 +459,7 @@ function heatOption(q: QualityFile, m: Model, t: Theme, narrow: boolean): EChart
       text: narrow ? undefined : ["", "Rows touched in the month"],
       textGap: 10,
       showLabel: true,
-      textStyle: { color: t.ink3, fontFamily: FONT, fontSize: 11.5 },
+      textStyle: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5) },
       selectedMode: false,
       dimension: 2,
     },
@@ -463,7 +477,7 @@ function heatOption(q: QualityFile, m: Model, t: Theme, narrow: boolean): EChart
         markArea: {
           silent: true,
           itemStyle: { color: "rgba(0,0,0,0)", borderColor: t.ink3, borderWidth: 1 },
-          label: { show: true, position: "top", color: t.ink, fontFamily: FONT, fontSize: 12, fontWeight: 600, distance: 4 },
+          label: { show: true, position: "top", color: t.ink, fontFamily: FONT, fontSize: fz(12), fontWeight: 600, distance: 4 },
           data: marks.map((x) => [{ xAxis: months[x.a], name: `${x.title}, ${monthSpan(months[x.a], months[x.b])}` }, { xAxis: months[x.b] }]),
         },
       },
@@ -528,7 +542,7 @@ function ChecksModule({ q, m, status, file, setParam, onCell }: { q: QualityFile
             {c.title}
           </span>
           <span className="g1-sub">
-            <span className="g1-code" style={{ fontSize: 11, color: "var(--ink-3)" }}>
+            <span className="g1-code" style={{ fontSize: fz(11), color: "var(--ink-3)" }}>
               {c.check_id}
             </span>
             {c.severity === "error" ? ", blocking" : c.severity === "warning" ? ", warning" : ", note"}, in {c.unit.replace(/_/g, " ")}

@@ -16,7 +16,7 @@ import { useResource } from "../data/load";
 import type { MacroFile } from "../data/types";
 import { countWord, render } from "../insights/headlines";
 import { IND, indName, indShort } from "../insights/indicators";
-import { CHECK_TEMPLATES, EV_TEMPLATES, LAG_TEMPLATES, MACRO_TEMPLATES, MATRIX_TEMPLATES, PATH_TEMPLATES, SENS_TEMPLATES, STABLE_R, cell, eraLabel, macroFacts, sensRows, type SensRow } from "../insights/macro";
+import { CHECK_TEMPLATES, EV_TEMPLATES, LAG_TEMPLATES, MACRO_TEMPLATES, MATRIX_TEMPLATES, PATH_TEMPLATES, SENS_TEMPLATES, STABLE_R, cell, eraLabel, fmtPtsAbs, macroFacts, pathChange, sensRows, type SensRow } from "../insights/macro";
 import { checkOption, evOption, lagOption, matrixOption, sensMedians, sensOption } from "./g2/macroCharts";
 import "./g2/g2.css";
 import { useElementWidth } from "../app/hooks";
@@ -72,7 +72,9 @@ export default function Macro() {
       const last = v[m.asOf];
       const end = v[m.nMonths - 1];
       const rep = mf.repaired.month.filter((_, i) => mf.repaired.indicator[i] === key);
-      return { key, k, v, last: last ?? NaN, end: end ?? NaN, chg: last !== null && end !== null && last !== 0 ? end / last - 1 : NaN, rep };
+      // the change of the PRINTED values: rates in points, levels in % (gate item 19)
+      const ch = last !== null && end !== null ? pathChange(key, last, end) : null;
+      return { key, k, v, last: last ?? NaN, end: end ?? NaN, chg: ch ? ch.chg : NaN, pts: ch ? ch.pts : NaN, rate: ch?.rate ?? false, rep };
     });
   }, [mf, m]);
 
@@ -130,6 +132,7 @@ export default function Macro() {
   if (mr.loading && !mf) return <Loading what="macro indicators and the lead / lag table" height={360} />;
   if (mr.error || !mf || !facts || !c) return <ErrorState message={mr.error ?? "macro.json missing"} />;
 
+  const maxLag = (mf.leadlag.corr[0]?.[0]?.[0]?.length ?? 13) - 1;
   const fam = m.dims.families.name[sel.f];
   const ind = mf.indicators[sel.k];
   const headline = render(MACRO_TEMPLATES.headline, facts).text;
@@ -137,7 +140,7 @@ export default function Macro() {
   const nFam = m.dims.families.name.length;
   const scopeFams = filters.family === null ? m.dims.families.name.map((_, i) => i) : [filters.family];
   const stableIn = scopeFams.filter((f) => facts.stableFams.includes(f)).length;
-  const lagFacts = { fam, ind, c };
+  const lagFacts = { fam, ind, c, eras: mf.leadlag.eras };
   const checkFacts = { fam, ind, lag: c.lag, r: check?.r ?? NaN };
   type SR = SensRow;
   const scols: Column<SR>[] = [
@@ -181,7 +184,7 @@ export default function Macro() {
 
       <Module
         title={render(MATRIX_TEMPLATES.title, facts).text}
-        dek={`Correlation of each family's macro index with each indicator ${monthName(m.months[0])} – ${monthName(m.months[m.asOf])}, at the model's lag for its drivers (ink outline) and at the strongest lag elsewhere. Click a cell to inspect it; the orange outline is the selection.`}
+        dek={`Correlation of each family's macro index with each indicator, ${monthName(m.months[0])} – ${monthName(m.months[m.asOf])}. Full colour with an ink outline: the model's drivers, at the model's lag. Faded: not a driver, shown at its strongest lag; lag ${maxLag} is the edge of the search window, so a strong faded cell there is usually a seasonal echo, not a lead. Click a cell to inspect it; the orange outline is the selection.`}
         info={{ what: "The family × indicator lead / lag matrix of the features stage.", how: "Positive r: demand rises after the indicator rises. The lag is in months the indicator leads demand.", source: "macro.json (leadlag)" }}
       >
         <div ref={wref} className={narrow ? "g2-scroll" : undefined}>
@@ -205,7 +208,7 @@ export default function Macro() {
             Selected: <b>{fam}</b> × <b>{indName(ind)}</b>
           </span>
           <span>
-            {c.driver ? `model driver at lag ${c.lag}` : `not a driver; strongest at lag ${c.lag}`}, r = {fmtFixed(c.r, 2)}
+            {c.driver ? `model driver at lag ${c.lag}` : `not a driver; strongest at lag ${c.lag}`}, r = {fmtFixed(c.r, 2)} over {eraLabel(mf.leadlag.eras[0] ?? "all")}
           </span>
         </p>
       </Module>
@@ -213,7 +216,7 @@ export default function Macro() {
       <div className="cols-5-7">
         <Module
           title={render(LAG_TEMPLATES.title, lagFacts).text}
-          dek={`Correlation at every lag, 0 to 12 months, for ${fam} and ${indName(ind)}: ${eraLabel(mf.leadlag.eras[0])} in ink, the two eras in grey. The dotted rule is the ${c.driver ? "model's" : "strongest"} lag.`}
+          dek={`Correlation at every lag, 0 to ${maxLag} months, for ${fam} and ${indName(ind)}: ${eraLabel(mf.leadlag.eras[0])} in ink, each era in grey and labelled at its end. The dotted rule is the ${c.driver ? "model's" : "strongest"} lag.`}
           info={{ what: "Is the lead stable? The same correlation computed over the whole period and over each era.", how: "A driver is stable when the two eras agree in sign and both reach |r| ≥ 0.5 at the driver's lag.", source: "macro.json (leadlag.corr)" }}
           keyItems={mf.leadlag.eras.map((e, i) => ({ kind: i === 0 ? ("line" as const) : ("thin" as const), color: ["var(--ink)", "var(--ink-3)", "var(--ink-4)"][i] ?? "var(--ink-3)", label: eraLabel(e) }))}
         >
@@ -234,7 +237,7 @@ export default function Macro() {
 
       <Module
         title={render(PATH_TEMPLATES.title, { items: paths, inds: mf.indicators, endMonth: m.months[m.nMonths - 1] }).text}
-        dek={`Each indicator, ${monthName(m.months[0])} – ${monthName(m.months[m.nMonths - 1])}, on its own scale: the cleaned history in ink, the supplied path the forecast uses as a known input in orange, rings where a value was repaired. Click one to inspect its column.`}
+        dek={`Each indicator, ${monthName(m.months[0])} – ${monthName(m.months[m.nMonths - 1])}, on its own scale: the cleaned history in ink, the supplied path the forecast uses as a known input in orange, rings where a value was repaired. The change from ${monthName(m.months[m.asOf])} to ${monthName(m.months[m.nMonths - 1])} is in points for rates and indices read in points (PMI, year-on-year growth, utilisation) and in % for levels. Click one to inspect its column.`}
         info={{ what: "The macro inputs of the forecast: history and the path assumed through the window.", how: "Values from the cleaned indicator file; repaired cells (unit or scale errors, gaps) are listed in the change log.", source: "macro.json (values, repaired) ← clean/macro_clean.csv, quality/macro_change_log.csv" }}
       >
         <div className="g2-paths">
@@ -245,10 +248,10 @@ export default function Macro() {
                 <span>
                   {fmt1(p.last)} to <b>{fmt1(p.end)}</b>
                 </span>
-                <span>{Number.isFinite(p.chg) ? fmtSignedPct(p.chg) : "–"}</span>
+                <span>{p.rate ? (Number.isFinite(p.pts) ? fmtPtsAbs(p.pts) : "–") : Number.isFinite(p.chg) ? fmtSignedPct(p.chg) : "–"}</span>
               </span>
               <PathMini v={p.v} asOf={m.asOf} rep={p.rep} />
-              <span className="caption">{IND[p.key] ? `In ${IND[p.key].unit}; ` : ""}{p.rep.length ? `${countWord(p.rep.length)} ${p.rep.length === 1 ? "value" : "values"} repaired` : "no repairs"}</span>
+              <span className="caption">{IND[p.key] ? `In ${IND[p.key].level}; ` : ""}{p.rep.length ? `${countWord(p.rep.length)} ${p.rep.length === 1 ? "value" : "values"} repaired` : "no repairs"}</span>
             </button>
           ))}
           <div className="g2-paths-axis">

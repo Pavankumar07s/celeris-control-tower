@@ -10,7 +10,7 @@ import type { Filters, Lens, Measure, Model } from "../data/model";
 import { fmtInt, fmtMoney, fmtNum, monthLong, monthName, monthSpan, yearSpan } from "../data/format";
 import type { ExceptionFile } from "../data/types";
 import type { Annotation, AnnotationFrame } from "./Annotations";
-import { FONT, axisTick, baseOption, esc, niceMax, tooltipStyle, ttHead, ttNote, ttRow, ttEnd, type Theme } from "./theme";
+import { FONT, fz, fpx, axisTick, baseOption, esc, niceMax, tooltipStyle, ttHead, ttNote, ttRow, ttEnd, type Theme } from "./theme";
 
 export interface TimelineAnomaly {
   month: number;
@@ -90,6 +90,30 @@ export function rangeStart(m: Model, preset: RangePreset): number {
   }
   if (preset === "window") return Math.max(0, m.asOf - 11);
   return 0;
+}
+
+/** Which history marks the timeline draws in its visible range, with the same rules as buildTimeline, so a
+ *  key lists only the marks a reader can find on the chart (pass it to timelineKey as `present`). */
+export function markPresence(spec: Pick<TimelineSpec, "m" | "hist" | "range" | "zoom" | "lens" | "columns">): { shipped: boolean; lost: boolean; rebuilt: boolean } {
+  const { m, hist: h } = spec;
+  const out = { shipped: false, lost: false, rebuilt: false };
+  if (!h) return out;
+  const range = spec.zoom ?? spec.range ?? "all";
+  const start = Array.isArray(range) ? Math.max(0, range[0]) : rangeStart(m, range);
+  const end = Math.min(m.asOf, Array.isArray(range) ? range[1] : m.asOf);
+  const latent = spec.lens === "latent";
+  // a gap counts as drawn when a reader can see it: at least 1 % of the largest month in range (about 3px of plot)
+  let top = 0;
+  for (let i = start; i <= end; i++) top = Math.max(top, h.demand[i]);
+  const seen = Math.max(0.5, 0.01 * top);
+  for (let i = start; i <= end; i++) {
+    const d = h.demand[i];
+    const u = latent ? d : h.shipped[i] + (h.unknownDemand?.[i] ?? 0);
+    if (!latent && d > 0 && (d - u) / d > 0.004 && d - u >= seen) out.shipped = true;
+    if (!latent && d - u >= seen) out.lost = true;
+    if (h.imputed && h.imputed[i] > (spec.columns ? 0 : Math.max(5, 0.015 * h.cells[i]))) out.rebuilt = true;
+  }
+  return out;
 }
 
 /** Labels of the three presets, computed from the calendar ("2019–2028", "Since 2024", "Forecast window"). */
@@ -394,18 +418,41 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
   }
 
   if (s.anomalies?.length) {
+    // Marks sit ON their value (no vertical offset: on a y-axis an offset reads as another value).  Each mark
+    // gets a 2px paper ring (a halo drawn under it) so it stays legible where it overlaps the line; when a data
+    // error and a real event share a month they step 5px apart horizontally instead of stacking.
+    const inRange = s.anomalies.filter((a) => a.month >= start && a.month <= end);
+    const both = new Set<number>();
+    const seen = new Map<number, Set<string>>();
+    for (const a of inRange) {
+      const k = seen.get(a.month) ?? new Set<string>();
+      k.add(a.cls);
+      seen.set(a.month, k);
+      if (k.size > 1) both.add(a.month);
+    }
     for (const cls of ["data_error", "real_event"] as const) {
-      const pts = s.anomalies.filter((a) => a.cls === cls && a.month >= start && a.month <= end);
+      const pts = inRange.filter((a) => a.cls === cls);
       if (!pts.length) continue;
+      const dx = (month: number) => (both.has(month) ? (cls === "data_error" ? -5 : 5) : 0);
       series.push({
-        name: cls === "data_error" ? "Data error, fixed" : "Real event, kept",
+        name: `${cls}-halo`,
         type: "scatter",
-        data: pts.map((a) => ({ value: [rel(a.month), a.value], text: a.text })),
+        silent: true,
+        data: pts.map((a) => ({ value: [rel(a.month), a.value], symbolOffset: [dx(a.month), 0] })),
+        symbol: cls === "data_error" ? "diamond" : "triangle",
+        symbolSize: 13,
+        itemStyle: { color: t.paper },
+        tooltip: { show: false },
+        z: 7,
+      });
+      series.push({
+        name: cls === "data_error" ? "Data error" : "Real event, kept",
+        type: "scatter",
+        data: pts.map((a) => ({ value: [rel(a.month), a.value], text: a.text, symbolOffset: [dx(a.month), 0] })),
         symbol: cls === "data_error" ? "diamond" : "triangle",
         symbolSize: 9,
         // design system 2.4: data error fixed = hollow rose diamond (cat-1); real event kept = filled jade triangle (cat-7)
         itemStyle: cls === "data_error" ? { color: t.paper, borderColor: t.cat[0], borderWidth: 1.75 } : { color: t.cat[6], borderColor: t.paper, borderWidth: 1.5 },
-        symbolOffset: cls === "data_error" ? [0, -10] : [0, 0],
         z: cls === "data_error" ? 9 : 8,
         tooltip: { trigger: "item", formatter: (p: { data: { text: string } }) => `<div class="tt" style="max-width:300px">${esc(p.data.text)}</div>` },
       });
@@ -415,8 +462,8 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
   const ev = s.showEvents ? laneEvents(m, s.filters).filter((e) => e.end >= start && e.start <= end) : [];
   const rugH = ev.length ? 16 : 0;
   // the right margin holds the end label; columns (one series) and history-only charts carry none, so they get the width back
-  const right = columns || !future ? (s.narrow ? 12 : 24) : s.narrow ? 58 : 92;
-  const grid = s.narrow ? { left: 34, right, top: 30, bottom: 30 + rugH } : { left: 46, right, top: 30, bottom: 30 + rugH };
+  const right = columns || !future ? (s.narrow ? 12 : fpx(24)) : s.narrow ? 58 : fpx(92);
+  const grid = s.narrow ? { left: 34, right, top: 30, bottom: 30 + rugH } : { left: fpx(46), right, top: fpx(30), bottom: fpx(30) + rugH };
   if (ev.length) {
     series.push({
       name: "Events",
@@ -459,8 +506,8 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
       axisLine: { lineStyle: { color: t.ruleStrong } },
       axisTick: showYear ? { interval: (_: number, v: string) => ax(v), length: 5, lineStyle: { color: t.ruleStrong }, alignWithLabel: true } : { show: false },
       axisLabel: showYear
-        ? { interval: (_: number, v: string) => axLabel(v), formatter: (v: string) => v.slice(0, 4), color: t.ink3, fontSize: 11.5, margin: 9, fontFamily: FONT }
-        : { interval: (i: number) => i % 3 === 0, formatter: (v: string) => monthName(v).replace(" 20", " ’"), color: t.ink3, fontSize: 11.5, margin: 9, fontFamily: FONT },
+        ? { interval: (_: number, v: string) => axLabel(v), formatter: (v: string) => v.slice(0, 4), color: t.ink3, fontSize: fz(11.5), margin: 9, fontFamily: FONT }
+        : { interval: (i: number) => i % 3 === 0, formatter: (v: string) => monthName(v).replace(" 20", " ’"), color: t.ink3, fontSize: fz(11.5), margin: 9, fontFamily: FONT },
       splitLine: { show: false },
       axisPointer: { label: { show: false } },
     },
@@ -469,7 +516,7 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
       min: 0,
       max: yMax,
       interval: yMax / 4,
-      axisLabel: { formatter: (v: number) => axisTick(v, usd), color: t.ink3, fontSize: 11.5, fontFamily: FONT },
+      axisLabel: { formatter: (v: number) => axisTick(v, usd), color: t.ink3, fontSize: fz(11.5), fontFamily: FONT },
       splitLine: { lineStyle: { color: t.grid, width: 1, type: "solid" } },
       axisLine: { show: false },
       axisTick: { show: false },
@@ -492,8 +539,13 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
             h += ttRow(t.ink4, "shipped", fv(shipped[i]));
             if ((gap[i] as number) > 0.5) h += ttRow(t.lossFill, "lost to stock-outs", fv(gap[i]), "box");
           }
-          if (imputed && imputed[i] > 0)
-            h += ttNote(`${fmtInt(imputed[i])} cell${imputed[i] === 1 ? "" : "s"} rebuilt this month${missing && missing[i] > 0 ? `, ${fmtInt(missing[i])} of them rows missing from the extract` : ""}; never zero-filled`);
+          if (imputed && imputed[i] > 0) {
+            // one vocabulary: rows missing from the extract are REBUILT; ERP blanks have units UNKNOWN and are kept out of fitting
+            const rows = missing ? missing[i] : imputed[i];
+            const unk = Math.max(0, imputed[i] - rows);
+            const parts = [rows > 0 ? `${fmtInt(rows)} missing ${rows === 1 ? "row" : "rows"} rebuilt` : "", unk > 0 ? `${fmtInt(unk)} ${unk === 1 ? "cell" : "cells"} with units unknown, kept out of fitting` : ""].filter(Boolean);
+            h += ttNote(`${parts.join("; ")}; never zero-filled`);
+          }
         }
         if (i > asOf && s.fc) {
           h += ttRow(t.accent, latent ? "latent demand (forecast)" : "forecast (submitted)", fv(fc[i]));
@@ -505,7 +557,7 @@ export function buildTimeline(s: TimelineSpec): TimelineModel {
         }
         for (const line of s.lines ?? []) if (line.data[i] !== null && line.data[i] !== undefined) h += ttRow(line.color, line.name, fv(line.data[i]), !!line.dashed);
         // anomaly marks and (with the rug on) events of this month, as notes: an axis tooltip covers them all
-        for (const a of (s.anomalies ?? []).filter((x) => x.month === i).slice(0, 2)) h += ttNote(`${a.cls === "data_error" ? "Data error fixed" : "Real event"}: ${a.text}`);
+        for (const a of (s.anomalies ?? []).filter((x) => x.month === i).slice(0, 2)) h += ttNote(`${a.cls === "data_error" ? "Data error" : "Real event"}: ${a.text}`);
         const evHere = ev.filter((e) => e.start <= i && e.end >= i);
         for (const e of evHere.slice(0, 3)) h += ttNote(`${m.dims.events.type[e.i]}: ${m.dims.events.description[e.i]}`);
         if (evHere.length > 3) h += ttNote(`and ${evHere.length - 3} more events`);
@@ -652,15 +704,23 @@ export function timelineAnnotations(c: AnnotationContext): Annotation[] {
       while (a > 0 && miss[a - 1] > thr) a--;
       while (b < asOf && miss[b + 1] > thr) b++;
       let total = 0;
-      for (let i = a; i <= b; i++) total += miss[i];
+      let rowsMissing = 0;
+      for (let i = a; i <= b; i++) {
+        total += miss[i];
+        rowsMissing += s.hist.missing ? s.hist.missing[i] : miss[i];
+      }
+      // one vocabulary with Data health and the anomaly monitor: missing rows are rebuilt from the Record_ID
+      // grid; ERP blanks have units unknown and are kept out of fitting (neither is ever zero-filled)
+      const unknown = Math.max(0, total - rowsMissing);
       const ev = events.find((e) => E.type[e.i] === "System" && e.start <= b && e.end >= a);
       const mid = Math.round((a + b) / 2);
+      const what = [rowsMissing > 0 ? `${fmtInt(rowsMissing)} missing rows rebuilt` : "", unknown > 0 ? `${fmtInt(unknown)} cells with units unknown, kept out of fitting` : ""].filter(Boolean).join("; ");
       out.push({
         id: `reb-${bi}`,
         at: rel(mid),
         value: D[mid] as number,
-        title: ev ? eventTitle(E.description[ev.i]) : "History rebuilt",
-        text: `${fmtInt(total)} cells rebuilt, not zero-filled, ${monthSpan(months[a], months[b])}`,
+        title: ev ? eventTitle(E.description[ev.i]) : unknown > rowsMissing ? "Units unknown" : "History rebuilt",
+        text: `${what}, ${monthSpan(months[a], months[b])}`,
         anchor: "above",
         tone: "past",
         align: "left",
@@ -697,12 +757,14 @@ export function timelineAnnotations(c: AnnotationContext): Annotation[] {
       if (vis(at) && tm.fc[at] !== null) {
         // the impact in the active measure: units removed, or the revenue they carry (removed units x price)
         const removed = s.measure === "usd" ? g.usd : g.units;
-        const amount = s.measure === "usd" ? `${fmtMoney(Math.abs(removed), 2)} of revenue` : `${fmtInt(Math.abs(removed))} units`;
+        // short enough to sit inside the narrow forecast zone: compact amount, and the first word of a long name
+        const amount = s.measure === "usd" ? `${fmtMoney(Math.abs(removed), 1)}` : `${fmtNum(Math.abs(removed))} units`;
+        const short = who.length > 14 ? who.split(/\s+/)[0] : who;
         out.push({
           id: `win-${label}`,
           at: rel(at),
           value: tm.fc[at] as number,
-          title: `${who} ${noun}`,
+          title: `${short} ${noun}`,
           text: `${removed >= 0 ? "−" : "+"}${amount}, ${monthSpan(months[g.start], months[Math.min(g.end, m.nMonths - 1)])}`,
           anchor: "below",
           tone: "future",
@@ -742,7 +804,7 @@ export function anomalyAnnotations(model: TimelineModel, items: { month: number;
       id: `anom-${a.month}-${k}`,
       at: a.month - model.start,
       value: a.value,
-      title: `${a.cls === "data_error" ? "Data error fixed" : "Real event"}: ${a.title}`,
+      title: `${a.cls === "data_error" ? "Data error" : "Real event"}: ${a.title}`,
       text: a.text,
       anchor: "above" as const,
       tone: "past" as const,

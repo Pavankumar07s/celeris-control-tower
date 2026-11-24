@@ -4,23 +4,27 @@
 //  -> figure strip (revenue with sparkline, WAPE ladder, lost sales, history repaired)
 //  -> the brief | where the change comes from (mix by region / family / channel) + top exceptions
 //  -> outlook small multiples (moving annual total) -> colophon.
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { useApp } from "../app/context";
-import { useSelection } from "../app/hooks";
+import { useMedia, useSelection } from "../app/hooks";
 import { TimelineChart } from "../charts/TimelineChart";
-import { rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec } from "../charts/timeline";
-import { MoreLink, RangePresets, RuleChip, Tabs } from "../components/controls";
+import { rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec, markPresence } from "../charts/timeline";
+import { Button, LinkButton, MoreLink, RangePresets, RuleChip, Tabs } from "../components/controls";
 import { Delta, Figure, FigureStrip, HeroFigure, Ladder, Lede, RangeStrip, Rich, Sparkline } from "../components/Figure";
 import { Module, timelineKey } from "../components/Module";
-import { Notice } from "../components/states";
+import { Empty, Notice } from "../components/states";
 import { BarTable } from "../components/tables";
 import { breakdown, sharesOf, type BreakdownDim } from "../data/breakdown";
+import { NO_FILTERS } from "../data/model";
 import { forecastAgg, forecastLatent, historyAgg, sum } from "../data/aggregate";
 import { fmt1, fmtInt, fmtMoney, fmtNum, fmtOnScale, fmtPct, fmtSignedPct, fmtValue, monthLong, monthName } from "../data/format";
 import { useResource } from "../data/load";
 import { lognormalQuantile, moments, Z10, Z90 } from "../data/quantiles";
 import type { ExceptionFile, ForecastDetail, StockoutFile } from "../data/types";
-import { briefing, exceptionRowsIn, ladderFacts, readableMonths } from "../insights/briefing";
+import { actFact, briefing, exceptionRowsIn, ladderFacts, lostShare, riskFact } from "../insights/briefing";
+import { ptsBetween } from "../insights/accuracy";
+import { reasonShort, lastOrderPhrase } from "../insights/inbox";
+import { repairFacts } from "../insights/health";
 import { countWord, render, selectionWords } from "../insights/headlines";
 import { CHANGE_TEMPLATES, OUTLOOK_TEMPLATES, OVERVIEW_TEMPLATES, TOP_TEMPLATES, changeDek, changeFacts, changeTitle, overviewFacts, timelineDek } from "../insights/overview";
 import "./Overview.css";
@@ -32,7 +36,7 @@ export default function Overview() {
   const { m, theme, filters, measure, lens, params, setParam, setFilters, go } = useApp();
   const latent = lens === "latent";
   const usd = measure === "usd";
-  const { segs, runs, single, h, fc } = useSelection();
+  const { segs, runs, series, single, h, fc } = useSelection();
   const detail = useResource<ForecastDetail>(latent ? "forecast_detail.json" : null);
   const stock = useResource<StockoutFile>("stockouts.json");
   const exc = useResource<ExceptionFile>("exceptions.json");
@@ -58,7 +62,11 @@ export default function Overview() {
   const fv = (v: number) => fmtValue(v, measure);
 
   // ---- the timeline
-  const range = (["recent", "window"].includes(params.get("tl") ?? "") ? params.get("tl") : single !== null ? "recent" : "all") as RangePreset;
+  // phones default to "Since <year>" so the 19 forecast months are not squeezed into a sliver of a 2019–2028 axis
+  const phone = useMedia("(max-width: 640px)");
+  const defRange: RangePreset = single !== null || phone ? "recent" : "all";
+  const tlParam = params.get("tl");
+  const range = (["all", "recent", "window"].includes(tlParam ?? "") ? tlParam : defRange) as RangePreset;
   const showEvents = params.get("ev") === "1";
   const rangeText = `${monthName(m.months[rangeStart(m, range)])} – ${monthName(m.months[m.nMonths - 1])}`;
   const spec = useMemo<Omit<TimelineSpec, "narrow" | "height">>(
@@ -95,7 +103,10 @@ export default function Overview() {
   const fullRange = `${monthName(m.months[0])} – ${monthName(m.months[m.nMonths - 1])}`;
   const pa = m.meta.price_assumption.vs_2026_pct;
   const priceYears = Object.entries(pa).filter(([, v]) => v !== 0);
-  const { final, naive, snaive, floor, origins: nOrigins } = ladderFacts(m);
+  const { final, naive, snaive, cycle, floor, origins: nOrigins } = ladderFacts(m);
+  // the best (lowest-WAPE) benchmark, as Forecast & accuracy names it; differences from the printed values
+  const best = [cycle, snaive, naive].filter((x): x is NonNullable<typeof x> => !!x).reduce<typeof cycle>((a, b) => (!a || Number((b.wape * 100).toFixed(1)) < Number((a.wape * 100).toFixed(1)) ? b : a), undefined);
+  const bestLabel = best === cycle ? "cycle-aware naive" : best === snaive ? "seasonal naive" : "naive";
   const lost = useMemo(() => {
     if (!stock.data) return null;
     const c = stock.data.cells;
@@ -110,8 +121,8 @@ export default function Overview() {
     }
     return { u, usd: v };
   }, [stock.data, segs, m, filters.customer]);
-  const fixed = sum(hUnits.fixed);
-  const rebuilt = sum(hUnits.missing);
+  // one definition of "repaired" with Data health: a partition of the history cells (corrected + rebuilt + units unknown)
+  const repaired = useMemo(() => repairFacts(m, segs, "family").total, [m, segs]);
 
   // ---- breakdowns (mix by region / family / channel, both the brief and the change table)
   const bds = useMemo(() => DIMS.map((dim) => sharesOf(m, breakdown(m, filters, dim, measure))), [m, filters, measure]);
@@ -164,6 +175,62 @@ export default function Overview() {
   }, [m, filters, measure, openDims.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (d: BreakdownDim, idx: number) => setFilters({ ...filters, [d]: idx, ...(d === "family" ? { sku: null } : {}) });
+
+  // ---- the watch list in the lede: the three things an executive should worry about, without scrolling.
+  // Each line reads the same variable as its evidence below: the brief's Risk and Act facts (riskFact,
+  // actFact: the inbox's cases) and the change table's weakest row.
+  const watch = useMemo(() => {
+    const items: { tag: string; tone?: "warn" | "crit"; text: ReactNode; link: { label: string; onClick: () => void } }[] = [];
+    const X = exc.data;
+    const r = X ? riskFact(m, X, excRows) : null;
+    if (r)
+      items.push({
+        tag: "Risk",
+        tone: "warn",
+        text: (
+          <>
+            {r.who} {r.what}, {r.span}: <b>{r.units >= 0 ? "−" : "+"}{fmtInt(Math.abs(r.units))} units</b> ({fmtMoney(r.usd, 1)}) across {r.n} series
+          </>
+        ),
+        link: { label: "Window events", onClick: () => go("exceptions", { cause: "window_event" }) },
+      });
+    const a = X ? actFact(m, X, excRows) : null;
+    if (a)
+      items.push({
+        tag: "Act",
+        tone: "crit",
+        text: (
+          <>
+            <b>
+              {fmtInt(a.n)} {a.n === 1 ? "case" : "cases"}
+            </b>
+            , {fmtMoney(a.usd, 1)} of revenue at risk; the largest is {a.ruleWords}, {a.whoNode}
+            {a.lost ? <> ({lastOrderPhrase(a.lost).replace(/^Last/, "last")})</> : null}
+          </>
+        ),
+        link: { label: "Inbox", onClick: () => go("exceptions") },
+      });
+    if (change && dim && change.rows.length > 1) {
+      const rows = change.rows.filter((x) => Number.isFinite(x.pct));
+      const worst = rows.length ? rows.reduce((p, q) => (q.pct < p.pct ? q : p)) : null;
+      if (worst)
+        items.push({
+          tag: "Demand",
+          text:
+            worst.pct < 0 ? (
+              <>
+                {worst.label} falls <b>{fmtSignedPct(worst.pct)}</b> over the next 12 months, the steepest {dim} decline
+              </>
+            ) : (
+              <>
+                Every {dim} grows over the next 12 months; {worst.label} grows least, <b>{fmtSignedPct(worst.pct)}</b>
+              </>
+            ),
+          link: { label: "Filter", onClick: () => pick(dim, worst.idx) },
+        });
+    }
+    return items;
+  }, [exc.data, excRows, m, change, dim, go]); // eslint-disable-line react-hooks/exhaustive-deps
   const presets = rangePresets(m);
   const p50Note = (tm: TimelineModel) =>
     tm.hasBand ? (
@@ -176,11 +243,43 @@ export default function Overview() {
       <span>Latent lens: history and forecast both spread each order over the months it covers; the P10–P90 range applies to orders as booked.</span>
     ) : null;
 
+  // a selection no series matches (reachable only through a typed link): say so once, with the way out
+  if (!series.length)
+    return (
+      <>
+        <Lede headline="No series matches this selection" standfirst={`The filters ${sel.name ? `(${sel.name}) ` : ""}combine values that never occur together in the history, so there is nothing to forecast or chart.`} />
+        <Empty title="Nothing to show for these filters" action={<Button onClick={() => setFilters(NO_FILTERS)}>Reset the filters</Button>}>
+          Every filter only offers values that exist under the other filters, so this state comes from a typed or edited link. Reset the filters, or change one of them in the bar above.
+        </Empty>
+      </>
+    );
+
   return (
     <>
       <Lede
         headline={headline}
         standfirst={standfirst}
+        after={
+          watch.length ? (
+            <ul className="watch" aria-label={`${countWord(watch.length, true)} things to watch`}>
+              {watch.map((w) => (
+                <li key={w.tag}>
+                  <span className="tag">
+                    {w.tone && <i className={w.tone} aria-hidden="true" />}
+                    {w.tag}
+                    {w.tone && <span className="visually-hidden"> ({w.tone === "crit" ? "act now" : "risk"})</span>}
+                  </span>
+                  <span className="txt">
+                    {w.text}{" "}
+                    <LinkButton onClick={w.link.onClick} title={`Open the evidence: ${w.link.label}`}>
+                      {w.link.label}
+                    </LinkButton>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : undefined
+        }
         figure={
           <HeroFigure
             label={`Forecast, next ${m.nWin} months`}
@@ -203,7 +302,7 @@ export default function Overview() {
         dek={timelineDek(facts, rangeText)}
         tools={
           <>
-            <RangePresets value={range} options={presets} onChange={(v) => setParam({ tl: v === (single !== null ? "recent" : "all") ? null : v }, true)} />
+            <RangePresets value={range} options={presets} onChange={(v) => setParam({ tl: v === defRange ? null : v }, true)} />
             <button type="button" className={`btn sm quiet ${showEvents ? "" : ""}`} aria-pressed={showEvents} onClick={() => setParam({ ev: showEvents ? null : "1" }, true)} title="Show every event as a rug under the axis (hover a tick for details)">
               {showEvents ? "Hide events" : "All events"}
             </button>
@@ -214,7 +313,7 @@ export default function Overview() {
           how: "Exact sums over the selected series. The forecast continues unconstrained demand (stock-outs added back); its first point is the last actual. The P10–P90 band uses the contract's aggregate-quantile formula.",
           source: "history.json, forecast.json, dims.json (events), exceptions.json",
         }}
-        keyItems={timelineKey({ latent, columns: single !== null, rebuilt: !latent, lost: !latent })}
+        keyItems={timelineKey({ latent, columns: single !== null, rebuilt: !latent, lost: !latent, present: markPresence(spec) })}
       >
         {latent && detail.loading ? (
           <Notice tone="info">Loading latent demand for the forecast window…</Notice>
@@ -243,38 +342,38 @@ export default function Overview() {
         <Figure
           label="Backtest error (WAPE)"
           value={final ? fmtPct(final.wape) : "–"}
-          context={final && snaive ? `**${fmt1(Math.abs(snaive.wape - final.wape) * 100)} pts** ${snaive.wape >= final.wape ? "better" : "worse"} than seasonal naive; lower is better` : undefined}
+          context={final && best ? `**${fmt1(Math.abs(ptsBetween(best.wape, final.wape)))} pts** ${best.wape >= final.wape ? "better" : "worse"} than ${bestLabel}, the best benchmark; lower is better` : undefined}
           visual={
             final ? (
               <Ladder
-                rows={[...(naive ? [{ label: "Naive", value: naive.wape }] : []), ...(snaive ? [{ label: "Seasonal naive", value: snaive.wape }] : []), { label: "Our model", value: final.wape, me: true }]}
-                format={(v) => fmt1(v * 100)}
-                foot={`${nOrigins} origins${floor !== null ? `, noise floor ${fmtPct(floor)}` : ""}, all series`}
+                rows={[...(snaive ? [{ label: "Seasonal naive", value: snaive.wape }] : []), ...(cycle ? [{ label: "Cycle-aware naive", value: cycle.wape }] : []), { label: "Our model", value: final.wape, me: true }]}
+                format={(v) => `${fmt1(v * 100)}%`}
+                foot={`${nOrigins} origins${floor !== null ? `, in-hindsight floor ${fmtPct(floor)}` : ""}, all series`}
               />
             ) : undefined
           }
           link={{ label: "Forecast & accuracy", onClick: () => go("forecast") }}
-          info={{ what: "Rolling-origin backtest at a 19-month horizon over every SKU × region × month, pooled over the scored origins on the cells every model forecast (all series, not the filter).", how: "WAPE = Σ|actual − forecast| / Σ actual on unconstrained demand. Lower is better; the noise floor is the error a perfect model of the level would still make.", source: "meta.json (backtest ladder)" }}
+          info={{ what: "Rolling-origin backtest at a 19-month horizon over every SKU × region × month, pooled over the scored origins on the cells every model forecast (all series, not the filter).", how: "WAPE = Σ|actual − forecast| / Σ actual on unconstrained demand. Lower is better; the in-hindsight floor is the error a model that knew each series' level in hindsight would still make.", source: "meta.json (backtest ladder)" }}
         />
         <Figure
           label={`Lost sales, ${m.months[0].slice(0, 4)}–${m.months[m.asOf].slice(0, 4)}`}
           value={lost ? fmtInt(lost.u) : "…"}
           unit="units"
-          context={lost ? `**${fmtMoney(lost.usd, 1)}** never shipped, ${fmtPct(lost.u / Math.max(1, sum(hUnits.demand)), 2)} of unconstrained demand` : "Reading stock-outs…"}
+          context={lost ? `**${fmtMoney(lost.usd, 1)}** never shipped, ${fmtPct(lostShare(lost.u, hUnits), 2)} of unconstrained demand` : "Reading stock-outs…"}
           link={{ label: "Stock-outs & lost sales", onClick: () => go("stockouts") }}
           info={{ what: "Units customers requested but Celeris never shipped: listed stock-outs, imputed unlisted semiconductor months and detected hidden stock-outs.", how: "Lost units × the invoice price of the month.", source: "stockouts.json (cells.lost)" }}
         />
         <Figure
-          label="History repaired"
-          value={fmtInt(fixed)}
+          label="History cells repaired"
+          value={fmtInt(repaired.touched)}
           unit="cells"
-          context={`**${fmtPct(fixed / Math.max(1, sum(hUnits.cells)))}** of ${fmtInt(sum(hUnits.cells))} history cells fixed, plus **${fmtInt(rebuilt)}** missing rows rebuilt, not zero-filled`}
+          context={`**${fmtPct(repaired.share)}** of ${fmtInt(repaired.cells)} cells: ${fmtInt(repaired.fixed)} corrected, ${fmtInt(repaired.rebuilt)} rows rebuilt, ${fmtInt(repaired.unknown)} units unknown`}
           link={{ label: "Data health", onClick: () => go("health") }}
-          info={{ what: "History cells whose units, price or revenue were corrected (units × 10, cents, EUR, pack of 10, sign …), and rows missing from the extract that were rebuilt from the Record_ID grid.", how: "Flags on every history cell. Missing rows are never treated as zero demand.", source: "history.json (flags)" }}
+          info={{ what: "History cells the cleaning repaired, each counted once: values corrected (units × 10, cents, EUR, pack of 10, sign …), rows missing from the extract rebuilt from the Record_ID grid, and ERP blanks whose units stay unknown (kept out of fitting). The same definition as the Data health repairs table.", how: "Flags on every history cell of the selection. Missing rows are never treated as zero demand.", source: "history.json (flags)" }}
         />
       </FigureStrip>
 
-      <div className="cols-7-5">
+      <div className="cols-7-5 ov-lower">
         <Module
           className="brief"
           title="The brief"
@@ -336,7 +435,7 @@ export default function Overview() {
                     const s = X.series[i];
                     return (
                       <li key={i}>
-                        <button type="button" className="row" onClick={() => go("exceptions", { case: String(i) })} title={readableMonths(X.cause[i])}>
+                        <button type="button" className="row" onClick={() => go("exceptions", { case: String(i) })}>
                           <span className="rk">{k + 1}</span>
                           <span className="who">
                             <span className="id">{s >= 0 ? m.dims.skus.id[m.sSku[s]] : m.dims.families.code[X.family[i]]}</span> · {s >= 0 ? m.dims.regions[m.sRegion[s]] : m.dims.regions[X.region[i]]}
@@ -347,7 +446,7 @@ export default function Overview() {
                           </span>
                           <span className="why">
                             <RuleChip>{X.rules[X.rule[i]]?.title ?? X.rule[i]}</RuleChip>
-                            {readableMonths(X.cause[i].split(";")[0].split(". ")[0])}
+                            {reasonShort(X, i)}
                           </span>
                         </button>
                       </li>

@@ -33,16 +33,19 @@ export interface LedeProps {
   eyebrow?: ReactNode;
   /** The one hero figure (a <HeroFigure/>). */
   figure?: ReactNode;
+  /** A short block under the standfirst (the Overview's three-line watch list). */
+  after?: ReactNode;
 }
 
 /** View header: headline and standfirst on 8 columns, the hero figure on 4, split by a vertical hairline. */
-export function Lede({ headline, standfirst, eyebrow, figure }: LedeProps) {
+export function Lede({ headline, standfirst, eyebrow, figure, after }: LedeProps) {
   return (
     <section className={`lede ${figure ? "" : "no-fig"}`} aria-label="Summary">
       <div className="lede-text" aria-live="polite">
         {eyebrow && <span className="kicker">{eyebrow}</span>}
         <h1 className={`headline ${headline.length > 46 ? "long" : ""}`}>{noBreakCodes(headline)}</h1>
         {standfirst && <p className="standfirst">{typeof standfirst === "string" ? <Rich text={standfirst} /> : standfirst}</p>}
+        {after}
       </div>
       {figure}
     </section>

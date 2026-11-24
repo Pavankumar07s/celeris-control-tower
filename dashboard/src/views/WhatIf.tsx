@@ -10,8 +10,8 @@ import { useApp } from "../app/context";
 import { useSelection, useElementWidth } from "../app/hooks";
 import { EChart } from "../charts/EChart";
 import { TimelineChart } from "../charts/TimelineChart";
-import { eventTitle, rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec } from "../charts/timeline";
-import { BAR_MAX, FONT, axisTooltip, barStyle, baseOption, categoryAxis, niceMax, ttEnd, ttHead, ttRow, valueAxis, type TooltipItem } from "../charts/theme";
+import { eventTitle, rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec, markPresence } from "../charts/timeline";
+import { BAR_MAX, FONT, fz, axisTooltip, barStyle, baseOption, categoryAxis, ttEnd, ttHead, ttRow, valueAxis, type TooltipItem } from "../charts/theme";
 import type { Annotation } from "../charts/Annotations";
 import { Button, RangePresets, Select } from "../components/controls";
 import { Figure, FigureStrip, HeroFigure, Lede } from "../components/Figure";
@@ -118,6 +118,12 @@ export default function WhatIf() {
   const annotate = useCallback(
     (tm: TimelineModel): Annotation[] => {
       const out = timelineAnnotations({ spec: { ...spec }, model: tm, include: ["divider", "end"] });
+      // the scenario's end value and its gap to the base, labelled at the end with the base forecast's own
+      // end label (one label, so the two never overprint)
+      const end = out.find((a) => a.id === "end");
+      const last = m.nWin - 1;
+      if (end && sums && Math.abs(sums.scen[last] - sums.base[last]) > 0.5)
+        end.text = `${end.text ?? ""}\nScenario ${fmtValue(sums.scen[last], measure, 1)}, ${fmtSignedPct(sums.base[last] > 0 ? sums.scen[last] / sums.base[last] - 1 : 0)}`;
       if (peakK >= 0 && Math.abs(diff[peakK]) > 0.5 && sums) {
         const i = m.w0 + peakK;
         if (i >= tm.start && i < tm.start + tm.labels.length)
@@ -142,13 +148,23 @@ export default function WhatIf() {
     const labs = Array.from({ length: m.nWin }, (_, k) => m.months[m.w0 + k]);
     const lo = Math.min(0, ...diff);
     const hi = Math.max(0, ...diff);
-    const span = niceMax(Math.max(Math.abs(lo), Math.abs(hi), 1) * 1.15);
     const both = lo < 0 && hi > 0;
+    // round ticks: a 1 / 2 / 2.5 / 5 x 10^k step and three to six intervals in all (0, −1K … −5K), never
+    // the 1.25K or 1.5K steps a fixed four-interval split of a "nice" span gives
+    const head = 1.12;
+    const reach = Math.max(Math.abs(lo), Math.abs(hi), 1) * head;
+    let tick = 1;
+    for (const k of [1, 2, 2.5, 5, 10]) {
+      tick = k * 10 ** Math.floor(Math.log10(reach / 5));
+      if (Math.ceil((Math.abs(lo) * head) / tick) + Math.ceil((hi * head) / tick) <= (both ? 6 : 5)) break;
+    }
+    const yMin = lo < 0 ? -Math.ceil((Math.abs(lo) * head) / tick) * tick : 0;
+    const yMax = hi > 0 ? Math.ceil((hi * head) / tick) * tick : yMin === 0 ? tick : 0;
     return {
       ...baseOption(theme),
       grid: { left: 46, right: 16, top: 24, bottom: 30 },
-      xAxis: categoryAxis(theme, labs, { axisLabel: { color: theme.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9, interval: (i: number) => i % 3 === 0, formatter: (v: string) => monthName(v).replace(" 20", " ’") } }),
-      yAxis: valueAxis(theme, { min: lo < 0 ? -span : 0, max: hi > 0 ? span : 0, usd }),
+      xAxis: categoryAxis(theme, labs, { axisLabel: { color: theme.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 9, interval: (i: number) => i % 3 === 0, formatter: (v: string) => monthName(v) } }),
+      yAxis: { ...valueAxis(theme, { min: yMin, max: yMax, usd }), interval: tick },
       tooltip: axisTooltip(theme, (items: TooltipItem[]) => {
         const k = items[0]?.dataIndex ?? 0;
         return `${ttHead(monthLong(labs[k]), "forecast")}${ttRow(theme.scenario, "scenario − base", fmtSigned(diff[k], measure, 2), "box")}${ttRow(theme.accent, "base forecast mean", fmtValue(sums.base[k], measure))}${ttRow(theme.scenario, "scenario mean", fmtValue(sums.scen[k], measure))}${ttEnd()}`;
@@ -156,7 +172,7 @@ export default function WhatIf() {
       series: [
         {
           type: "bar",
-          data: diff.map((d, k) => ({ value: d, label: { show: k === peakK && Math.abs(d) > 0.5, position: d < 0 ? "bottom" : "top", distance: 4, color: theme.ink2, fontFamily: FONT, fontSize: 11.5, formatter: () => fmtSigned(d, measure, 1) } })),
+          data: diff.map((d, k) => ({ value: d, label: { show: k === peakK && Math.abs(d) > 0.5, position: d < 0 ? "bottom" : "top", distance: 4, color: theme.ink2, fontFamily: FONT, fontSize: fz(11.5), formatter: () => fmtSigned(d, measure, 1) } })),
           barMaxWidth: BAR_MAX,
           itemStyle: { ...barStyle(theme.scenario), borderRadius: both ? 2 : lo < 0 ? [0, 0, 2, 2] : [2, 2, 0, 0] },
         },
@@ -174,8 +190,27 @@ export default function WhatIf() {
   const sd = Math.sqrt(histVals.reduce((a, b) => a + (b - mu) ** 2, 0) / Math.max(1, histVals.length));
   const lim = Math.max(1, Math.ceil(sd * 3));
   const step = lim > 10 ? 1 : 0.5;
+  // reach in one unit everywhere: forecast series of the selection whose SKU x channel group carries a
+  // sensitivity to the indicator (the same test runScenario applies), so the menu and the figure agree
   const linksBy = new Map<number, number>();
-  for (const k of mf.sensitivity.indicator) linksBy.set(k, (linksBy.get(k) ?? 0) + 1);
+  {
+    const keysBy = new Map<number, Set<string>>();
+    const S = mf.sensitivity;
+    for (let i = 0; i < S.sku.length; i++) {
+      const set = keysBy.get(S.indicator[i]) ?? new Set<string>();
+      set.add(`${S.sku[i]}|${S.channel_group[i]}`);
+      keysBy.set(S.indicator[i], set);
+    }
+    const aftermarket = m.dims.channels.indexOf("Aftermarket");
+    for (const [k, set] of keysBy) {
+      let n = 0;
+      for (const r of runs) {
+        const ser = m.rSeries[r];
+        if (set.has(`${m.sSku[ser]}|${m.sChannel[ser] === aftermarket ? "aftermarket" : "other"}`)) n++;
+      }
+      linksBy.set(k, n);
+    }
+  }
   const winMonths = Array.from({ length: m.nWin }, (_, k) => m.w0 + k);
   const custEvents = m.dims.events.id
     .map((_, i) => i)
@@ -238,8 +273,11 @@ export default function WhatIf() {
               label="Indicator"
               value={draft.ind}
               onChange={(v) => setDraft({ ...draft, ind: v, shift: draft.ind === v ? draft.shift : 0 })}
-              options={mf.indicators.map((k, i) => ({ value: k, label: `${indName(k)} (${fmtInt(linksBy.get(i) ?? 0)} SKU links)` }))}
+              options={mf.indicators.map((k, i) => ({ value: k, label: `${indName(k)} (${fmtInt(linksBy.get(i) ?? 0)} series)` }))}
             />
+            <p className="caption" style={{ marginTop: -6 }}>
+              In brackets: how many of the {fmtInt(runs.length)} series with a forecast in view respond to the indicator.
+            </p>
             <div className="g2-slider">
               <label className="top" htmlFor="wi-shift">
                 <span>Shift, {IND[draft.ind]?.unit ?? "units of the indicator"}</span>
@@ -271,7 +309,7 @@ export default function WhatIf() {
                 {dirty ? "Changes not applied yet" : `Showing: ${name}`}
               </span>
             </div>
-            {kd >= 0 && !linksBy.get(kd) && <Notice tone="warn">The model has no sensitivity to {indName(draft.ind)}: no SKU selected it as a driver, so a shift changes nothing.</Notice>}
+            {kd >= 0 && !linksBy.get(kd) && <Notice tone="warn">No series in this selection responds to {indName(draft.ind)}: none of its SKUs selected it as a driver, so a shift changes nothing.</Notice>}
           </div>
         </Module>
 
@@ -280,7 +318,7 @@ export default function WhatIf() {
           dek={`${usd ? "Revenue in USD" : "Units"} per month, ${rangeText}. The submitted forecast with its P10–P90 range, and the scenario's order mean after the shift.`}
           tools={<RangePresets value={range} options={rangePresets(m)} onChange={(v) => setParam({ tl: v === "window" ? null : v }, true)} />}
           info={{ what: "The base forecast and the scenario on the shared timeline.", how: "The scenario line is the sum of the recomputed order means; the base band is the aggregate P10–P90 of the submitted forecast.", source: "computed in the browser from forecast.json, forecast_detail.json, macro.json" }}
-          keyItems={timelineKey({ latent: false, rebuilt: true, lost: true, columns: single !== null, extra: [{ kind: "line", color: "var(--scenario)", label: "Scenario" }] })}
+          keyItems={timelineKey({ latent: false, rebuilt: true, lost: true, columns: single !== null, present: markPresence(spec), extra: [{ kind: "line", color: "var(--scenario)", label: "Scenario" }] })}
         >
           {lens === "latent" && <Notice tone="info">The what-if works on orders as booked; the latent lens does not apply here.</Notice>}
           <TimelineChart
@@ -320,7 +358,7 @@ export default function WhatIf() {
           <Figure
             label="Forecast rows changed"
             value={fmtInt(result?.changed ?? 0)}
-            context={`of **${fmtInt(result?.rows ?? 0)}** rows in the selection; ${fmtInt(result?.linked ?? 0)} of ${fmtInt(result?.series ?? 0)} series respond to ${indName(applied.ind)}${applied.removeEvents ? " or carry an event" : ""}; scheduled zeros stay zero`}
+            context={`of **${fmtInt(result?.rows ?? 0)}** rows in the selection; ${fmtInt(result?.linked ?? 0)} of the ${fmtInt(result?.series ?? 0)} series with a forecast respond to ${indName(applied.ind)}${applied.removeEvents ? " or carry an event" : ""}; scheduled zeros stay zero`}
             info={{ what: "Forecast rows (series × month) whose order mean changes.", how: "Rows with a zero mean (off-phase months, lost accounts, after EOL) are never touched." }}
           />
         </FigureStrip>

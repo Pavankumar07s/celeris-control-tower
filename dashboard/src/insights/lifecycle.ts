@@ -65,6 +65,7 @@ export interface Handover {
   succEnd: number; // average units a month over the last 3 window months
   ratio: number; // succEnd / predLast12
   afterEol: number; // forecast units after the EOL month (rule 5: must be 0)
+  eolUnits: number; // forecast units in the EOL month itself (the run-off's last sales; 0 when outside the window)
   beforeLaunch: number; // forecast units before launch (rule 5: must be 0)
   overlap: number | null; // months both SKUs are forecast (launch .. EOL)
   ramps: boolean;
@@ -86,6 +87,7 @@ export function handovers(m: Model, f: Filters, skus: LifeSku[]): Handover[] {
     const succEnd = Q && Q.runs > 0 ? sum(Q.fc, m.nWin - 3, m.nWin) / 3 : NaN;
     let afterEol = 0;
     if (P && pe !== null) for (let t = Math.max(m.w0, pe + 1); t < m.nMonths; t++) afterEol += P.fc[t - m.w0];
+    const eolUnits = P && pe !== null && pe >= m.w0 && pe < m.nMonths ? P.fc[pe - m.w0] : 0;
     let beforeLaunch = 0;
     if (Q && sl !== null) for (let t = m.w0; t < Math.min(sl, m.nMonths); t++) beforeLaunch += Q.fc[t - m.w0];
     let ramps = false;
@@ -111,6 +113,7 @@ export function handovers(m: Model, f: Filters, skus: LifeSku[]): Handover[] {
       succRuns: Q ? Q.runs : 0,
       predWindow: P ? sum(P.fc) : 0,
       afterEol,
+      eolUnits,
       beforeLaunch,
       overlap: pe !== null && sl !== null && pe >= sl ? pe - sl + 1 : null,
       ramps,
@@ -150,6 +153,31 @@ export interface LifeFacts {
 const full = (h: Handover[]) => h.filter((x) => x.pred !== null && x.succ !== null && x.succRuns > 0);
 const years = (f: LifeFacts, xs: number[]) => (xs.length ? yearSpan(f.m.months[Math.min(...xs)], f.m.months[Math.max(...xs)]) : "");
 
+/** Units below half a unit print as 0 (forecasts are whole units). */
+const isZero = (v: number) => v < 0.5;
+/** How the run-offs end, from the forecast: the last units sold in the EOL month and nothing after it
+ *  ("PTC-005 and PMP-003 sell their last units in their EOL months (May 2027 and Aug 2027) and are zero from
+ *  the month after"), zero already before the EOL month, or volume left after it. */
+function runoffSentence(m: Model, ends: Handover[]): string {
+  if (!ends.length) return "";
+  const M = m.months;
+  const inWin = ends.filter((p) => (p.eol as number) >= m.w0 && (p.eol as number) < m.nMonths);
+  const last = inWin.filter((p) => !isZero(p.eolUnits) && isZero(p.afterEol));
+  const early = inWin.filter((p) => isZero(p.eolUnits) && isZero(p.afterEol));
+  const leak = ends.filter((p) => !isZero(p.afterEol));
+  const one = (xs: Handover[]) => xs.length === 1;
+  const ids = (xs: Handover[]) => joinList(xs.map((p) => p.predId as string));
+  const months = (xs: Handover[], d = 0) => joinList(xs.map((p) => monthName(M[Math.min(m.nMonths - 1, (p.eol as number) + d)])));
+  const out: string[] = [];
+  if (last.length)
+    out.push(
+      `${ids(last)} ${one(last) ? "sells its" : "sell their"} last units in ${one(last) ? "its EOL month" : "their EOL months"} (${months(last)}) and ${one(last) ? "is" : "are"} zero from the month after.`,
+    );
+  if (early.length) out.push(`${ids(early)} ${one(early) ? "reaches" : "reach"} zero before ${one(early) ? "its EOL month" : "their EOL months"} (${months(early)}).`);
+  if (leak.length) out.push(`${ids(leak)} still ${one(leak) ? "has" : "have"} forecast units after ${one(leak) ? "its EOL month" : "their EOL months"}.`);
+  return out.length ? `${out.join(" ")} ` : "";
+}
+
 export const LIFE_TEMPLATES = {
   /** "Three SKUs hand over to successors in 2027" / "Two SKUs end and one launches inside the window". */
   headline: {
@@ -174,10 +202,7 @@ export const LIFE_TEMPLATES = {
     when: (f) => f.pairs.length > 0,
     text: (f) => {
       const M = f.m.months;
-      const ends = f.pairs.filter((p) => p.pred !== null && p.eol !== null);
-      const runoff = ends.length
-        ? `${joinList(ends.map((p) => p.predId as string))} ${ends.length === 1 ? "runs" : "run"} off to zero in ${ends.length === 1 ? "its" : "their"} EOL month${ends.length === 1 ? "" : "s"} (${joinList(ends.map((p) => monthName(M[p.eol as number])))}). `
-        : "";
+      const runoff = runoffSentence(f.m, f.pairs.filter((p) => p.pred !== null && p.eol !== null));
       const rule = f.ruleOk ? "Business rule 5 holds: **0 units** are forecast after any end of life or before any launch." : "**Business rule 5 is broken**: some units are forecast after an end of life or before a launch.";
       const ramp =
         Number.isFinite(f.ratio) && full(f.pairs).length
@@ -219,16 +244,24 @@ export const GANTT_TEMPLATES = {
 } satisfies Record<string, Template<GanttFacts>>;
 
 export const HANDOVER_TEMPLATES = {
-  /** "Every run-off reaches zero in its EOL month, and every successor ramps up from launch". */
+  /** "Every run-off sells its last units in its EOL month and is zero after it, and every successor ramps up from launch". */
   title: {
     id: "lifecycle.handover",
     when: (h: Handover[]) => h.length > 0,
     text: (h) => {
       const ends = h.filter((x) => x.pred !== null && x.eol !== null);
       const starts = h.filter((x) => x.succ !== null && x.launch !== null && x.succRuns > 0);
-      const zero = ends.every((x) => x.afterEol === 0);
+      const zero = ends.every((x) => isZero(x.afterEol));
+      const lastInEol = zero && ends.every((x) => !isZero(x.eolUnits));
       const ramp = starts.every((x) => x.ramps);
-      const a = ends.length ? (zero ? `${ends.length === 1 ? "The" : "Every"} run-off reaches zero in its EOL month` : "A run-off keeps volume after its EOL month") : "";
+      const det = ends.length === 1 ? "The" : "Every";
+      const a = ends.length
+        ? lastInEol
+          ? `${det} run-off sells its last units in its EOL month and is zero after it`
+          : zero
+            ? `${det} run-off is zero after its EOL month`
+            : "A run-off keeps volume after its EOL month"
+        : "";
       const b = starts.length ? (ramp ? `${ends.length ? ", and " : ""}${starts.length === 1 ? "the" : "every"} successor ramps up from launch` : `${ends.length ? ", and " : ""}not every successor ramps up`) : "";
       const s = `${a}${b}`;
       return s.charAt(0).toUpperCase() + s.slice(1);

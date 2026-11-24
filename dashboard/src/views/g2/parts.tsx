@@ -3,7 +3,7 @@
 // is in the DOM (accessible).
 import { Fragment } from "react";
 import { fmtPct, fmtPts, fmtSignedPct } from "../../data/format";
-import type { CalRow } from "../../insights/accuracy";
+import { fracBetween, shares100, type CalRow } from "../../insights/accuracy";
 import "./g2.css";
 
 /** Forecast value added: each step's WAPE as a bar against the in-hindsight floor (a vertical ink hairline). */
@@ -31,7 +31,7 @@ export function FvaSteps({ steps, floor, ariaLabel }: { steps: { md: string; lab
             <b style={{ fontWeight: s.me ? 600 : 500, color: "var(--ink)", minWidth: 42 }}>{fmtPct(s.w)}</b>
           </span>
           <span className={`c ${s.me ? "me" : ""}`} role="cell">
-            {i === 0 ? "–" : fmtPts(steps[i - 1].w - s.w)}
+            {i === 0 ? "–" : fmtPts(fracBetween(steps[i - 1].w, s.w))}
           </span>
           <span className="c" role="cell">
             {fmtSignedPct(s.b)}
@@ -40,7 +40,7 @@ export function FvaSteps({ steps, floor, ariaLabel }: { steps: { md: string; lab
       ))}
       {fx !== null && (
         <span className="floor-lab" aria-hidden="true">
-          <span style={{ left: `calc(${fx}% * 0.82)` }}>floor {fmtPct(floor)}</span>
+          <span style={{ left: `calc(${fx}% * 0.82)` }}>in-hindsight floor {fmtPct(floor)}</span>
         </span>
       )}
     </div>
@@ -56,9 +56,15 @@ const CAL_LABEL: Record<string, [string, string]> = {
 
 /** 100 % bars: below P10 | inside P10–P90 | above P90, with dashed target ticks at 10 % and 90 %. */
 export function CalBars({ rows }: { rows: CalRow[] }) {
+  // largest-remainder rounding: the three printed shares of a row add to 100.0, and "at or below P90" elsewhere
+  // reads below + inside of the same printed numbers
+  const shown = rows.map((r0) => {
+    const [below, inside, above] = shares100([r0.below, r0.inside, r0.above]);
+    return { ...r0, below, inside, above };
+  });
   return (
     <div className="g2-cal">
-      {rows.map((r) => (
+      {shown.map((r) => (
         <div className="row" key={r.level} role="img" aria-label={`${CAL_LABEL[r.level]?.[0] ?? r.level}: ${fmtPct(r.below)} below P10, ${fmtPct(r.inside)} inside, ${fmtPct(r.above)} above P90 (target 10 / 80 / 10)`}>
           <span className="who">
             {CAL_LABEL[r.level]?.[0] ?? r.level}
@@ -87,6 +93,28 @@ export function CalBars({ rows }: { rows: CalRow[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/** One accuracy row on a shared 0..max scale: the in-hindsight floor as an ink tick, seasonal naive as a ring, our
+ *  model as the orange dot, joined by a hairline (the gain over the benchmark).  For BarTable text cells. */
+export function DotRange({ label, ours, base, floor, max }: { label: string; ours: number; base: number; floor: number; max: number }) {
+  const x = (v: number) => `${Math.max(0, Math.min(1, v / max)) * 100}%`;
+  const has = (v: number) => Number.isFinite(v);
+  const lo = has(base) ? Math.min(base, ours) : ours;
+  const hi = has(base) ? Math.max(base, ours) : ours;
+  return (
+    <span
+      className="g2-dr"
+      role="img"
+      aria-label={`${label}: our model ${fmtPct(ours)}${has(base) ? `, seasonal naive ${fmtPct(base)}` : ""}${has(floor) ? `, in-hindsight floor ${fmtPct(floor)}` : ""}`}
+    >
+      <span className="base" />
+      {has(base) && <span className="ln" style={{ left: x(lo), width: `calc(${x(hi)} - ${x(lo)})` }} />}
+      {has(floor) && <span className="fl" style={{ left: x(floor) }} />}
+      {has(base) && <span className="dot b" style={{ left: x(base) }} />}
+      <span className="dot f" style={{ left: x(ours) }} />
+    </span>
   );
 }
 

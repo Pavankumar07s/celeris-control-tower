@@ -18,7 +18,7 @@ import { historyPrice, NO_FILTERS, selectRuns, selectSegments, type Filters } fr
 import type { ExceptionFile } from "../../data/types";
 import { cycleWords } from "../../insights/explorer";
 import { cap } from "../../insights/headlines";
-import { caseHeadline, caseSpan, ruleOne, ruleTitle, STATUS_LABEL, tidy, type CaseFacts, type Status } from "../../insights/inbox";
+import { caseHeadline, caseSpan, lostFacts, reasonFull, ruleOne, ruleTitle, STATUS_LABEL, type CaseFacts, type Status } from "../../insights/inbox";
 
 // ---- the case chart: the shared timeline plus one evidence layer (the at-risk area) -------------------------
 function CaseTimeline({ spec, annotate, height, ariaLabel, risk, fill }: { spec: Omit<TimelineSpec, "narrow" | "height">; annotate: (tm: TimelineModel) => Annotation[]; height: number; ariaLabel: string; risk: (number | null)[] | null; fill: string }) {
@@ -97,13 +97,37 @@ export function CaseFile(p: CaseFileProps) {
   const runs = useMemo(() => selectRuns(m, f), [m, f]);
   const h = useMemo(() => historyAgg(m, segs, measure), [m, segs, measure]);
   const fc = useMemo(() => forecastAgg(m, runs, measure), [m, runs, measure]);
+  const fcU = useMemo(() => (measure === "units" ? fc.fc : forecastAgg(m, runs, "units").fc), [m, runs, measure, fc]);
 
   // ---- facts for the headline and the evidence layer
   const facts = useMemo<CaseFacts>(() => {
+    // a lost account's last order and silent months: the exported cause first (the same variable the inbox
+    // row and the brief read), else the last month of the series with ordered demand
     let lastOrder: string | null = null;
-    if (rule === "lost_account") for (let t = m.asOf; t >= 0; t--) if (h.demand[t] > 0) {
-      lastOrder = m.months[t];
-      break;
+    let silent: number | null = null;
+    if (rule === "lost_account") {
+      const lf = lostFacts(E.cause[row]);
+      if (lf) {
+        lastOrder = lf.lastOrder;
+        silent = lf.silent;
+      } else
+        for (let t = m.asOf; t >= 0; t--)
+          if (h.demand[t] > 0) {
+            lastOrder = m.months[t];
+            silent = m.asOf - t;
+            break;
+          }
+    }
+    // end of life: the forecast in the EOL month and whether every later month is zero
+    const eolLabel = m.dims.skus.eol[sku];
+    const te = eolLabel ? m.months.indexOf(eolLabel) : -1;
+    let eolUnits: number | null = null;
+    let zeroAfterEol = false;
+    if (te >= m.w0 && te < m.nMonths) {
+      // forecast arrays are indexed from the first forecast month
+      eolUnits = fcU[te - m.w0] ?? 0;
+      zeroAfterEol = true;
+      for (let t = te + 1; t < m.nMonths; t++) if ((fcU[t - m.w0] ?? 0) >= 0.5) zeroAfterEol = false;
     }
     const switchMonth = m.dims.series.switch_month[s];
     let fromCustomer: string | null = null;
@@ -116,12 +140,15 @@ export function CaseFile(p: CaseFileProps) {
     const ei = evId ? m.dims.events.id.indexOf(evId) : -1;
     return {
       rule,
+      silent,
       sku: skuId,
       region,
       customer,
       lastOrder,
       launch: m.dims.skus.launch[sku],
       eol: m.dims.skus.eol[sku],
+      eolUnits,
+      zeroAfterEol,
       replaces: m.dims.skus.replaces[sku],
       metric: E.metric[row],
       switchMonth,
@@ -131,7 +158,7 @@ export function CaseFile(p: CaseFileProps) {
       span: caseSpan(m, E, row),
       ruleTitle: ruleTitle(E, rule),
     };
-  }, [m, E, row, rule, s, sku, skuId, region, customer, h]);
+  }, [m, E, row, rule, s, sku, skuId, region, customer, h, fcU]);
   const headline = caseHeadline(facts);
   // SKU codes never break at their hyphen
   const title = headline.split(/([A-Z]{3}-\d{3})/).map((part, k) => (k % 2 ? <span key={k} className="nb">{part}</span> : part));
@@ -229,7 +256,6 @@ export function CaseFile(p: CaseFileProps) {
   const keyItems = timelineKey({ columns: true, lost: anyLost, rebuilt: false, extra: evidence.extra });
   const a0 = m.months[Math.min(E.start[row], m.nMonths - 1)];
   const a1 = m.months[Math.min(E.end[row], m.nMonths - 1)];
-  const compactSpan = a0.slice(0, 4) === a1.slice(0, 4) ? facts.span : `${monthName(a0).replace(" 20", " ’")} – ${monthName(a1).replace(" 20", " ’")}`;
   const chartAria = `${headline}. ${usd ? "Revenue" : "Units"} per month for ${skuId} in ${region}, ${monthName(m.months[first])} – ${monthName(m.months[m.nMonths - 1])}: history as ink columns, the forecast as orange columns with P10–P90 whiskers.`;
   const units = E.impact_units[row];
   const cycle = m.dims.series.cycle[s];
@@ -250,7 +276,9 @@ export function CaseFile(p: CaseFileProps) {
         </div>
         <div>
           <span>Months</span>
-          <b title={facts.span}>{compactSpan}</b>
+          <b className="span" title={`${a0 === a1 ? 1 : m.months.indexOf(a1) - m.months.indexOf(a0) + 1} months`}>
+            {facts.span}
+          </b>
         </div>
       </div>
       <div className="g3-case-chart">
@@ -259,7 +287,7 @@ export function CaseFile(p: CaseFileProps) {
       </div>
       <section>
         <h3>Why it is flagged</h3>
-        <p className="g3-why">{tidy(E.cause[row])}</p>
+        <p className="g3-why">{reasonFull(E, row)}</p>
       </section>
       <section>
         <h3>Recommended action</h3>
@@ -272,13 +300,7 @@ export function CaseFile(p: CaseFileProps) {
         <dd>{m.dims.channels[m.sChannel[s]]}</dd>
         <dt>Ordering cycle</dt>
         <dd>
-          {cap(cycleWords(cycle))}
-          {cycle ? (
-            <>
-              {" "}
-              <span className="mono">{cycle}</span>
-            </>
-          ) : null}
+          <span title={cycle ? `Cycle code ${cycle}` : undefined}>{cap(cycleWords(cycle))}</span>
         </dd>
         <dt>Family</dt>
         <dd>{m.dims.families.name[m.sFamily[s]]}</dd>

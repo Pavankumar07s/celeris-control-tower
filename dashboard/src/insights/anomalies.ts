@@ -112,7 +112,13 @@ export interface AnomalyFacts {
   cells: number;
   errCells: number;
   realCells: number;
+  /** Data-error cells whose units stay unknown (ERP blanks): kept out of fitting, not corrected. */
+  unknownCells: number;
+  /** Episode-level flags in the selection: on the selected series themselves, and file- or market-wide
+   *  episodes (no series) whose scope covers the selection.  episodes = seriesEpisodes + wideEpisodes. */
   episodes: number;
+  seriesEpisodes: number;
+  wideEpisodes: number;
   errTypes: TypeRow[];
   realTypes: TypeRow[];
   /** Month (absolute) with the most flagged cells, its count and dominant type. */
@@ -124,12 +130,16 @@ export interface AnomalyFacts {
   biggest: { code: string; month: string; units: number } | null;
 }
 
-export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: string, single: boolean): AnomalyFacts {
+/** `unknownHist`: cells of the selection whose units stay unknown, from the history flags (the variable the Overview
+ *  and Data health use); without it the register's own "units unknown" actions are counted. */
+export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: string, single: boolean, unknownHist?: number): AnomalyFacts {
   const byType = new Map<string, TypeRow>();
   const perMonth = new Map<number, Map<string, number>>();
   let errCells = 0;
   let realCells = 0;
+  let unknownCells = 0;
   let episodes = 0;
+  let seriesEpisodes = 0;
   let biggest: AnomalyFacts["biggest"] = null;
   for (const i of rows) {
     const code = lab(a.type, i) ?? "?";
@@ -149,8 +159,10 @@ export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: str
     }
     byType.set(code, r);
     if (isCell) {
-      if (cls === "data_error") errCells++;
-      else realCells++;
+      if (cls === "data_error") {
+        errCells++;
+        if (/units unknown/i.test(lab(a.action, i) ?? "")) unknownCells++;
+      } else realCells++;
       const t = a.start[i];
       if (t >= 0 && t <= m.asOf) {
         const mm = perMonth.get(t) ?? new Map<string, number>();
@@ -159,7 +171,10 @@ export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: str
       }
       const u = Math.abs(a.impact_units[i] ?? 0);
       if (single && t >= 0 && (!biggest || u > Math.abs(biggest.units))) biggest = { code, month: m.months[t], units: a.impact_units[i] ?? 0 };
-    } else episodes++;
+    } else {
+      episodes++;
+      if (a.series[i] >= 0) seriesEpisodes++;
+    }
   }
   let peak = -1;
   let peakN = 0;
@@ -179,7 +194,10 @@ export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: str
     cells: errCells + realCells,
     errCells,
     realCells,
+    unknownCells: unknownHist ?? unknownCells,
     episodes,
+    seriesEpisodes,
+    wideEpisodes: episodes - seriesEpisodes,
     errTypes: all.filter((r) => r.cls === "data_error"),
     realTypes: all.filter((r) => r.cls === "real_event"),
     peak,
@@ -192,7 +210,8 @@ export function anomalyFacts(m: Model, a: AnomalyFile, rows: number[], name: str
 
 const verb = (code: string) => (PLURAL[typeLabel(code)] ? "lead" : "leads");
 const share = (f: AnomalyFacts) => (f.cells ? f.realCells / f.cells : NaN);
-const top3 = (rows: TypeRow[]) => joinList(rows.filter((r) => r.cells > 0).slice(0, 3).map((r) => typePlural(r.code)));
+// a type with one flagged cell reads in the singular ("a sign error"), several in the plural
+const top3 = (rows: TypeRow[]) => joinList(rows.filter((r) => r.cells > 0).slice(0, 3).map((r) => (r.cells === 1 ? `${/^[aeiou]/i.test(typeLabel(r.code)) ? "an" : "a"} ${typeLabel(r.code)}` : typePlural(r.code))));
 
 export const ANOMALY_TEMPLATES = {
   /** "78% of flagged cells were real business, not errors". */
@@ -201,7 +220,7 @@ export const ANOMALY_TEMPLATES = {
     when: (f) => f.cells > 0,
     text: (f) => {
       const s = share(f);
-      return s >= 0.5 ? `${cap(fractionWord(s))} of flagged cells were real business, not errors` : `${cap(fractionWord(1 - s))} of flagged cells were data errors, now fixed`;
+      return s >= 0.5 ? `${cap(fractionWord(s))} of flagged cells were real business, not errors` : `${cap(fractionWord(1 - s))} of flagged cells were data errors, corrected or kept out of fitting`;
     },
     fallback: (f) => (f.episodes > 0 ? `No single cell was flagged; ${fmtInt(f.episodes)} ${plural(f.episodes, "episode")} cover this selection` : "Nothing in this selection was flagged as unusual"),
   },
@@ -209,9 +228,26 @@ export const ANOMALY_TEMPLATES = {
     id: "anomalies.standfirst",
     when: (f) => f.cells > 0,
     text: (f) => {
-      const err = f.errCells ? `**${fmtInt(f.errCells)}** ${f.errCells === 1 ? "was a data error and was" : "were data errors and were"} corrected${top3(f.errTypes) ? ` (${top3(f.errTypes)})` : ""}` : "none was a data error";
+      const fixedCells = f.errCells - f.unknownCells;
+      // missing rows are rebuilt from the Record_ID grid, not "corrected": name both when both occur
+      const fixedWord = f.errTypes.some((r) => r.code === "DE.MISSING_ROW" && r.cells > 0) ? "corrected or rebuilt" : "corrected";
+      const errHow =
+        f.unknownCells === 0
+          ? `${f.errCells === 1 ? "was a data error and was" : "were data errors and were"} corrected`
+          : fixedCells === 0
+            ? `${f.errCells === 1 ? "was a data error whose units stay unknown" : "were data errors whose units stay unknown"}, kept out of fitting`
+            : `were data errors: ${fmtInt(fixedCells)} ${fixedWord}, ${fmtInt(f.unknownCells)} with units unknown and kept out of fitting`;
+      const err = f.errCells ? `**${fmtInt(f.errCells)}** ${errHow}${top3(f.errTypes) ? ` (${top3(f.errTypes)})` : ""}` : "none was a data error";
       const real = f.realCells ? `**${fmtInt(f.realCells)}** ${f.realCells === 1 ? "was a real event" : "were real events"}, kept in the history and modelled or masked from fitting${top3(f.realTypes) ? ` (${top3(f.realTypes)})` : ""}` : "none was a real event";
-      return `**${fmtInt(f.cells)} ${f.cells === 1 ? "cell" : "cells"}** of ${f.single ? f.name : f.name ? `the history of ${f.name}` : "the history"} were flagged. ${cap(err)}; ${real}.${f.episodes ? ` ${fmtInt(f.episodes)} more ${plural(f.episodes, "flag")} cover whole episodes, from date formats to launches.` : ""}`;
+      // episodes are counted apart from cells, and the sentence says which ones (C4: the series' own episodes
+      // vs file- or market-wide episodes that cover it); both are listed in the register under "Episodes"
+      const ep =
+        f.episodes === 0
+          ? ""
+          : f.single
+            ? ` The register also lists ${f.seriesEpisodes ? `${fmtInt(f.seriesEpisodes)} ${plural(f.seriesEpisodes, "episode")} on this series and ` : ""}${fmtInt(f.wideEpisodes)} file- or market-wide ${plural(f.wideEpisodes, "episode")} that cover it, from date formats to price changes (level "Episodes").`
+            : ` ${fmtInt(f.episodes)} more ${plural(f.episodes, "flag")} cover whole episodes, from date formats to launches.`;
+      return `**${fmtInt(f.cells)} ${f.cells === 1 ? "cell" : "cells"}** of ${f.single ? f.name : f.name ? `the history of ${f.name}` : "the history"} were flagged. ${cap(err)}; ${real}.${ep}`;
     },
     fallback: (f) => (f.episodes ? `${fmtInt(f.episodes)} register ${plural(f.episodes, "episode")} apply to this selection, none of them at the level of single cells.` : "Widen the filters to see flagged points."),
   },

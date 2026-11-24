@@ -83,7 +83,9 @@ export interface ExplorerFacts {
   peakUnexpN: number;
   peakEvent: string | null;
   lostAccount: boolean;
+  /** The last month with an order (one variable for "last order" everywhere) and the silent months since. */
   lastOrder: string | null;
+  silent: number | null;
   customers: { name: string; from: number; to: number }[];
   status: string | null;
   launch: string | null;
@@ -160,6 +162,7 @@ export function explorerFacts(a: {
     peakEvent: peak >= 0 ? a.eventTitleAt(peak) : null,
     lostAccount: s !== null && m.dims.series.lost[s] === 1,
     lastOrder: a.lastOrder,
+    silent: a.lastOrder && m.months.indexOf(a.lastOrder) >= 0 ? m.asOf - m.months.indexOf(a.lastOrder) : null,
     customers: s !== null ? m.segOfSeries[s].map((g) => ({ name: m.dims.customers[m.gCustomer[g]], from: m.gStart[g], to: m.gStart[g] + m.gLen[g] - 1 })) : [],
     status: sku >= 0 ? m.dims.skus.status[sku] : null,
     launch: sku >= 0 ? m.dims.skus.launch[sku] : null,
@@ -183,7 +186,8 @@ export const EXPLORER_HEADLINES: Template<ExplorerFacts>[] = [
   {
     id: "explorer.lost",
     when: (f) => f.single && f.lostAccount && !!f.lastOrder,
-    text: (f) => `${f.name} has placed no order since ${monthName(f.lastOrder as string)}`,
+    // one phrasing with the inbox: the last order month, then the silent months after it
+    text: (f) => `${f.name} last ordered in ${monthName(f.lastOrder as string)}${f.silent ? ` and has been silent for ${fmtInt(f.silent)} ${plural(f.silent, "month")}` : ""}`,
     fallback: (f) => f.name,
   },
   {
@@ -201,7 +205,7 @@ export const EXPLORER_HEADLINES: Template<ExplorerFacts>[] = [
   {
     id: "explorer.zeros",
     when: (f) => !f.single && f.zeros > 0 && f.sched / f.zeros >= 0.5,
-    text: (f) => `Ordering cycles explain ${fmtPct(f.sched / f.zeros)} of zero months`,
+    text: (f) => `Ordering cycles explain ${fmtPct(f.sched / f.zeros)} of zero months since ${(f.months[0] ?? "").slice(0, 4)}`,
     fallback: (f) => (f.single ? `${f.name}: demand month by month` : f.zeros === 0 ? "Every month of this selection carried demand" : `${cap(f.sel.all ? "demand" : f.sel.name)}: demand month by month`),
   },
 ];
@@ -229,7 +233,7 @@ export const EXPLORER_TEMPLATES = {
         const life = f.eol ? ` The SKU reaches end of life in ${monthLong(f.eol)}.` : "";
         return `${zeros}${cust}${life}${vol}`;
       }
-      const peak = f.peakUnexp >= 0 && f.unexp > 0 ? `, most of them in ${monthName(monthKey(f, f.peakUnexp))}${f.peakEvent ? ` (${f.peakEvent})` : ""}` : "";
+      const peak = f.peakUnexp >= 0 && f.unexp > 0 ? `${f.unexp === 1 ? ", in" : ", most of them in"} ${monthName(monthKey(f, f.peakUnexp))}${f.peakEvent ? ` (${f.peakEvent})` : ""}` : "";
       const monthly = (f.kinds.M ?? 0) / Math.max(1, f.nSeries);
       return `**${fmtInt(f.zeros)}** of ${fmtInt(f.cells)} history cells are zero. ${fmtInt(f.sched)} fall on the off-months of a customer's ordering cycle; ${f.unexp ? `${fmtInt(f.unexp)} fell on an order month${peak}` : "none fell on an order month"}${f.lost ? `, and ${fmtInt(f.lost)} follow a lost account` : ""}. ${cap(fractionWord(monthly))} of the ${fmtInt(f.nSeries)} ${plural(f.nSeries, "series", "series")} order every month.${vol}`;
     },

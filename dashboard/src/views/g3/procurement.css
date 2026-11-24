@@ -2,15 +2,15 @@
 
 /* "Cover a [- 3 months +] lead time at a [P80 | P90 | P95 | P97.5] service level." */
 .g3-plan {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 12px 0 0;
-  border-top: 1px solid var(--rule-strong); font: 400 15.5px/1.4 var(--font-serif); font-variation-settings: "opsz" 16; color: var(--ink);
+  display: flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--u)) calc(10 * var(--u)); padding: calc(12 * var(--u)) 0 0;
+  border-top: 1px solid var(--rule-strong); font: 400 calc(15.5 * var(--u))/1.4 var(--font-serif); font-variation-settings: "opsz" 16; color: var(--ink);
 }
 .g3-plan-text { white-space: nowrap; }
-.g3-plan .info-wrap { margin-left: 4px; }
+.g3-plan .info-wrap { margin-left: calc(4 * var(--u)); }
 
-.g3-ellip { display: inline-block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.g3-ellip { display: inline-block; max-width: calc(280 * var(--u)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 
 @media (max-width: 700px) {
-  .g3-plan { font-size: 16px; }
-  .g3-ellip { max-width: 160px; }
+  .g3-plan { font-size: calc(16 * var(--u)); }
+  .g3-ellip { max-width: calc(160 * var(--u)); }
 }

@@ -11,14 +11,14 @@ import { useSelection, useElementWidth } from "../app/hooks";
 import { EChart } from "../charts/EChart";
 import { niceMax } from "../charts/theme";
 import { TimelineChart } from "../charts/TimelineChart";
-import { rangePresets, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec } from "../charts/timeline";
+import { rangePresets, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec, markPresence } from "../charts/timeline";
 import { RangePresets, Segmented, Tabs, Stamp } from "../components/controls";
 import { HeroFigure, Ladder, Lede, Rich } from "../components/Figure";
 import { Module, timelineKey } from "../components/Module";
 import { Empty, ErrorState, Loading, Notice } from "../components/states";
-import { BarTable, DataTable, type Column } from "../components/tables";
+import { BarTable, DataTable, type BarCol, type Column } from "../components/tables";
 import { forecastLatent, sum } from "../data/aggregate";
-import { fmt1, fmtInt, fmtPct, fmtPts, fmtValue, fmtValueUnit, monthLong, monthName, monthSpan, fmtSignedPct } from "../data/format";
+import { fmtInt, fmtPct, fmtValue, fmtValueUnit, monthLong, monthName, monthSpan, fmtSignedPct } from "../data/format";
 import { useResource } from "../data/load";
 import { historyPrice } from "../data/model";
 import { lognormalQuantile, moments, Z10, Z90 } from "../data/quantiles";
@@ -42,7 +42,10 @@ import {
   PERIOD_TEMPLATES,
   SEGMENT_TEMPLATES,
   accuracy,
+  bestBenchmark,
   biasGrid,
+  fracBetween,
+  ptsBetween,
   biasOf,
   calibration,
   horizonData,
@@ -55,7 +58,7 @@ import {
   type SegDim,
 } from "../insights/accuracy";
 import { biasOption, horizonOption, timeMachineOption } from "./g2/forecastCharts";
-import { CalBars, Dumbbell, FvaSteps } from "./g2/parts";
+import { CalBars, DotRange, Dumbbell, FvaSteps } from "./g2/parts";
 import { XRAY_TEMPLATE, XRay, firstForecastMonth, xraySteps } from "./g2/XRay";
 import "./g2/g2.css";
 
@@ -93,8 +96,14 @@ export default function Forecast() {
       .flatMap((d) => ((segAll[d]?.length ?? 0) >= 2 ? (segAll[d] ?? []).filter((r) => r.share >= 0.03).map((r) => ({ ...r, dim: d })) : []));
     return cands.length ? cands.reduce((a, b) => (b.w > a.w ? b : a)) : null;
   }, [segAll]);
+  const bench = useMemo(
+    () => (acc ? CHAIN.filter((md) => models.includes(md)).map((md) => ({ md, label: modelLabel(md, final), w: wapeOf(acc, md) })).filter((b) => Number.isFinite(b.w)) : []),
+    [acc, models, final],
+  );
   const facts = useMemo(
     () => ({
+      bench,
+      best: bestBenchmark(bench),
       sel,
       cells: acc?.n ?? 0,
       origins: scored.length,
@@ -106,7 +115,7 @@ export default function Forecast() {
       weakest,
       segCount: weakest ? (segAll[weakest.dim]?.length ?? 0) : 0,
     }),
-    [sel, acc, scored.length, final, models, weakest, segAll],
+    [sel, acc, scored.length, final, models, weakest, segAll, bench],
   );
   const headline = bt.data ? render(ACCURACY_TEMPLATES.headline, facts).text : "Scoring the forecast against the backtest…";
   const standfirst = bt.data ? render(ACCURACY_TEMPLATES.standfirst, facts).text : undefined;
@@ -246,11 +255,15 @@ export default function Forecast() {
       firstLabel: hz?.fine ? `${hz.xs[firstI]} month${hz.xs[firstI] === "1" ? "" : "s"}` : `${hz?.xs[firstI] ?? ""} months`,
       lastLabel: hz?.fine ? `${hz.xs[lastI]} months` : `${hz?.xs[lastI] ?? ""} months`,
       gapToFloor: null,
+      values: w,
+      labels: (hz?.xs ?? []).map((x) => (hz?.fine ? `${x} month${x === "1" ? "" : "s"}` : `${x} months`)),
     };
   }, [hz, final]);
   const grid = useMemo(() => (bt.data ? biasGrid(m, bt.data, filters) : []), [bt.data, m, filters]);
   const biasOpt = useMemo(() => (grid.length ? biasOption(theme, m, grid, { fam: filters.family, reg: filters.region }, narrow) : null), [grid, theme, m, filters.family, filters.region, narrow]);
   const biasCells = grid.filter((c) => c.bias !== null && c.actual > 0).map((c) => ({ fam: m.dims.families.name[c.fam], reg: m.dims.regions[c.reg], bias: c.bias as number }));
+  const biasFacts = { cells: biasCells, selFam: filters.family !== null ? m.dims.families.name[filters.family] : null, selReg: filters.region !== null ? m.dims.regions[filters.region] : null };
+  const biasTitle = render(BIAS_TEMPLATES.title, biasFacts).text;
   const cal = useMemo(() => (bt.data ? calibration(bt.data) : null), [bt.data]);
   const lvl = useMemo(() => (bt.data ? levelWape(bt.data, ["seasonal_naive", final]) : []), [bt.data, final]);
   const fvaSteps = acc
@@ -261,6 +274,30 @@ export default function Forecast() {
   const why = bt.data ? String((bt.data.summary as { why?: unknown }).why ?? "") : "";
 
   const pickSeg = (d: SegDim, idx: number) => setFilters({ ...filters, [d]: idx, ...(d === "family" ? { sku: null } : {}) });
+  // one shared scale for every row and the selection: floor tick, our model (orange dot), seasonal naive (ring)
+  const segMax = niceMax(Math.max(0.1, facts.snaive || 0, facts.final || 0, ...segRows.flatMap((r) => [r.w, r.ws, r.floor].filter(Number.isFinite))) * 1.04);
+  const segScaleText = `0–${fmtPct(segMax, 0)}`;
+  type SRow = (typeof segRows)[number];
+  const lane = (r: { label: string; w: number; ws: number; floor: number }) => <DotRange label={r.label} ours={r.w} base={r.ws} floor={r.floor} max={segMax} />;
+  const selLane = Number.isFinite(facts.final) ? lane({ label: "Selection", w: facts.final, ws: facts.snaive, floor: facts.floor }) : "";
+  const segCols: BarCol<SRow>[] = segDim
+    ? narrow
+      ? [
+          { key: "l", label: DIM_LABEL[segDim], kind: "label", value: (r) => r.label, width: "34%" },
+          { key: "b", label: `WAPE, ${segScaleText}`, kind: "text", render: lane },
+          { key: "w", label: "Ours", kind: "num", value: (r) => fmtPct(r.w), width: "17%" },
+          { key: "x", label: "Bias", kind: "num", value: (r) => fmtSignedPct(r.b), width: "17%" },
+        ]
+      : [
+          { key: "l", label: DIM_LABEL[segDim], kind: "label", value: (r) => r.label, width: "22%" },
+          { key: "s", label: "Share of volume", kind: "num", value: (r) => fmtPct(r.share), width: "10%" },
+          { key: "b", label: `WAPE, ${segScaleText}`, kind: "text", render: lane },
+          { key: "w", label: "Our model", kind: "num", value: (r) => fmtPct(r.w), width: "10%" },
+          { key: "n", label: "Seasonal naive", kind: "num", value: (r) => fmtPct(r.ws), width: "11%" },
+          { key: "f", label: "Floor", kind: "num", value: (r) => fmtPct(r.floor), width: "8%" },
+          { key: "x", label: "Bias", kind: "num", value: (r) => fmtSignedPct(r.b), width: "8%" },
+        ]
+    : [];
 
   // ---- render ---------------------------------------------------------------------------------------------------------
   const machineTitle = machine ? render(MACHINE_TEMPLATES.title, { origin: machine.o.origin, baseLabel: machine.baseLabel, agg: machine.agg, aggBase: machine.aggBase, cell: machine.cell, cellBase: machine.cellBase }).text : "";
@@ -290,12 +327,12 @@ export default function Forecast() {
               acc && Number.isFinite(facts.final) ? (
                 <Ladder
                   rows={fvaSteps.map((s) => ({ label: s.me ? "Our model" : s.label, value: s.w, me: s.me }))}
-                  format={(v) => fmt1(v * 100)}
+                  format={(v) => fmtPct(v)}
                   foot={`${facts.origins} origins, 19-month horizon${Number.isFinite(facts.floor) ? `; in-hindsight floor ${fmtPct(facts.floor)}` : ""}`}
                 />
               ) : undefined
             }
-            context={acc && Number.isFinite(facts.final) && Number.isFinite(facts.snaive) ? `**${fmtPts(facts.snaive - facts.final).replace("+", "")}** ${facts.final <= facts.snaive ? "better" : "worse"} than seasonal naive; lower is better` : bt.loading ? "Reading the backtest…" : "No scored backtest cells for this selection."}
+            context={acc && Number.isFinite(facts.final) && facts.best ? heroContext(facts.final, facts.best, facts.snaive) : bt.loading ? "Reading the backtest…" : "No scored backtest cells for this selection."}
             info={{
               what: "Weighted absolute percentage error of the submitted model in a rolling-origin backtest with a 19-month horizon, for the series in the selection, against three benchmarks.",
               how: `WAPE = Σ|actual − forecast| / Σ actual over every scored series-month, pooled over the ${foldWords} that chose the model; actual = unconstrained demand. The floor is the error of an in-hindsight forecast of each series' level: no honest forecast goes below it.`,
@@ -331,7 +368,7 @@ export default function Forecast() {
                 { kind: "line", color: "var(--accent)", label: `Our model, made ${monthName(machine.o.origin)}` },
                 { kind: "dash", color: "var(--ink-3)", label: machine.baseLabel },
               ]
-            : timelineKey({ latent, columns: single !== null, rebuilt: !latent, lost: !latent })
+            : timelineKey({ latent, columns: single !== null, rebuilt: !latent, lost: !latent, present: markPresence(spec) })
         }
       >
         <div className="g2-ctl" style={{ marginTop: 4, marginBottom: 6 }}>
@@ -368,7 +405,12 @@ export default function Forecast() {
       {bt.data && acc && segDim && (
         <Module
           title={segDim && segRows.length ? render(SEGMENT_TEMPLATES.title, { dim: segDim, rows: segRows }).text : "The filters fix family, region and channel"}
-          dek={segDim ? `Backtest WAPE and bias of our model by ${segDim}, pooled over ${foldWords}, against seasonal naive and the in-hindsight floor of the same cells. Click a row to filter the page.` : "There is nothing to compare inside one segment. Widen a filter to see accuracy by family, region or channel."}
+          dek={segDim ? `Backtest WAPE of our model by ${segDim}, pooled over ${foldWords}, against seasonal naive and the in-hindsight floor of the same cells, all on one ${segScaleText} scale; bias on the right. Click a row to filter the page.` : "There is nothing to compare inside one segment. Widen a filter to see accuracy by family, region or channel."}
+          keyItems={[
+            { kind: "point", color: "var(--accent)", label: "Our model" },
+            { kind: "ring", color: "var(--ink-3)", label: "Seasonal naive" },
+            { kind: "rule", color: "var(--ink)", label: "In-hindsight floor" },
+          ]}
           info={{
             what: "Where the forecast is weakest: our model's error by segment, the benchmark's error on the same cells, our bias, and the floor that even an in-hindsight level forecast would not beat.",
             how: "WAPE and bias are exact pooled sums over the segment's scored series-months; a segment's floor is the oracle's WAPE on its cells, so a high WAPE close to its floor is noise, not a modelling miss.",
@@ -383,26 +425,8 @@ export default function Forecast() {
                 rows={segRows}
                 rowKey={(r) => r.label}
                 onRow={(r) => pickSeg(segDim, r.idx)}
-                bar={{ value: (r) => r.w, tone: "forecast", leader: (r) => r === segRows[0] }}
-                cols={
-                  narrow
-                    ? [
-                        { key: "l", label: DIM_LABEL[segDim], kind: "label", value: (r) => r.label, width: "38%" },
-                        { key: "b", label: "WAPE", kind: "bar" },
-                        { key: "w", label: "", kind: "num", value: (r) => fmtPct(r.w), width: "17%" },
-                        { key: "x", label: "Bias", kind: "num", value: (r) => fmtSignedPct(r.b), width: "17%" },
-                      ]
-                    : [
-                        { key: "l", label: DIM_LABEL[segDim], kind: "label", value: (r) => r.label, width: "24%" },
-                        { key: "s", label: "Share of volume", kind: "num", value: (r) => fmtPct(r.share), width: "11%" },
-                        { key: "b", label: "WAPE, our model", kind: "bar" },
-                        { key: "w", label: "WAPE", kind: "num", value: (r) => fmtPct(r.w), width: "9%" },
-                        { key: "n", label: "Seasonal naive", kind: "num", value: (r) => fmtPct(r.ws), width: "11%" },
-                        { key: "f", label: "Floor", kind: "num", value: (r) => fmtPct(r.floor), width: "8%" },
-                        { key: "x", label: "Bias", kind: "num", value: (r) => fmtSignedPct(r.b), width: "9%" },
-                      ]
-                }
-                total={narrow ? { l: "Selection", w: fmtPct(facts.final), x: fmtSignedPct(facts.bias) } : { l: "Selection", s: "100%", w: fmtPct(facts.final), n: fmtPct(facts.snaive), f: fmtPct(facts.floor), x: fmtSignedPct(facts.bias) }}
+                cols={segCols}
+                total={narrow ? { l: "Selection", b: selLane, w: fmtPct(facts.final), x: fmtSignedPct(facts.bias) } : { l: "Selection", s: "100%", b: selLane, w: fmtPct(facts.final), n: fmtPct(facts.snaive), f: fmtPct(facts.floor), x: fmtSignedPct(facts.bias) }}
               />
             </>
           )}
@@ -412,7 +436,7 @@ export default function Forecast() {
       {bt.data && acc && (
         <div className="cols-7-5">
           <Module
-            title={render(BIAS_TEMPLATES.title, { cells: biasCells }).text}
+            title={biasTitle}
             dek={`Signed backtest bias of our model, Σ(forecast − actual) / Σ actual, by family and region${filters.channel !== null || filters.customer !== null ? " within the other filters" : ""}; plum over-forecasts, jade under-forecasts. Click a cell to filter.`}
             info={{ what: "Where the model leans high or low: bias for every family × region cell, the other filters applied.", how: "Pooled over every scored series-month of the cell; the scale is symmetric around zero and its ends are printed.", source: "backtest.json (series_buckets)" }}
           >
@@ -420,7 +444,7 @@ export default function Forecast() {
               <EChart
                 option={biasOpt}
                 height={narrow ? 330 : 360}
-                ariaLabel={`${render(BIAS_TEMPLATES.title, { cells: biasCells }).text}. Bias by family and region.`}
+                ariaLabel={`${biasTitle}. Bias by family and region.`}
                 onClick={(e) => {
                   const v = e.value as number[];
                   if (!Array.isArray(v)) return;
@@ -532,4 +556,15 @@ export default function Forecast() {
       {!bt.data && !bt.loading && !bt.error && <Notice tone="info">No backtest in the bundle.</Notice>}
     </>
   );
+}
+
+/** The hero's one line of context: points better (or worse) than the best benchmark, and than seasonal naive when
+ *  that is a different benchmark.  Points are differences of the printed WAPEs. */
+function heroContext(final: number, best: { md: string; label: string; w: number }, snaive: number): string {
+  const d = ptsBetween(best.w, final);
+  const word = (x: number) => (x >= 0 ? "better" : "worse");
+  const lead = `**${Math.abs(d).toFixed(1)} pts** ${word(d)} than ${best.label.charAt(0).toLowerCase()}${best.label.slice(1)}, the best benchmark`;
+  if (best.md === "seasonal_naive" || !Number.isFinite(snaive)) return `${lead}; lower is better`;
+  const ds = fracBetween(snaive, final);
+  return `${lead}; ${Math.abs(ds * 100).toFixed(1)} pts ${word(ds)} than seasonal naive`;
 }

@@ -181,14 +181,15 @@ export function LineageDrawer({ series, month, onClose }: { series: number; mont
           <div className="trio" role="group" aria-label="Cleaned cell">
             <div>
               <span>Shipped, cleaned</span>
-              <b>{Number.isNaN(m.u[i]) ? "unknown" : fmt1(m.u[i])}</b>
+              <b>{Number.isNaN(m.u[i]) ? "unknown" : fmtInt(m.u[i])}</b>
             </div>
             <div>
               <span>Unconstrained demand</span>
-              <b>{fmt1(m.d[i])}</b>
+              {/* shipped units are whole; demand is whole unless an estimated stock-out loss is added back */}
+              <b>{Math.abs(m.d[i] - Math.round(m.d[i])) < 0.05 ? fmtInt(m.d[i]) : fmt1(m.d[i])}</b>
             </div>
             <div>
-              <span>Latent monthly demand</span>
+              <span>Latent demand, a month</span>
               <b>{fmt1(m.latent[i])}</b>
             </div>
           </div>

@@ -3,31 +3,51 @@
 // one axis (both series standardised), demand by powertrain indexed to 2023 = 100, and the per-SKU sensitivity
 // dot plot.  Never a dual axis.
 import type { EChartsCoreOption } from "echarts/core";
-import { FONT, axisTooltip, baseOption, categoryAxis, esc, niceMax, onFill, scaleLegend, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, valueAxis, type Theme, type TooltipItem } from "../../charts/theme";
+import { FONT, fz, fpx, axisTooltip, baseOption, categoryAxis, esc, niceMax, scaleLegend, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, valueAxis, type Theme, type TooltipItem } from "../../charts/theme";
+import { contrastOf, endLabelSeries, rampAt, readableOn, type EndLabel } from "./forecastCharts";
 import type { Model } from "../../data/model";
 import { monthLong, fmtSignedPct } from "../../data/format";
 import { indShort } from "../../insights/indicators";
 import { eraLabel, type Cell, type SensRow } from "../../insights/macro";
 
 const r2 = (r: number) => `${r < 0 ? "−" : r > 0 ? "+" : ""}${Math.abs(r).toFixed(2)}`;
-const endLab = (t: Theme, text: string, strong = false) => ({ show: true, formatter: text, color: strong ? t.ink : t.ink3, fontFamily: FONT, fontSize: 11.5, fontWeight: strong ? 600 : 400, distance: 6 });
+const endLab = (t: Theme, text: string, strong = false) => ({ show: true, formatter: text, color: strong ? t.ink : t.ink3, fontFamily: FONT, fontSize: fz(11.5), fontWeight: strong ? 600 : 400, distance: 6 });
 
+/** Mix a colour towards the paper: k = 1 keeps the colour, 0.35 keeps 35 % of it (the faded non-driver cells). */
+function toward(t: Theme, c: string, k: number): string {
+  const hex = (x: string) => {
+    const h = x.trim().match(/^#([0-9a-f]{6})$/i);
+    return h ? [0, 2, 4].map((i) => parseInt(h[1].slice(i, i + 2), 16)) : null;
+  };
+  const a = hex(c);
+  const p = hex(t.paper);
+  if (!a || !p) return c;
+  return `#${a.map((v, i) => Math.round(p[i] + (v - p[i]) * k).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** The family x indicator matrix.  The model's drivers carry the full diverging colour and a 2px ink outline;
+ *  every other cell (shown at its strongest lag, often a seasonal echo at the edge of the search window) is faded
+ *  to 35 % towards the paper with muted text, so the eye lands on the drivers, not on the artefacts.  The colour
+ *  scale legend stays (a visualMap bound to an empty series), and each cell's colour is the legend's colour. */
 export function matrixOption(t: Theme, m: Model, inds: string[], cells: Cell[], sel: { f: number; k: number }, narrow: boolean): EChartsCoreOption {
-  const color = (r: number) => t.diverging[Math.max(0, Math.min(8, Math.round(((r + 1) / 2) * 8)))];
+  const color = (r: number) => rampAt(t.diverging, (r + 1) / 2);
   const data = cells.map((c) => {
     const isSel = c.f === sel.f && c.k === sel.k;
+    const fill = c.driver ? color(c.r) : toward(t, color(c.r), 0.35);
     return {
       value: [c.k, c.f, c.r, c.lag, c.driver ? 1 : 0, c.stable ? 1 : 0],
-      itemStyle: { borderColor: isSel ? t.accent : c.driver ? t.ink : t.paper, borderWidth: isSel ? 3 : c.driver ? 1.5 : 2 },
-      label: { color: onFill(t, color(c.r)), fontWeight: c.driver ? 600 : 400 },
+      itemStyle: { color: fill, borderColor: isSel ? t.accent : c.driver ? t.ink : t.paper, borderWidth: isSel ? 3 : 2 },
+      // drivers: ink or paper by contrast; faded cells: muted ink-3 where it still reaches 4.5:1, else the readable one
+      label: { color: !c.driver && contrastOf(t.ink3, fill) >= 4.5 ? t.ink3 : readableOn(t, fill), fontWeight: c.driver ? 600 : 400 },
     };
   });
   return {
     ...baseOption(t),
     grid: { left: narrow ? 46 : 176, right: 8, top: 4, bottom: 62 },
-    xAxis: { ...categoryAxis(t, inds.map((k) => indShort(k).replace(" ", "\n"))), position: "top", axisLine: { show: false }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: 11.5, interval: 0, lineHeight: 14, margin: 8 } },
-    yAxis: { ...categoryAxis(t, narrow ? m.dims.families.code : m.dims.families.name), inverse: true, axisLine: { show: false }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: 12, margin: 10 } },
-    visualMap: { ...scaleLegend(t, { min: -1, max: 1, colors: t.diverging, format: (v) => r2(v), low: "moves against demand", high: "moves with demand" }), bottom: 0, itemHeight: narrow ? 120 : 200 },
+    xAxis: { ...categoryAxis(t, inds.map((k) => indShort(k).replace(" ", "\n"))), position: "top", axisLine: { show: false }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), interval: 0, lineHeight: 14, margin: 8 } },
+    yAxis: { ...categoryAxis(t, narrow ? m.dims.families.code : m.dims.families.name), inverse: true, axisLine: { show: false }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: fz(12), margin: 10 } },
+    // the legend only: bound to the empty series 1, so it never repaints the cells (each cell sets its own colour)
+    visualMap: { ...scaleLegend(t, { min: -1, max: 1, colors: t.diverging, format: (v) => r2(v), low: "moves against demand", high: "moves with demand" }), seriesIndex: 1, bottom: 0, itemHeight: narrow ? 120 : 200 },
     tooltip: {
       ...tooltipStyle(t),
       trigger: "item",
@@ -47,12 +67,13 @@ export function matrixOption(t: Theme, m: Model, inds: string[], cells: Cell[], 
         label: {
           show: true,
           fontFamily: FONT,
-          fontSize: narrow ? 10.5 : 11.5,
+          fontSize: fz(narrow ? 10.5 : 11.5),
           lineHeight: 14,
           formatter: (p: { value: number[] }) => (narrow ? r2(p.value[2]) : `${r2(p.value[2])}\nlag ${p.value[3]}`),
         },
         emphasis: { itemStyle: { borderColor: t.accent, borderWidth: 3 } },
       },
+      { type: "heatmap", data: [], silent: true },
     ],
   } as EChartsCoreOption;
 }
@@ -66,13 +87,21 @@ export function lagOption(t: Theme, corr: (number | null)[][], eras: string[], l
     { c: t.ink3, w: 1.5 },
     { c: t.ink4, w: 1.5 },
   ];
+  // each line labelled at its end (the eras were two greys told apart only by shade)
+  const ends: EndLabel[] = corr
+    .map((row, e): EndLabel | null => {
+      let i = row.length - 1;
+      while (i >= 0 && (row[i] === null || !Number.isFinite(row[i] as number))) i--;
+      return i >= 0 ? { x: i, y: row[i] as number, text: eraLabel(eras[e] ?? ""), color: style[e]?.c ?? t.ink3, strong: e === 0 } : null;
+    })
+    .filter((x): x is EndLabel => x !== null);
   return {
     ...baseOption(t),
-    grid: { left: 40, right: 16, top: 22, bottom: 34 },
-    xAxis: categoryAxis(t, xs, { boundaryGap: false, name: "months the indicator leads", nameLocation: "middle", nameGap: 24, nameTextStyle: { color: t.ink3, fontSize: 11.5, fontFamily: FONT } }),
-    yAxis: { ...valueAxis(t, { min: -1, max: 1 }), axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, formatter: (v: number) => (v === 0 ? "0" : r2(v)) } },
-    tooltip: axisTooltip(t, (items: TooltipItem[]) => `${ttHead(`Lag ${items[0]?.axisValue} month${items[0]?.axisValue === "1" ? "" : "s"}`, "correlation")}${items.map((it) => ttRow(style[it.seriesIndex]?.c ?? t.ink3, eraLabel(eras[it.seriesIndex] ?? ""), it.value === null || it.value === undefined ? "–" : r2(it.value as number))).join("")}${ttEnd()}`),
-    series: corr.map((row, e) => ({
+    grid: { left: fpx(40), right: fpx(62), top: 22, bottom: 34 },
+    xAxis: categoryAxis(t, xs, { boundaryGap: false, name: "months the indicator leads", nameLocation: "middle", nameGap: 24, nameTextStyle: { color: t.ink3, fontSize: fz(11.5), fontFamily: FONT } }),
+    yAxis: { ...valueAxis(t, { min: -1, max: 1 }), axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), formatter: (v: number) => (v === 0 ? "0" : r2(v)) } },
+    tooltip: axisTooltip(t, (items: TooltipItem[]) => `${ttHead(`Lag ${items[0]?.axisValue} month${items[0]?.axisValue === "1" ? "" : "s"}`, "correlation")}${items.filter((it) => it.seriesIndex < corr.length).map((it) => ttRow(style[it.seriesIndex]?.c ?? t.ink3, eraLabel(eras[it.seriesIndex] ?? ""), it.value === null || it.value === undefined ? "–" : r2(it.value as number))).join("")}${ttEnd()}`),
+    series: [...corr.map((row, e) => ({
       name: eraLabel(eras[e] ?? ""),
       type: "line",
       data: row,
@@ -87,11 +116,11 @@ export function lagOption(t: Theme, corr: (number | null)[][], eras: string[], l
               symbol: ["none", "none"],
               data: [
                 { yAxis: 0, lineStyle: { color: t.ruleStrong, type: "solid", width: 1 }, label: { show: false } },
-                { xAxis: String(lag), lineStyle: { color: t.ink, type: [2, 3], width: 1 }, label: { show: true, position: "end", formatter: `lag ${lag}`, color: t.ink, fontFamily: FONT, fontSize: 11.5, fontWeight: 600 } },
+                { xAxis: String(lag), lineStyle: { color: t.ink, type: [2, 3], width: 1 }, label: { show: true, position: "end", formatter: `lag ${lag}`, color: t.ink, fontFamily: FONT, fontSize: fz(11.5), fontWeight: 600 } },
               ],
             }
           : undefined,
-    })),
+    })), endLabelSeries(t, ends)],
   } as EChartsCoreOption;
 }
 
@@ -139,8 +168,8 @@ export function checkOption(t: Theme, m: Model, famLatent: Float64Array, ind: (n
   const option = {
     ...baseOption(t),
     grid: { left: 44, right: 16, top: 16, bottom: 30 },
-    xAxis: categoryAxis(t, labels, { boundaryGap: false, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9, interval: (i: number) => labels[i].endsWith("-01") && Number(labels[i].slice(0, 4)) % 2 === 0, formatter: (v: string) => v.slice(0, 4) } }),
-    yAxis: { ...valueAxis(t, { min: -lim, max: lim }), axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, formatter: (v: number) => (v === 0 ? "0" : `${v > 0 ? "+" : "−"}${Math.abs(v)} sd`) } },
+    xAxis: categoryAxis(t, labels, { boundaryGap: false, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 9, interval: (i: number) => labels[i].endsWith("-01") && Number(labels[i].slice(0, 4)) % 2 === 0, formatter: (v: string) => v.slice(0, 4) } }),
+    yAxis: { ...valueAxis(t, { min: -lim, max: lim }), axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), formatter: (v: number) => (v === 0 ? "0" : `${v > 0 ? "+" : "−"}${Math.abs(v)} sd`) } },
     tooltip: axisTooltip(t, (items: TooltipItem[]) => {
       const i = items[0]?.dataIndex ?? 0;
       const f = (v: number | null) => (v === null ? "–" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)} sd`);
@@ -163,7 +192,7 @@ export function evOption(t: Theme, m: Model, series: { name: string; data: (numb
   return {
     ...baseOption(t),
     grid: { left: 40, right: 72, top: 16, bottom: 30 },
-    xAxis: categoryAxis(t, labels, { boundaryGap: false, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9, interval: (i: number) => labels[i].endsWith("-01"), formatter: (v: string) => v.slice(0, 4) } }),
+    xAxis: categoryAxis(t, labels, { boundaryGap: false, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 9, interval: (i: number) => labels[i].endsWith("-01"), formatter: (v: string) => v.slice(0, 4) } }),
     yAxis: valueAxis(t, { max }),
     tooltip: axisTooltip(t, (items: TooltipItem[]) => {
       const i = items[0]?.dataIndex ?? 0;
@@ -173,7 +202,7 @@ export function evOption(t: Theme, m: Model, series: { name: string; data: (numb
         .join("")}${ttEnd()}`;
     }),
     series: [
-      { name: "base", type: "line", data: [], markLine: { silent: true, symbol: ["none", "none"], label: { show: true, position: "insideStartTop", formatter: "2023 = 100", color: t.ink3, fontFamily: FONT, fontSize: 11 }, lineStyle: { color: t.ink3, width: 1, type: "solid" }, data: [{ yAxis: 100 }] } },
+      { name: "base", type: "line", data: [], markLine: { silent: true, symbol: ["none", "none"], label: { show: true, position: "insideStartTop", formatter: "2023 = 100", color: t.ink3, fontFamily: FONT, fontSize: fz(11) }, lineStyle: { color: t.ink3, width: 1, type: "solid" }, data: [{ yAxis: 100 }] } },
       ...series.map((s) => ({ name: s.name, type: "line", data: s.data, symbol: "none", lineStyle: { width: s.width, color: s.color }, itemStyle: { color: s.color }, endLabel: s.strong ? endLab(t, s.name, true) : undefined })),
     ],
   } as EChartsCoreOption;
@@ -198,7 +227,7 @@ export function sensOption(t: Theme, rows: SensRow[], inds: string[], sku: (k: n
     xAxis: { ...valueAxis(t, { min: -span, max: span, percent: true }), splitNumber: 4, interval: span / 2 },
     yAxis: [
       { type: "value", min: -0.5, max: ks.length - 0.5, inverse: true, show: false },
-      { ...categoryAxis(t, ks.map((k) => indShort(inds[k]))), inverse: true, position: "left", axisLine: { show: false }, splitLine: { show: true, interval: 0, lineStyle: { color: t.rule, width: 1 } }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: 12, margin: 10 } },
+      { ...categoryAxis(t, ks.map((k) => indShort(inds[k]))), inverse: true, position: "left", axisLine: { show: false }, splitLine: { show: true, interval: 0, lineStyle: { color: t.rule, width: 1 } }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: fz(12), margin: 10 } },
     ],
     tooltip: {
       ...tooltipStyle(t),
@@ -239,7 +268,7 @@ export function sensOption(t: Theme, rows: SensRow[], inds: string[], sku: (k: n
         type: "scatter",
         silent: true,
         symbolSize: 0,
-        data: med.map((x, i) => ({ value: [span, i], label: { show: true, position: "right", distance: 8, formatter: fmtSignedPct(x.median), color: t.ink, fontFamily: FONT, fontSize: 11.5, fontWeight: 600 } })),
+        data: med.map((x, i) => ({ value: [span, i], label: { show: true, position: "right", distance: 8, formatter: fmtSignedPct(x.median), color: t.ink, fontFamily: FONT, fontSize: fz(11.5), fontWeight: 600 } })),
       },
     ],
   } as EChartsCoreOption;

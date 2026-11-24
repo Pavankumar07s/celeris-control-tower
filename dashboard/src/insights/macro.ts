@@ -7,7 +7,7 @@ import type { MacroFile } from "../data/types";
 import type { Model } from "../data/model";
 import { fmtPct, fmtPctAbs, monthName, fmtSignedPct } from "../data/format";
 import { countWord, joinList, plural, type Template } from "./headlines";
-import { indShort } from "./indicators";
+import { indIsRate, indShort, indVerb } from "./indicators";
 
 export const STABLE_R = 0.5;
 
@@ -78,16 +78,28 @@ export function macroFacts(m: Model, mf: MacroFile, famFilter: number | null): M
 
 const r2 = (r: number) => `${r < 0 ? "−" : ""}${Math.abs(r).toFixed(2)}`;
 const lagWords = (L: number) => (L === 0 ? "in the same month" : `by ${countWord(L)} month${L === 1 ? "" : "s"}`);
-const moves = (c: Cell) => (c.r < 0 ? "moves against" : "leads");
+const moves = (key: string, c: Cell) => (c.r < 0 ? indVerb(key, "move against", "moves against") : indVerb(key, "lead", "leads"));
+/** "Vehicle orders lead Electrical Assemblies by two months" / "PMI moves against Thermal Management three months ahead". */
+const pairWords = (f: { inds: string[]; fams: string[] }, c: Cell) =>
+  c.r < 0
+    ? `${indShort(f.inds[c.k])} ${indVerb(f.inds[c.k], "move against", "moves against")} ${f.fams[c.f]} ${c.lag ? `${countWord(c.lag)} month${c.lag === 1 ? "" : "s"} ahead` : "in the same month"}`
+    : `${indShort(f.inds[c.k])} ${indVerb(f.inds[c.k], "lead", "leads")} ${f.fams[c.f]} ${lagWords(c.lag)}`;
+/** The statistic named in place: "r = 0.93 over 2019–26". */
+const rAll = (f: { eras: string[] }, r: number) => `r = ${r2(r)} over ${eraLabel(f.eras[0] ?? "all")}`;
 
 export const MACRO_TEMPLATES = {
-  /** "New vehicle orders leads Electrical Assemblies by two months (r = 0.93)". */
+  /** All families: the hero's finding, "Five of seven families have a leading indicator that holds in both eras".
+   *  One family: its strongest stable driver, "PMI leads Hydraulic Systems by three months (r = 0.81 over 2019–26)". */
   headline: {
     id: "macro.headline",
-    when: (f) => f.lead !== null,
+    when: (f) => (f.famFilter === null ? f.stableFams.length > 0 : f.lead !== null),
     text: (f) => {
+      if (f.famFilter === null) {
+        const n = f.stableFams.length;
+        return n === f.fams.length ? "Every family has a leading indicator that holds in both eras" : `${countWord(n, true)} of ${countWord(f.fams.length)} families have a leading indicator that holds in both eras`;
+      }
       const c = f.lead as Cell;
-      return c.r < 0 ? `${indShort(f.inds[c.k])} moves against ${f.fams[c.f]} ${c.lag ? `${c.lag} months ahead` : "in the same month"} (r = ${r2(c.r)})` : `${indShort(f.inds[c.k])} leads ${f.fams[c.f]} ${lagWords(c.lag)} (r = ${r2(c.r)})`;
+      return `${pairWords(f, c)} (${rAll(f, c.r)})`;
     },
     fallback: (f) => (f.famFilter !== null ? `${f.fams[f.famFilter]} has no stable leading indicator` : "No indicator leads demand steadily across both eras"),
   },
@@ -101,14 +113,16 @@ export const MACRO_TEMPLATES = {
       const top = f.drivenBy[0];
       const none = f.drivenBy.filter((d) => d.n === 0).map((d) => indShort(f.inds[d.k]));
       const a = `**${n} of ${N} families** follow a public indicator whose link holds in both ${eraLabel(f.eras[1] ?? "")} and ${eraLabel(f.eras[2] ?? "")} (same sign, |r| of at least ${STABLE_R} in each).`;
+      const strongest = f.lead ? `The strongest: **${pairWords(f, f.lead)}** (${rAll(f, f.lead.r)}, at the model's lag).` : "";
       const b = top && top.n ? ` ${indShort(f.inds[top.k])} is the model's most common driver, used for **${countWord(top.n)} ${plural(top.n, "family", "families")}**${none.length ? `; ${joinList(none)} ${none.length === 1 ? "drives" : "drive"} none` : ""}.` : "";
+      const def = ` A link holds when it keeps its sign and |r| of at least ${STABLE_R} in ${eraLabel(f.eras[1] ?? "")} and in ${eraLabel(f.eras[2] ?? "")}.`;
       const c = missing.length ? ` ${joinList(missing.map((i) => f.fams[i]))} ${missing.length === 1 ? "has" : "have"} drivers that weaken after 2022, so ${missing.length === 1 ? "its" : "their"} forecast leans less on the economy.` : " Every family keeps a stable driver.";
       if (f.famFilter !== null) {
         const mine = f.cells.filter((x) => x.f === f.famFilter && x.driver);
         const st = mine.filter((x) => x.stable);
         return `The model uses **${countWord(mine.length)} ${plural(mine.length, "indicator", "indicators")}** for ${f.fams[f.famFilter]}${mine.length ? ` (${joinList(mine.map((x) => `${indShort(f.inds[x.k])} at lag ${x.lag}`))})` : ""}; ${st.length ? `**${countWord(st.length)}** ${plural(st.length, "holds", "hold")} in both eras.` : "none holds in both eras."} ${a}`;
       }
-      return a + b + c;
+      return strongest + b + c + def;
     },
     fallback: () => "The lead / lag table is empty in this bundle.",
   },
@@ -132,6 +146,8 @@ export interface LagFacts {
   fam: string;
   ind: string;
   c: Cell;
+  /** macro.json leadlag.eras: [all, first era, second era] (names the r of each era in place). */
+  eras?: string[];
 }
 export const LAG_TEMPLATES = {
   /** "PMI leads Hydraulic Systems by three months in both eras" / "... link at lag 2 fades after 2022". */
@@ -142,9 +158,10 @@ export const LAG_TEMPLATES = {
       const c = l.c;
       const e1 = c.e1 as number;
       const e2 = c.e2 as number;
-      if (c.stable) return `${indShort(l.ind)} ${moves(c)} ${l.fam} at lag ${c.lag} in both eras (r = ${r2(e1)}, then ${r2(e2)})`;
-      if (Math.sign(e1) !== Math.sign(e2)) return `${indShort(l.ind)}'s link to ${l.fam} at lag ${c.lag} flips sign after 2022 (r = ${r2(e1)}, then ${r2(e2)})`;
-      return `${indShort(l.ind)}'s link to ${l.fam} at lag ${c.lag} ${Math.abs(e2) < Math.abs(e1) ? "weakens" : "strengthens"} after 2022 (r = ${r2(e1)}, then ${r2(e2)})`;
+      const eras = `r = ${r2(e1)} in ${eraLabel(l.eras?.[1] ?? "2019-2022")} and ${r2(e2)} in ${eraLabel(l.eras?.[2] ?? "2023-2026")}`;
+      if (c.stable) return `${indShort(l.ind)} ${moves(l.ind, c)} ${l.fam} at lag ${c.lag} in both eras (${eras})`;
+      if (Math.sign(e1) !== Math.sign(e2)) return `${indShort(l.ind)}'s link to ${l.fam} at lag ${c.lag} flips sign after 2022 (${eras})`;
+      return `${indShort(l.ind)}'s link to ${l.fam} at lag ${c.lag} ${Math.abs(e2) < Math.abs(e1) ? "weakens" : "strengthens"} after 2022 (${eras})`;
     },
     fallback: (l) => `Correlation of ${indShort(l.ind)} with ${l.fam} at every lag`,
   },
@@ -157,30 +174,47 @@ export interface CheckFacts {
   r: number;
 }
 export const CHECK_TEMPLATES = {
-  /** "Raw data agree: PMI, shifted three months, tracks Hydraulic Systems' demand growth (r = 0.78)". */
+  /** "The raw data agree: PMI, 3 months earlier, tracks Hydraulic Systems' demand growth (the 12-month changes
+   *  correlate at r = 0.78)": a third statistic, so it is named as one. */
   title: {
     id: "macro.check",
     when: (c) => Number.isFinite(c.r),
-    text: (c) => `${Math.abs(c.r) >= 0.5 ? "The raw data agree" : Math.abs(c.r) >= 0.3 ? "The raw data partly agree" : "The raw data barely agree"}: ${indShort(c.ind)}${c.lag ? `, ${c.lag} month${c.lag === 1 ? "" : "s"} earlier,` : ""} tracks ${c.fam}${c.fam.endsWith("s") ? "'" : "'s"} demand growth at r = ${r2(c.r)}`,
+    text: (c) => `${Math.abs(c.r) >= 0.5 ? "The raw data agree" : Math.abs(c.r) >= 0.3 ? "The raw data partly agree" : "The raw data barely agree"}: ${indShort(c.ind)}${c.lag ? `, ${c.lag} month${c.lag === 1 ? "" : "s"} earlier,` : ""} ${indVerb(c.ind, "track", "tracks")} ${c.fam}${c.fam.endsWith("s") ? "'" : "'s"} demand growth (the 12-month changes correlate at r = ${r2(c.r)})`,
     fallback: (c) => `${indShort(c.ind)} shifted by its lag against ${c.fam}'s demand growth`,
   },
 } satisfies Record<string, Template<CheckFacts>>;
 
 export interface PathFacts {
-  items: { k: number; last: number; end: number; chg: number }[];
+  /** chg: % change for levels; pts: change in points of the printed values for rates (see pathChange). */
+  items: { k: number; last: number; end: number; chg: number; pts?: number }[];
   inds: string[];
   endMonth: string;
 }
+/** The change of an indicator path from the last actual to the end of the window, from the PRINTED values (one
+ *  decimal): rates and diffusion indices in points, levels in %. */
+export function pathChange(key: string, last: number, end: number): { rate: boolean; pts: number; chg: number } {
+  const a = Number(last.toFixed(1));
+  const b = Number(end.toFixed(1));
+  return { rate: indIsRate(key), pts: Math.round((b - a) * 10) / 10, chg: a !== 0 ? b / a - 1 : NaN };
+}
+/** "+0.2 pts" / "−5.0 pts" with a true minus. */
+export const fmtPtsAbs = (p: number): string => `${p > 0 ? "+" : p < 0 ? "−" : ""}${Math.abs(p).toFixed(1)} pts`;
 export const PATH_TEMPLATES = {
-  /** "Inventory days rise 12.3% by May 2028; 3 of 8 indicators are assumed to fall". */
+  /** "Inventory days rise 12.3% by May 2028; 3 of 8 indicators are assumed to fall" (the largest mover among the
+   *  level indicators; a rate would be quoted in points). */
   title: {
     id: "macro.paths",
-    when: (p) => p.items.some((x) => Number.isFinite(x.chg)),
+    when: (p) => p.items.some((x) => Number.isFinite(x.chg) || Number.isFinite(x.pts ?? NaN)),
     text: (p) => {
-      const ok = p.items.filter((x) => Number.isFinite(x.chg));
-      const top = ok.reduce((a, b) => (Math.abs(b.chg) > Math.abs(a.chg) ? b : a));
-      const down = ok.filter((x) => x.chg < -0.005).length;
-      return `${indShort(p.inds[top.k])} ${top.chg < 0 ? "falls" : "rises"} ${fmtPctAbs(top.chg)} by ${monthName(p.endMonth)}; ${down} of ${ok.length} indicators are assumed to fall`;
+      const ok = p.items.filter((x) => Number.isFinite(x.chg) || Number.isFinite(x.pts ?? NaN));
+      const levels = ok.filter((x) => !indIsRate(p.inds[x.k]) && Number.isFinite(x.chg));
+      const pool = levels.length ? levels : ok;
+      const top = pool.reduce((a, b) => (Math.abs(b.chg) > Math.abs(a.chg) ? b : a));
+      const rate = indIsRate(p.inds[top.k]);
+      const dir = (x: { k: number; chg: number; pts?: number }) => (indIsRate(p.inds[x.k]) ? (x.pts ?? 0) : x.chg);
+      const down = ok.filter((x) => (indIsRate(p.inds[x.k]) ? (x.pts ?? 0) < 0 : x.chg < -0.005)).length;
+      const amount = rate ? `${Math.abs(top.pts ?? 0).toFixed(1)} points` : fmtPctAbs(top.chg);
+      return `${indShort(p.inds[top.k])} ${dir(top) < 0 ? indVerb(p.inds[top.k], "fall", "falls") : indVerb(p.inds[top.k], "rise", "rises")} ${amount} by ${monthName(p.endMonth)}; ${down} of ${ok.length} indicators are assumed to fall`;
     },
     fallback: () => "Indicator paths into the forecast window",
   },

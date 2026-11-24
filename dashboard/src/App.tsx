@@ -3,18 +3,18 @@
 // the URL hash (src/state/url.ts), so every view with its filters is a shareable link.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
 import { AppContext, VIEWS, type AppState } from "./app/context";
-import { readTheme, type ThemeName } from "./charts/theme";
+import { readTheme, typeScale, type ThemeName } from "./charts/theme";
 import { FilterBar } from "./components/FilterBar";
 import { Masthead } from "./components/shell/Masthead";
 import { Rail } from "./components/shell/Rail";
 import { ViewFooter } from "./components/shell/Footer";
-import { ToastHost } from "./components/overlays";
+import { toast, ToastHost } from "./components/overlays";
 import { ErrorState, SkeletonChart, SkeletonText } from "./components/states";
 import { fetchJson } from "./data/load";
 import { buildModel, type Model } from "./data/model";
 import { runSelfCheck, type SelfCheckResult } from "./data/quantiles";
 import type { Dims, ForecastFile, HistoryFile, Meta } from "./data/types";
-import { filterPatch, filtersFrom, lensFrom, measureFrom, useRoute } from "./state/url";
+import { filterPatch, filtersFrom, lensFrom, measureFrom, unknownFilterValues, useRoute } from "./state/url";
 
 const VIEW_COMPONENTS: Record<string, ComponentType> = {
   overview: lazy(() => import("./views/Overview")),
@@ -110,7 +110,22 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = themeName;
   }, [themeName]);
-  const theme = useMemo(() => readTheme(themeName), [themeName]);
+  // the chart type scale follows the viewport (1 up to 1600px wide, see typeScale): re-read the theme when it changes
+  // (stepped by 0.02 so dragging a window edge does not rebuild every chart on every frame)
+  const [fsKey, setFsKey] = useState(() => Math.round(typeScale() * 50) / 50);
+  useEffect(() => {
+    let raf = 0;
+    const on = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setFsKey(Math.round(typeScale() * 50) / 50));
+    };
+    window.addEventListener("resize", on);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", on);
+    };
+  }, []);
+  const theme = useMemo(() => readTheme(themeName), [themeName, fsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setParam = useCallback((patch: Record<string, string | null>, replace = false) => navigate(null, patch, replace), [navigate]);
   const go = useCallback(
@@ -139,6 +154,13 @@ export default function App() {
       go,
     };
   }, [model, theme, themeName, route, navigate, setParam, go]);
+
+  // a link with an unknown view or filter value says so instead of silently showing something else
+  const badLink = model ? [...(VIEW_COMPONENTS[route.view] ? [] : [`view "${route.view}"`]), ...unknownFilterValues(model.m, route.params)] : [];
+  const badKey = badLink.join("|");
+  useEffect(() => {
+    if (badKey) toast(`That link has an unknown ${badKey.split("|").join(", ")}; it was ignored${VIEW_COMPONENTS[route.view] ? "" : ", showing the overview"}.`);
+  }, [badKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!state) return;

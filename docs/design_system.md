@@ -3,7 +3,8 @@
 This is the canonical, as-built design system of the Celeris control tower (`dashboard/`). Code against it. The
 Executive overview (`dashboard/src/views/Overview.tsx`) is the reference implementation: when in doubt, copy what it does.
 
-All twelve views are built on this system (integration pass, 24 Nov 2026); the per-view gate results are in
+All twelve views are built on this system (integration pass, 24 Nov 2026; fix round and extra-large screens, 25 Nov
+2026); the per-view gate results are in
 [`docs/design_gate_results.md`](design_gate_results.md).
 
 The dashboard reads like a well-edited planning report set in the team owner's black / orange / cream palette (the
@@ -73,8 +74,8 @@ picked light. The app sets `data-theme` on `<html>` before the first render. Lig
 | `--paper` | `#EDE6D6` cream | `#0A0A0A` night | page and chart surface |
 | `--raised` | `#F7F3EA` | `#151515` | popover, drawer, tooltip, input, pressed segment |
 | `--hover` | `#E4DBC8` (paper-2) | `#1C1C1C` | hover wash, segmented track, neutral chip |
-| `--band` (= `--rail`) | `#0A0A0A` | `#111111` | the black bands: rail and footer |
-| `--band-2` / `--band-rule` | `#151515` / `#2B2B2B` | `#1C1C1C` / `#2B2B2B` | hover / active surface and hairlines on a band |
+| `--band` (= `--rail`) | `#0A0A0A` | `#161513` | the black bands: rail and footer (in dark a shade above the night page, so the band still reads as a band) |
+| `--band-2` / `--band-rule` | `#151515` / `#2B2B2B` | `#211F1C` / `#36332D` | hover / active surface and hairlines on a band |
 | `--band-ink` / `--band-ink-2` | `#F2EDE3` chalk / `#A39D90` | same | text on a band (16.97:1 / 7.34:1) |
 | `--band-dots` | `rgba(242,237,227,.07)` | `.06` | the faint dot grid on bands (14px pitch) |
 | `--ink` | `#141414` | `#F2EDE3` | primary text, **history line**, hero numbers (14.82:1 / 16.97:1) |
@@ -82,7 +83,8 @@ picked light. The app sets `data-theme` on `<html>` before the first render. Lig
 | `--ink-3` | `#5F5849` | `#A39D90` | muted text, axis labels, captions (5.67:1, 5.31 on the wash / 7.34:1) |
 | `--ink-4` | `#8A8475` | `#6E685E` | **non-text marks only**: shipped hairline, benchmark bars, "Other" (3.00:1 / 3.59:1) |
 | `--rule` | `#D3C9B4` | `#242424` | hairlines between rows and figures |
-| `--rule-strong` | `#B3A892` | `#3A3833` | module rule, axis baseline, control borders |
+| `--rule-strong` | `#B3A892` | `#3A3833` | module rule, axis baseline (non-interactive structure) |
+| `--control-edge` | `#857B67` | `#736C61` | borders of controls: chips, segmented tracks and pressed segments, presets, buttons, selects, stepper, "i" buttons, row toggles (3.36:1 on paper, 3.04 on the wash / 3.82:1 on night): WCAG 1.4.11 |
 | `--grid` | `#DDD4C1` | `#1A1A1A` | chart gridlines (solid, 1px) |
 
 **Bands re-scope the tokens.** Inside `.rail` and `.view-foot` (`styles/shell.css`) `--paper`, `--ink*`, `--rule*`,
@@ -147,7 +149,7 @@ Alert never reads as forecast: status and loss are red / green / amber, never or
 | Last actual | `--ink` | solid 1px vertical rule, labelled "Oct 2026 · last actual" |
 | Benchmark / another forecast | `--ink-3`, `--ink-4` | 1.5px **dashed 4/3** (dashes mean "another forecast"; never gridlines, never history) |
 | What-if scenario | `--scenario` | 2px solid; base forecast stays orange; gap labelled at the end |
-| Data error fixed (anomaly) | `--cat-1` rose | 9px hollow diamond **plus** a text annotation (`anomalyAnnotations`); drawn by `buildTimeline` itself |
+| Data error (anomaly: corrected, or units unknown and kept out of fitting) | `--cat-1` rose | 9px hollow diamond on the value with a 2px paper halo, **plus** a text annotation (`anomalyAnnotations`); drawn by `buildTimeline` itself |
 | Real event (anomaly) | `--cat-7` jade | 9px filled triangle **plus** a text annotation; drawn by `buildTimeline` itself |
 
 History and forecast stay distinguishable in greyscale: the divider rule, the wash, the FORECAST zone label and the
@@ -202,13 +204,14 @@ numeric ends and name the poles in words in the legend (`scaleLegend`). For ordi
 
 | Group | Tokens |
 |---|---|
-| Spacing (px) | `--sp-2 4 6 8 10 12 14 16 20 24 30 40 48 56` (`var(--sp-14)`); use `gap`, not per-element margins |
-| Layout | `--rail-w` 232px (212 ≤ 1180px, 200 ≤ 1100px) · `--measure` 1128px · `--gutter` 40px (32 ≤ 1280, 24 ≤ 1100, 16 ≤ 900) · `--module-gap` 30px · `--col-gap` 48px |
+| Spacing (design px × `--u`) | `--sp-2 4 6 8 10 12 14 16 20 24 30 40 48 56` (`var(--sp-14)`); use `gap`, not per-element margins |
+| Fluid unit | `--u` = `clamp(1px, 1px + (100vw − 1600px) / 4800, 1.5px)`: exactly 1px up to a 1600px viewport, 1.07px at 1920, 1.2px at 2560, 1.47px at 3840. Type, spacing, rail, gutters and control sizes are written `calc(<design px> * var(--u))`, so nothing changes at 1440 and below (see [§4.1](#41-extra-large-screens)) |
+| Layout | `--rail-w` 232 × u (212px ≤ 1180px, 200px ≤ 1100px) · `--measure` 1128px, growing to 1280 / 1520 / 1760 / 1960px at 1600 / 1920 / 2240 / 2560px and 1800 × u from 3200px · `--gutter` 40 × u (32 ≤ 1280, 24 ≤ 1100, 16 ≤ 900) · `--module-gap` 30 × u · `--col-gap` 48 × u |
 | Radius | `--r-1` 3px (chips in text, rail item) · `--r-2` 6px (controls) · `--r-3` 10px (popover, drawer) · `--r-tt` 8px (tooltip) · `--r-pill` (pills, badges) |
 | Elevation | flat (everything on the page) or `--shadow-pop` (floating only). **No shadow on modules.** |
 | Z-index (only these) | `--z-sticky` 10 (filter bar) · `--z-pop` 20 (popovers, comboboxes, menus) · `--z-tooltip` 30 (skip link, tooltips) · `--z-overlay` 50 (drawer scrim, drawer, toasts) |
 | Motion | `--ease` `cubic-bezier(.2,.7,.2,1)`, `--dur` 180ms, `--dur-fast` 150ms. Hover feedback is colour / opacity / box-shadow over 150ms (never a transform that shifts layout); popovers fade and rise 6px; drawers slide 24px; charts update in 300ms and dim to 60 % while busy; no load animation on numbers; continuous animation only for loading; `prefers-reduced-motion` disables all of it. |
-| Borders | 1px everywhere: `--rule` between rows, `--rule-strong` above modules and around controls, `--ink` above the figure strip when it marks where the numbers start (`heavy`). Selected tab: 2px ink underline. The masthead carries the single 2px `--orange` rule. |
+| Borders | 1px everywhere: `--rule` between rows, `--rule-strong` above modules, `--control-edge` around controls, `--ink` above the figure strip when it marks where the numbers start (`heavy`). Selected tab: 2px ink underline. The masthead carries the single 2px `--orange` rule. |
 
 The deprecated aliases (`--surface`, `--muted`, `--hair`, `--history`, `--demand`, `--accent-ink`, `--slate-*`,
 `--cobalt-*` …) and `styles/legacy.css` were deleted in the integration pass: nothing uses them any more.
@@ -226,7 +229,10 @@ CDN request at runtime (Vite fingerprints and bundles them).
 | **IBM Plex Sans** (variable 400–700) | `--font-sans` | interface and evidence: labels, every number, tables, charts | Helvetica Neue, Arial, system-ui |
 | **IBM Plex Mono** 400 / 500 | `--font-mono` | **real codes only**: SKU IDs, Record_IDs, hashes, CLI commands, file paths. Never for numbers or flavour. | ui-monospace, Menlo, Consolas |
 
-Scale (use the shorthand tokens: `font: var(--t-title)`):
+Scale (use the shorthand tokens: `font: var(--t-title)`). The sizes below are the design sizes at 1440px; every token
+is `calc(<size> * var(--u))`, so above 1600px of viewport the whole scale grows smoothly (×1.07 at 1920, ×1.2 at 2560,
+×1.47 at 3840) and a 4K screen at device scale 1 reads like a comfortable zoom. Canvas text follows the same factor
+through `fz()` ([§6.1](#61-theme-and-helpers-chartsthemets)). Write any new size as `calc(N * var(--u))`, never bare px:
 
 | Token | Size / line height · weight · family | Use |
 |---|---|---|
@@ -282,12 +288,20 @@ Scale (use the shorthand tokens: `font: var(--t-title)`):
   tech ("Family filter: All"); each opens a combobox popover (search for SKU and Customer; the SKU list is ranked by
   last-12-month units with mono codes and volume bars; the customer note explains "customer at the time"). Right end:
   "**N** series in view" (live region) and Reset. Defaults to all. It writes the URL hash. Sticky above 700px.
+  Keyboard: the popover follows the ARIA combobox pattern. Focus stays on one element (the search input, or the listbox
+  when there is no search) and `aria-activedescendant` names the highlighted option, so the highlight, the focus ring and
+  what Enter picks are always the same option; ↑ ↓, Home / End, Page Up / Down move it, Escape closes and returns focus
+  to the chip, Tab closes. Options are `role="option"` elements, not tab stops.
 - **Footer** (`components/shell/Footer.tsx`, black band, mounted by the shell on every view): data as of (last actual
   month, forecast window), source (bundle version, export command, package version, history cells, forecast rows),
   pipeline run (short SHA-256 of the forecast and submission files, final or provisional inputs), and when the bundle
   was built (the server's `Last-Modified` of `meta.json`). Views never render their own provenance footer; a view may
   add a method colophon (`aside.colophon`).
-- **Skip link** "Skip to content" (first focusable element) jumps to `main#main`.
+- **Skip link** "Skip to content" (first focusable element) jumps to `main#main`, which carries `scroll-margin-top`
+  (and `html` a matching `scroll-padding-top`), so the headline lands below the sticky filter bar, not under it.
+- **One content edge.** The page is centred in the main column (`margin-inline: auto`); the masthead, the filter bar and
+  the footer pad their content to the same edge (`--edge` = max(gutter, (100 % − measure) / 2)), so "Copy link" and
+  "N series in view" end where the content ends on any screen.
 - **Page** (`main.page`): one grid column with `gap: 30px`. A view returns a fragment of top-level blocks (Lede,
   Modules, FigureStrip, column wrappers); never wrap them in a card.
 - **Column helpers**: `.cols-7-5`, `.cols-5-7`, `.cols-4-8`, `.cols-2`, `.cols-3` (all `minmax(0, …)`, stack below
@@ -296,8 +310,31 @@ Scale (use the shorthand tokens: `font: var(--t-title)`):
   section; 1180 stacks columns, folds the figure strip to 2×2 and hides "Copy link"'s label; 1100 narrows the rail;
   900 collapses the rail into a top bar; ≤ 700 the lede and the figure strip come first (top three figures first),
   everything else stacks below, the filter bar stops being sticky, touch targets grow to 44px and prose to 16px;
-  ≤ 640px chart annotations become a numbered list under the chart; ≤ 480 bar-table columns marked `hideNarrow`
-  drop out. Wide ledgers scroll inside their own `.table-wrap`.
+  ≤ 640px chart annotations become a numbered list under the chart (with the numbers drawn on the plot) and the
+  Overview timeline defaults to "Since <year>"; ≤ 480 bar-table columns marked `hideNarrow` drop out. Wide ledgers
+  scroll inside their own `.table-wrap`. Above 1440: see §4.1.
+
+### 4.1 Extra-large screens
+
+Tested at 1920 × 1080, 2560 × 1440 and 3840 × 2160 (device scale 1) with no horizontal scroll, light and dark.
+
+| Viewport | `--u` | Measure | Rail | What changes |
+|---|---|---|---|---|
+| ≤ 1600px | 1px | 1128px (1280 from 1600) | 232px | nothing: the 1440 design, pixel for pixel |
+| 1920px | 1.07px | 1520px | 247px | page centred with ~75px either side; grids gain a column where it helps (the Overview brief, change table and top exceptions sit in three columns, `.ov-lower`; the inbox case file widens to 470 × u); charts grow (below) |
+| 2240px | 1.13px | 1760px | 262px | as above |
+| 2560px | 1.2px | 1960px | 278px | type and spacing ×1.2 |
+| ≥ 3200px | 1.33–1.5px | 1800 × u (2640px at 3840) | 340px at 3840 | type and spacing ×1.47 at 3840: a 4K screen at scale 1 reads like the 1920 layout at a comfortable zoom |
+
+- **Prose never widens**: the headline (24ch), standfirst (70ch), deks (75ch) and the brief keep their limits; the extra
+  width goes to charts, tables and extra grid columns.
+- **Charts grow with the screen** (`chartHeight` in `charts/theme.ts`): the shared timeline keeps its 1440 shape (about
+  3.1 : 1), between its design height × the type scale and min(2.2 × design, 55 % of the viewport height), so it still
+  sits under the headline on a 1080px-high screen; every other chart grows with the viewport (up to 1.6×), never below
+  its design height × the type scale (rows of labels always fit) and never taller than 0.8 × its width. Canvas fonts,
+  grid margins and annotation boxes scale with the same factor (`fz`, `fpx`).
+- **Drawers** are sized in design px × `--u` and their right edge sits on the page's right edge, so on a 4K screen the
+  lineage drawer opens beside the content it explains instead of 1,800px away at the monitor's edge.
 
 Global state lives in the URL hash (`state/url.ts`): `#/<view>?fam=HYD&sku=HYD-004&reg=Europe&ch=…&cust=…&m=usd&lens=latent`.
 Put in-view UI state there too with `setParam(patch, true)` (replace, no history entry), so every state is a link. The
@@ -318,7 +355,8 @@ were deleted once every view was restyled.) All props are typed; the signatures 
 ### 5.1 The view header: `Lede` (`components/Figure.tsx`)
 
 ```ts
-Lede({ headline: string; standfirst?: string | ReactNode; eyebrow?: ReactNode /* sentence-case kicker */; figure?: ReactNode })
+Lede({ headline: string; standfirst?: string | ReactNode; eyebrow?: ReactNode /* sentence-case kicker */; figure?: ReactNode;
+       after?: ReactNode /* a short block under the standfirst: the Overview's three-line watch list */ })
 ```
 Headline and standfirst on 8 columns, the hero figure on 4 behind a vertical `--rule-strong` hairline. A string
 standfirst may carry `**bold**` markers for the key numbers (rendered by `Rich`). Both are computed ([§7](#7-headline-templates)).
@@ -383,8 +421,12 @@ KeyItem = { kind: KeyKind; label: ReactNode; color?: string; title?: string }
 KeyKind = "line" | "thin" | "dash" | "dot" | "box" | "band" | "ring" | "point" | "diamond" | "triangle" | "rule"
 Key({ items: (KeyItem | "sep")[]; ariaLabel?: string })
 KeyMark({ kind: KeyKind; color?: string })                       // a mark alone, for any legend
-timelineKey({ latent?, fc?, band?, lost?, rebuilt?, columns?, extra?: KeyItem[] }): (KeyItem | "sep")[]
+timelineKey({ latent?, fc?, band?, lost?, rebuilt?, columns?, extra?: KeyItem[];
+              present?: { shipped: boolean; lost: boolean; rebuilt: boolean } /* markPresence(spec) */ }): (KeyItem | "sep")[]
 ```
+Pass `present: markPresence(spec)` (charts/timeline.ts) so the key lists only marks drawn in the visible range (no
+"Lost to stock-outs" on a "Since 2024" range without losses). `Key` renders the items in groups split at `"sep"`; the
+divider is drawn in the gap before a group and clipped when the group wraps, so a wrapped key never starts a line with it.
 Anatomy: 1px `--rule-strong` rule → 14px → **conclusion title** (sans 600 17) with tools on the right → 4px → dek (13px,
 ink-3, what is plotted, units, scope) → 12px → inline key → evidence → footnote (12px ink-3). Tools order: range
 presets / segmented, view toggles, table-twin toggle, then the "i". `"sep"` in a key separates the past group from the
@@ -456,7 +498,8 @@ leftwards from the right edge. The leader is orange (forecast, `--accent`) or in
 
 ```ts
 DataTable<R>({ rows: R[]; cols: Column<R>[]; pageSize?: number; onRow?: (r: R) => void; selected?: (r: R) => boolean;
-               csvName?: string; initialSort?: { key: string; desc: boolean }; empty?: string; ariaLabel?: string })
+               csvName?: string; initialSort?: { key: string; desc: boolean }; empty?: string; ariaLabel?: string;
+               expand?: (r: R) => ReactNode; expandLabel?: string; rowKey?: (r: R) => string | number })
 Column<R> = { key: string; label: string; value: (r: R) => number | string | null; render?: (r: R) => ReactNode;
               num?: boolean; width?: number; wrap?: boolean; clamp?: boolean; id?: boolean; fc?: boolean }
 InlineBar({ value: number; max: number; label: ReactNode; lead?: boolean; tone?: BarTone; width?: number })
@@ -466,7 +509,11 @@ Header 11.5px ink-3 over a `--rule-strong` line, ▾ / ▴ on the sorted column;
 hover wash; selected row = `--accent-wash` + 2px orange inset on the first cell (the one selected marker). `num` right-aligns with tabular
 numerals; `id` sets Plex Mono 500; `clamp` clamps long text to 2 lines (full text in the title tooltip or the drawer);
 `fc` heads a forecast column with a 2px orange rule (the colour grammar inside a table). Rows are focusable and Enter
-opens. Every chart should have a table twin with the same columns as its CSV.
+opens. Every chart should have a table twin with the same columns as its CSV. **`expand`** adds a disclosure button
+(`aria-expanded`, `aria-controls`, 24px, 44px on phones) in a first column; it opens a full-width detail row under the
+row, so the full text a `clamp` cuts is reachable by keyboard and touch, not only by hover (the anomaly register shows
+type, scope, period, reason, evidence, detection, action, confidence and impact there). `rowKey` keeps open rows across
+sorting and paging. Never put a must-show text only in a `title` tooltip.
 
 ### 5.6 Floating surfaces (`components/overlays.tsx`)
 
@@ -474,7 +521,8 @@ opens. Every chart should have a table twin with the same columns as its CSV.
 Popover({ trigger: ReactNode; triggerClassName?: string; ariaLabel?: string; title?: string; align?: "left" | "right";
           width?: number; children: ReactNode | ((close: () => void) => ReactNode) })
 Info({ what: ReactNode; how?: ReactNode; source?: string; align?: "left" | "right"; size?: "sm" | "md"; label?: string })   // the "i"; label defaults to "About this module" (the masthead's says "About this view")
-Drawer({ title: ReactNode; sub?: ReactNode; eyebrow?: ReactNode /* sentence-case kicker */; onClose: () => void; children: ReactNode; width?: number })
+Drawer({ title: ReactNode; sub?: ReactNode; eyebrow?: ReactNode /* sentence-case kicker */; onClose: () => void; children: ReactNode;
+         width?: number /* design px (default 640), scaled by --u */ })
 toast(text: string)            // bottom-left, auto-dismiss after 4 s; <ToastHost/> is mounted once by the shell
 useDismiss(open, close)        // ref for "close on outside click and Escape"
 ```
@@ -483,7 +531,8 @@ useDismiss(open, close)        // ref for "close on outside click and Escape"
   headline (`--t-case`) → identity line (`sub`) → in the body: three-figure strip → series chart → "Why it is flagged"
   (`h3`: sans 600 13px) → "Recommended action" in serif (`className="action"`) → facts `<dl className="facts">`
   → status segmented, note, actions. It slides from the right over a 30 % paper scrim; Escape closes; focus moves in
-  and returns.
+  and returns. It is a real modal dialog: `aria-labelledby` points at its headline, Tab and Shift+Tab cycle inside it
+  and focus that lands behind the scrim is pulled back. Its right edge sits on the page's right edge (§4.1).
 
 ### 5.7 States (`components/states.tsx`)
 
@@ -533,14 +582,16 @@ were removed with the last unconverted view.)
 | `baseOption` | `(t) => {...}` | Plex Sans, ink-3 text, `animation: false` on first paint, 300ms updates, aria on |
 | `categoryAxis` | `(t, data, extra?)` | 1px rule-strong baseline, no ticks, no gridlines, ink-3 11.5px labels |
 | `valueAxis` | `(t, { max?, min?, usd?, percent?, name? })` | zero baseline (or `min` for a signed axis: bias uses `min: −max`), 4 intervals to `max`, compact labels ("150K", "$12M", "40%", "−2%" with a true minus), solid 1px grid |
-| `gridStd` | `(narrow?, extra?)` | `{left 46, right 92, top 30, bottom 30}` (92px right margin for end labels); phones 34 / 58 |
+| `gridStd` | `(narrow?, extra?)` | `{left 46, right 92, top 30, bottom 30}` × the type scale (92px right margin for end labels); phones 34 / 58 |
+| `fz`, `fpx`, `typeScale` | `fz(11.5)`, `fpx(92)`, `typeScale()` | canvas font sizes and px dimensions scaled like `--u` (1 up to 1600px; 1.2 at 2560; 1.47 at 3840). **Every `fontSize` in a chart option goes through `fz()`.** The shell re-reads the theme when the scale changes on resize |
+| `chartHeight` | `(base, width, aspect?)` | the height a chart gets on the current screen (§4.1); EChart and TimelineChart call it |
 | `niceMax` | `(v) => number` | smallest 1 / 1.2 / 1.6 / 2 / 2.4 / 3 / 4 / 5 / 6 / 8 × 10ᵏ ≥ v (quarters are round) |
 | `axisTick` | `(v, usd?) => string` | "0", "7.5K", "150K", "$2.4B" with a true minus |
 | `tooltipStyle` | `(t)` | floating surface: raised, 1px rule, 8px radius, `--shadow-pop`, confined |
 | `axisTooltip` | `(t, (items) => html)` | axis trigger with a 1px ink-3 crosshair that snaps to the category |
 | `ttHead` / `ttRow` / `ttNote` / `ttEnd` | `ttHead(title, "actual" \| "forecast" \| tag?)`, `ttRow(color, label, value, kind?)` | tooltip HTML: header with the ACTUAL / FORECAST tag; rows lead with the **value** (600, tabular) then the label; `kind` = `"line"` (default), `"dash"` (another forecast) or `"box"` (an area) |
 | `esc` | `(s) => string` | escape data labels before they go into tooltip HTML |
-| `onFill` | `(t, fill) => string` | ink or paper label colour by fill luminance (heatmap cells, bar labels) |
+| `onFill` | `(t, fill) => string` | the theme's ink or paper, whichever has the higher WCAG contrast on the fill (heatmap cells, bar labels; dark-theme extremes get dark text) |
 | `barStyle`, `BAR_MAX` | `(color, horizontal?)`, `24` | 2px data-end radius, square baseline; bars at most 24px thick |
 | `scaleLegend` | `(t, { min, max, colors, format, low?, high?, dimension? })` | numeric heatmap legend: printed end values, poles named in words |
 | `readTheme`, `cssVar` | `(name)`, `(varName)` | read the tokens (the shell does this; views use `useApp().theme`) |
@@ -565,9 +616,13 @@ const option = useMemo(() => ({
 ### 6.2 `EChart` (`charts/EChart.tsx`)
 
 ```ts
-EChart({ option: EChartsCoreOption; height: number; onClick?: (e: ChartEvent) => void; onXClick?: (index: number) => void;
+EChart({ option: EChartsCoreOption; height: number /* design height at 1440 */; aspect?: number; fixedHeight?: boolean;
+         onClick?: (e: ChartEvent) => void; onXClick?: (index: number) => void;
          xGrid?: number; ariaLabel: string; className?: string; busy?: boolean; onLayout?: (chart: ECharts) => void; children?: ReactNode })
 ```
+`height` is the design height at 1440px. Above a 1600px viewport the chart grows through `chartHeight(height, width,
+aspect)` (§4.1): with `aspect` it keeps about that width : height ratio, otherwise it grows with the viewport.
+`fixedHeight` turns growth off (TimelineChart sizes itself and passes it).
 Every chart gets an ECharts `aria` description from `ariaLabel`: state the finding there. Tree-shaken ECharts 6 (line, bar, scatter, heatmap, custom; grid, tooltip, markArea / Line / Point, visualMap, legend,
 dataZoom, aria). `busy` dims the previous render to 60 %; `onLayout` fires after each setOption and resize (for overlays
 using `convertToPixel`); `children` render over the canvas; with focus, ← → move the crosshair and Esc hides it. The
@@ -610,7 +665,9 @@ rebuilt cells in history and forecast, P90, P50, P10 in the window, plus any ext
 
 - **History-only charts** (no forecast and no extra line) end at the last actual with no divider, no wash and no
   end-label margin; columns charts carry no end label either, so their right margin shrinks to 24px (12px on phones).
-- **Anomaly marks** in their roles (rose hollow diamond, jade triangle), so views pass `anomalies` and nothing else.
+- **Anomaly marks** in their roles (rose hollow diamond, jade triangle), drawn ON their value (never offset: on a y axis an
+  offset reads as another value) with a 2px paper halo; a diamond and a triangle in the same month step 5px apart
+  horizontally. Views pass `anomalies` and nothing else.
 - **Phones**: below 640px the year labels thin to every second or third January (ticks stay yearly) and the story
   annotations become a numbered list under the chart.
 - **`patch`** lets a view add one evidence layer without forking the component (the case file adds the "at risk if it
@@ -635,17 +692,18 @@ Annotations are **generated from data, never typed**. The default generators in 
 |---|---|---|
 | disruption trough | a Disruption event in the filter, with its minimum < 85 % of the 6 months before | "COVID-19 lockdowns / Demand falls to 51.4K in Apr 2020" |
 | widest gap | the month where (demand − shipped) / demand peaks, > 1 % | "Semiconductor shortage / Shipments held below demand, 2021–22" (named after a covering Supply Constraint event, else "Stock-outs") |
-| rebuilt cells | the largest cluster of months with rebuilt cells | "ERP migration / 363 cells rebuilt, not zero-filled, Mar–May 2023" |
+| rebuilt cells | the largest cluster of months with rebuilt or unknown cells | "ERP migration / 33 missing rows rebuilt; 330 cells with units unknown, kept out of fitting, Mar–May 2023" (one vocabulary with Data health and the anomaly monitor: missing rows are *rebuilt*; ERP blanks have *units unknown* and are *kept out of fitting*) |
 | window event | the largest `window_event` group in `exceptions.json` for the selection | "Orion Driveline shutdown / −5,420 units, Jul–Aug 2027" |
 | divider + zone | a forecast or extra line is shown | "Oct 2026 / last actual" and "FORECAST / 19 months" |
 | end label | a forecast is shown (lines mode) | "153K / P10–P90 151K–155K" |
 
-Placement: labels are measured and wrapped (title 12.5px 600 ink, text 12px ink-3, max 190px), then placed in empty
+Placement: labels are measured and wrapped (title 12.5px 600 ink, text 12px ink-3, max 190px, all × the type scale so
+the measured box matches the rendered label on large screens), then placed in empty
 space above or below the lines (never over a line, another label or the divider), choosing the shortest leader; past
 labels stay left of the divider; future labels start at the divider, capped at the window width. A 1px ink-3 leader
 runs from a 3.5px dot (ink for the past, orange for the future, 2px paper ring) and stops at the label's edge when it
 would cross it. At most five story labels per chart; below 640px only the zone and end labels remain and the rest
-become a numbered list under the chart. Write your own generator returning `Annotation[]` for other charts and pass
+become a numbered list under the chart, with each number drawn on its point (`.anno-num`). Write your own generator returning `Annotation[]` for other charts and pass
 it to `TimelineChart.annotate` (or use `AnnotationLayer` with `EChart.onLayout`).
 
 ### 6.5 Other chart forms
@@ -810,6 +868,21 @@ Copy rules:
   one line of context in plain words, an evidence link ("Data health").
 - Empty and error states say what happened and what to do; errors name the cause and the fix.
 - Every number on screen comes from the bundle. If a number is not in the bundle, it does not go on screen.
+- **A fact shown twice comes from one variable** (fix round, 25 Nov 2026). Shared fact helpers, not copies:
+  `riskFact` / `actFact` / `lostShare` / `ladderFacts` (`insights/briefing.tsx`: the brief, the Overview watch list and
+  figures), `repairFacts` (`insights/health.ts`: Overview, Data health, the anomaly monitor's "units unknown"),
+  `lostFacts` / `lastOrderPhrase` / `reasonRow` / `reasonShort` / `reasonFull` (`insights/inbox.ts`: inbox rows, case file,
+  brief, Overview top five), `bestBenchmark` / `ptsBetween` / `shares100` (`insights/accuracy.ts`).
+- **Differences of printed numbers are taken from the printed numbers**: round each value to its shown precision first,
+  then subtract (`ptsBetween`), so "+13.0 pts" always equals 51.6 − 38.6. Rates change in **points**, levels in **%**
+  (PMI 52.4 to 50.3 is "−2.1 pts", never "−4.0 %"). Parts that are shown with a total add up to it (largest-remainder
+  rounding: `roundToTotal`, `roundParts`, `shares100`) or carry a rounding note.
+- **Name the base and the statistic**: "47 of the 90 blocking checks", "r = 0.93 over 2019–26", "4.8 pts better than
+  cycle-aware naive, the best benchmark". A single-series headline compares with the best benchmark for that series.
+- **One word per thing**: *cases* (the inbox, the rail badge, the brief, the watch list), *last order May 2025; silent 17
+  months* (never "since June"), *repaired* = corrected + rebuilt + units unknown (a partition of history cells),
+  *rebuilt* (missing rows) vs *units unknown, kept out of fitting* (ERP blanks), *in-hindsight floor* (never "noise
+  floor").
 
 ---
 
@@ -825,9 +898,14 @@ Copy rules:
 - **Focus**: a 2px `--focus` outline (burnt orange on cream, orange on black) with 2px offset on every interactive
   element (`:focus-visible`). Table rows,
   small multiples and rank rows are buttons or focusable rows; Enter opens.
-- **Keyboard**: Segmented, RangePresets and Tabs move with ← → (roving tabindex); filter comboboxes open with ↓, move
-  with ↑ ↓, choose with Enter, close with Escape; popovers and drawers close with Escape; charts take focus and move
-  the crosshair with ← →.
+- **Non-text contrast**: control borders use `--control-edge` (≥ 3:1 on paper, the wash and night); the focus ring and
+  the forecast line are ≥ 3:1; `--rule-strong` (1.9:1) is only for structure that is not a control.
+- **Keyboard**: Segmented, RangePresets and Tabs move with ← → (roving tabindex); filter comboboxes follow the ARIA
+  combobox pattern (`aria-activedescendant`, one highlight = the focus ring = what Enter picks; ↓ opens, ↑ ↓ Home End
+  move, Enter chooses, Escape closes back to the chip); popovers and drawers close with Escape; drawers trap Tab and are
+  named by their headline (`aria-labelledby`); register rows expand with a disclosure button; charts take focus and move
+  the crosshair with ← →. Hit areas are at least 24px at every width (the small "i" carries an invisible 3px halo) and
+  44px below 700px.
 - **Charts**: every `EChart` has `role="img"` and an `ariaLabel` that states what is plotted (the overview uses the
   computed title and dek); every chart should have a table twin (the same columns as its CSV); the annotation overlay is
   `aria-hidden` because the numbered list / tooltip / table carry the same facts.
@@ -999,8 +1077,11 @@ font CDN.
 ## 13. Acceptance gates: every view, before it ships
 
 Tick both gates against screenshots (light and dark at 1440×900 and 1280×720, plus 1024, 768 and 375 px, one filtered
-state and one single series). The UI/UX Pro Max gate comes first. A view that fails an item does not ship. The results
-of the integration pass, view by view, are in [`docs/design_gate_results.md`](design_gate_results.md).
+state and one single series) **and at 1920×1080, 2560×1440 and 3840×2160 (device scale 1)**, the team owner's
+extra-large-screen requirement: content centred with the bars on its edge, type comfortable, charts in proportion, no
+empty half-screen. The UI/UX Pro Max gate comes first. A view that fails an item does not ship. Record what was
+measured, not what was intended: the results, view by view, are in [`docs/design_gate_results.md`](design_gate_results.md)
+(the first integration pass claimed passes that two reviews disproved; the fix round re-ran every item).
 
 ### 13.1 UI/UX Pro Max gate (18 points; skill `ui-ux-pro-max`, notes in `research/dashboard-skill-ui-ux-pro-max.md`)
 

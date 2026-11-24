@@ -60,7 +60,8 @@
 
   /* ---- rules ---- */
   --rule: #D3C9B4;           /* hairlines between rows and figures */
-  --rule-strong: #B3A892;    /* module rule, axis baseline, control borders */
+  --rule-strong: #B3A892;    /* module rule, axis baseline */
+  --control-edge: #857B67;   /* borders of controls (chips, segmented, presets, selects, buttons): 3.36:1 on paper, 3.04 on the wash */
   --grid: #DDD4C1;           /* chart gridlines (solid, 1px) */
 
   /* ---- orange = the forecast (and the one active marker, the primary action, focus) ---- */
@@ -109,30 +110,42 @@
   --font-serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
   --font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
-  /* font shorthands: use as `font: var(--t-title)` */
-  --t-display: 600 38px/1.1 var(--font-serif);   /* view headline (opsz 56, tracking -0.018em) */
-  --t-hero: 600 54px/1.05 var(--font-sans);      /* the one hero figure (tracking -0.025em) */
-  --t-figure: 600 29px/1.05 var(--font-sans);    /* supporting figures (tracking -0.015em) */
-  --t-case: 600 23px/1.2 var(--font-serif);      /* drawer / case-file headline (opsz 32) */
-  --t-lede: 400 17.5px/1.5 var(--font-serif);    /* standfirst (opsz 18) */
-  --t-title: 600 17px/1.35 var(--font-sans);     /* module conclusion title */
-  --t-brief: 400 15.5px/1.55 var(--font-serif);  /* the brief, recommended action (opsz 16) */
-  --t-body: 400 14px/1.5 var(--font-sans);
-  --t-small: 400 13px/1.5 var(--font-sans);      /* dek, table body, chips */
-  --t-caption: 400 12px/1.45 var(--font-sans);   /* figure context, annotations, footnotes */
-  --t-axis: 400 11.5px/1 var(--font-sans);       /* axis ticks */
-  --t-eyebrow: 600 11px/1.3 var(--font-sans);    /* UPPERCASE, tracking +0.09em */
+  /* ---- the fluid unit: exactly 1px up to a 1600px-wide viewport, then +1px per 4800px of width (1.07px at
+         1920, 1.2px at 2560, 1.47px at 3840), capped at 1.5px.  Type, spacing, the rail and the gutters are
+         written as calc(<design px> * var(--u)), so nothing changes at 1440 / 1280 / 1024 / 768 / 375 and a
+         4K screen at device scale 1 reads like a 1.47x zoom.  charts/theme.ts typeScale() mirrors it. ---- */
+  --u: clamp(1px, calc(1px + (100vw - 1600px) / 4800), 1.5px);
 
-  /* ---- spacing scale (px) ---- */
-  --sp-2: 2px; --sp-4: 4px; --sp-6: 6px; --sp-8: 8px; --sp-10: 10px; --sp-12: 12px; --sp-14: 14px;
-  --sp-16: 16px; --sp-20: 20px; --sp-24: 24px; --sp-30: 30px; --sp-40: 40px; --sp-48: 48px; --sp-56: 56px;
+  /* font shorthands: use as `font: var(--t-title)` (sizes are the 1440px design sizes, scaled by --u) */
+  --t-display: 600 calc(38 * var(--u))/1.1 var(--font-serif);   /* view headline (opsz 56, tracking -0.018em) */
+  --t-hero: 600 calc(54 * var(--u))/1.05 var(--font-sans);      /* the one hero figure (tracking -0.025em) */
+  --t-figure: 600 calc(29 * var(--u))/1.05 var(--font-sans);    /* supporting figures (tracking -0.015em) */
+  --t-case: 600 calc(23 * var(--u))/1.2 var(--font-serif);      /* drawer / case-file headline (opsz 32) */
+  --t-lede: 400 calc(17.5 * var(--u))/1.5 var(--font-serif);    /* standfirst (opsz 18) */
+  --t-title: 600 calc(17 * var(--u))/1.35 var(--font-sans);     /* module conclusion title */
+  --t-brief: 400 calc(15.5 * var(--u))/1.55 var(--font-serif);  /* the brief, recommended action (opsz 16) */
+  --t-body: 400 calc(14 * var(--u))/1.5 var(--font-sans);
+  --t-small: 400 calc(13 * var(--u))/1.5 var(--font-sans);      /* dek, table body, chips */
+  --t-caption: 400 calc(12 * var(--u))/1.45 var(--font-sans);   /* figure context, annotations, footnotes */
+  --t-axis: 400 calc(11.5 * var(--u))/1 var(--font-sans);       /* axis ticks */
+  --t-eyebrow: 600 calc(11 * var(--u))/1.3 var(--font-sans);    /* UPPERCASE, tracking +0.09em */
 
-  /* ---- layout ---- */
-  --rail-w: 232px;
-  --measure: 1128px;         /* content measure (12 columns, 24px gutters) */
-  --gutter: 40px;            /* page gutter on desktop */
-  --module-gap: 30px;        /* vertical gap between modules */
-  --col-gap: 48px;           /* gap between 7/5 columns */
+  /* ---- spacing scale (design px, scaled by --u above 1600px) ---- */
+  --sp-2: calc(2 * var(--u)); --sp-4: calc(4 * var(--u)); --sp-6: calc(6 * var(--u)); --sp-8: calc(8 * var(--u));
+  --sp-10: calc(10 * var(--u)); --sp-12: calc(12 * var(--u)); --sp-14: calc(14 * var(--u)); --sp-16: calc(16 * var(--u));
+  --sp-20: calc(20 * var(--u)); --sp-24: calc(24 * var(--u)); --sp-30: calc(30 * var(--u)); --sp-40: calc(40 * var(--u));
+  --sp-48: calc(48 * var(--u)); --sp-56: calc(56 * var(--u));
+
+  /* ---- layout ----
+     The page is a centred column: the masthead, filter bar, page and footer share one content edge
+     (`--measure` wide, `--gutter` either side).  The measure grows at 1600 / 1920 / 2240 / 2560 / 3200px
+     (see the min-width blocks below); prose keeps its ch limits, so the extra width goes to charts,
+     tables and extra grid columns, never to longer lines. */
+  --rail-w: calc(232 * var(--u));
+  --measure: 1128px;         /* content measure (12 columns, 24px gutters) at 1440 */
+  --gutter: calc(40 * var(--u));            /* page gutter on desktop */
+  --module-gap: calc(30 * var(--u));        /* vertical gap between modules */
+  --col-gap: calc(48 * var(--u));           /* gap between 7/5 columns */
 
   /* ---- radius ---- */
   --r-1: 3px;                /* chips in text, rail active item */
@@ -162,10 +175,10 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --paper: #0A0A0A; --raised: #151515; --hover: #1C1C1C;
-    --rail: #111111; --band: #111111; --band-2: #1C1C1C; --band-rule: #2B2B2B; --band-ink: #F2EDE3; --band-ink-2: #A39D90;
+    --rail: #161513; --band: #161513; --band-2: #211F1C; --band-rule: #36332D; --band-ink: #F2EDE3; --band-ink-2: #A39D90;
     --band-dots: rgba(242, 237, 227, 0.06);
     --ink: #F2EDE3; --ink-2: #CFC8BA; --ink-3: #A39D90; --ink-4: #6E685E;
-    --rule: #242424; --rule-strong: #3A3833; --grid: #1A1A1A;
+    --rule: #242424; --rule-strong: #3A3833; --grid: #1A1A1A; --control-edge: #736C61;
     --orange: #FF6A13; --on-orange: #141414; --accent: #FF6A13; --accent-text: #FF7A2E; --accent-strong: #FFA066;
     --accent-wash: #1E120B; --accent-band: rgba(255, 106, 19, 0.28); --accent-edge: rgba(255, 106, 19, 0.6); --accent-tint: #6B3A1C;
     --focus: #FF6A13; --link: #F2EDE3;
@@ -183,10 +196,10 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --paper: #0A0A0A; --raised: #151515; --hover: #1C1C1C;
-  --rail: #111111; --band: #111111; --band-2: #1C1C1C; --band-rule: #2B2B2B; --band-ink: #F2EDE3; --band-ink-2: #A39D90;
+  --rail: #161513; --band: #161513; --band-2: #211F1C; --band-rule: #36332D; --band-ink: #F2EDE3; --band-ink-2: #A39D90;
   --band-dots: rgba(242, 237, 227, 0.06);
   --ink: #F2EDE3; --ink-2: #CFC8BA; --ink-3: #A39D90; --ink-4: #6E685E;
-  --rule: #242424; --rule-strong: #3A3833; --grid: #1A1A1A;
+  --rule: #242424; --rule-strong: #3A3833; --grid: #1A1A1A; --control-edge: #736C61;
   --orange: #FF6A13; --on-orange: #141414; --accent: #FF6A13; --accent-text: #FF7A2E; --accent-strong: #FFA066;
   --accent-wash: #1E120B; --accent-band: rgba(255, 106, 19, 0.28); --accent-edge: rgba(255, 106, 19, 0.6); --accent-tint: #6B3A1C;
   --focus: #FF6A13; --link: #F2EDE3;
@@ -200,3 +213,13 @@
   --div-6: #43283A; --div-7: #6E3D5F; --div-8: #A4628F; --div-9: #D896C3;
   --shadow-pop: 0 1px 2px rgba(0, 0, 0, .5), 0 12px 32px rgba(0, 0, 0, .6);
 }
+
+/* ---- Extra-large screens: the content measure grows in steps (the page stays centred, see shell.css).
+        Type, spacing, rail and gutters already grow with --u; these steps give the extra width to charts,
+        tables and additional grid columns (prose keeps its ch limits).
+        1600px: 1280 · 1920px: 1520 · 2240px: 1760 · 2560px: 1960 · 3200px and up: 1800 x --u (2640 at 3840). */
+@media (min-width: 1600px) { :root { --measure: 1280px; } }
+@media (min-width: 1920px) { :root { --measure: 1520px; } }
+@media (min-width: 2240px) { :root { --measure: 1760px; } }
+@media (min-width: 2560px) { :root { --measure: 1960px; } }
+@media (min-width: 3200px) { :root { --measure: calc(1800 * var(--u)); } }

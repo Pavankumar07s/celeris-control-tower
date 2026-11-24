@@ -16,7 +16,7 @@ import { joinList } from "../insights/headlines";
 import { selectRuns, selectSegments, type Filters } from "../data/model";
 import { render, selectionWords } from "../insights/headlines";
 import { GANTT_TEMPLATES, HANDOVER_TEMPLATES, LIFE_TEMPLATES, RECENT_TEMPLATES, handovers, lifecycleSkus, type Handover, type RecentRow } from "../insights/lifecycle";
-import { ganttOption, ganttRows, handoverOption } from "./g2/lifecycleCharts";
+import { ganttOption, ganttRows, handoverOption, handoverPeak } from "./g2/lifecycleCharts";
 import { Stamp } from "../components/controls";
 import { useElementWidth } from "../app/hooks";
 import "./g2/g2.css";
@@ -30,6 +30,8 @@ export default function Lifecycle() {
 
   const skus = useMemo(() => lifecycleSkus(m, filters), [m, filters]);
   const pairs = useMemo(() => handovers(m, filters, skus), [m, filters, skus]);
+  // one y-scale for every handover panel (side-by-side small multiples compare on a shared scale)
+  const handPeak = useMemo(() => Math.max(1, ...pairs.map((p) => handoverPeak(m, p))), [m, pairs]);
   const rows = useMemo(() => ganttRows(m, skus, pairs), [m, skus, pairs]);
   const gantt = useMemo(() => ganttOption(theme, m, rows, narrow), [theme, m, rows, narrow]);
 
@@ -189,7 +191,7 @@ export default function Lifecycle() {
       {pairs.length > 0 && (
         <Module
           title={render(HANDOVER_TEMPLATES.title, pairs).text}
-          dek={`Units per month, ${monthName(m.months[Math.max(0, m.asOf - 21)])} – ${monthName(m.months[m.nMonths - 1])}, every region in the filter. Click an SKU code to filter the page to it.`}
+          dek={`Units per month, ${monthName(m.months[Math.max(0, m.asOf - 21)])} – ${monthName(m.months[m.nMonths - 1])}, every region in the filter; the panels share one scale. Click an SKU code to filter the page to it.`}
           keyItems={[
             { kind: "line", color: "var(--ink)", label: "Retiring SKU, demand" },
             "sep",
@@ -197,11 +199,11 @@ export default function Lifecycle() {
             { kind: "box", color: "var(--accent)", label: "End of life" },
             { kind: "box", color: "var(--accent-tint)", label: "Successor forecast" },
           ]}
-          info={{ what: "One panel per handover: the forecast must reach zero in the end-of-life month and stay zero before launch (business rule 5).", how: "Exact sums over the SKU's series under the region, channel and customer filters. Successors do not inherit their predecessor's regions, customers or channels.", source: "history.json, forecast.json, dims.json (replaces)" }}
+          info={{ what: "One panel per handover, all on one shared scale: the retiring SKU sells its last units by its end-of-life month and nothing after it, and the successor sells nothing before launch (business rule 5).", how: "Exact sums over the SKU's series under the region, channel and customer filters. Successors do not inherit their predecessor's regions, customers or channels.", source: "history.json, forecast.json, dims.json (replaces)" }}
         >
           <div className={`g2-handovers n${Math.min(3, pairs.length)}`}>
             {pairs.map((p) => (
-              <HandoverPanel key={`${p.predId}-${p.succId}`} p={p} narrow={narrow} onPick={(k) => setFilters({ ...filters, family: m.skuFamily[k], sku: k })} />
+              <HandoverPanel key={`${p.predId}-${p.succId}`} p={p} narrow={narrow} peak={handPeak} onPick={(k) => setFilters({ ...filters, family: m.skuFamily[k], sku: k })} />
             ))}
           </div>
         </Module>
@@ -247,9 +249,9 @@ export default function Lifecycle() {
   );
 }
 
-function HandoverPanel({ p, narrow, onPick }: { p: Handover; narrow: boolean; onPick: (k: number) => void }) {
+function HandoverPanel({ p, narrow, peak, onPick }: { p: Handover; narrow: boolean; peak: number; onPick: (k: number) => void }) {
   const { m, theme } = useApp();
-  const opt = useMemo(() => handoverOption(theme, m, p, narrow), [theme, m, p, narrow]);
+  const opt = useMemo(() => handoverOption(theme, m, p, narrow, peak), [theme, m, p, narrow, peak]);
   return (
     <div className="g2-hand">
       <h3>

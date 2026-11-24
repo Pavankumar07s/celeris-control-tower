@@ -7,11 +7,14 @@
 //  -> safety stock by SKU (ledger, drill to a SKU) -> method colophon.
 // In-view state lives in the URL hash: sl=<service level> lt=<lead time in months>.
 import { useMemo } from "react";
+import { useResource } from "../data/load";
+import type { BacktestFile } from "../data/types";
+import { calibration } from "../insights/accuracy";
 import type { EChartsCoreOption } from "echarts/core";
 import { useApp } from "../app/context";
 import { useSelection, useMedia } from "../app/hooks";
 import { EChart } from "../charts/EChart";
-import { axisTooltip, BAR_MAX, baseOption, barStyle, categoryAxis, FONT, gridStd, niceMax, ttEnd, ttHead, ttNote, ttRow, valueAxis } from "../charts/theme";
+import { axisTooltip, BAR_MAX, baseOption, barStyle, categoryAxis, FONT, fz, gridStd, niceMax, ttEnd, ttHead, ttNote, ttRow, valueAxis } from "../charts/theme";
 import { Button, Segmented, Stepper } from "../components/controls";
 import { HeroFigure, Ladder, Lede } from "../components/Figure";
 import { Module } from "../components/Module";
@@ -32,12 +35,14 @@ export default function Procurement() {
   const lt = Number(params.get("lt"));
   const L = Number.isInteger(lt) && lt >= 1 && lt <= LEAD_MAX ? lt : 3;
   const label = level.label;
-  // calibration behind every buffer: share of backtest monthly actuals at or below the series P90 (meta.uncertainty)
+  // calibration behind every buffer: the share of backtest monthly series actuals at or below their P90, the
+  // same leave-one-origin-out count the Forecast & accuracy view prints ("10.2% above P90"); rounded first,
+  // then subtracted, so the two views' figures add to 100%
+  const bt = useResource<BacktestFile>("backtest.json");
   const p90Held = useMemo(() => {
-    const cov = (m.meta.uncertainty as { coverage?: { monthly?: { series?: { above_p90?: number } } } }).coverage;
-    const above = cov?.monthly?.series?.above_p90;
-    return typeof above === "number" ? 1 - above : null;
-  }, [m]);
+    const row = bt.data ? calibration(bt.data)?.rows.find((r) => r.level === "series") : undefined;
+    return row && Number.isFinite(row.above) ? (1000 - Math.round(row.above * 1000)) / 1000 : null;
+  }, [bt.data]);
   const setLevel = (v: string) => setParam({ sl: v === "0.9" ? null : v }, true);
   const setLead = (v: number) => setParam({ lt: v === 3 ? null : String(v) }, true);
 
@@ -46,8 +51,10 @@ export default function Procurement() {
   const headline = render(PLAN_TEMPLATES.headline, facts).text;
   const standfirst = render(PLAN_TEMPLATES.standfirst, facts).text;
   const tot = plan.tot;
-  const fv = (v: number) => (usd ? fmtMoney(v) : fmtNum(v));
-  const fvu = (v: number) => (usd ? fmtMoney(v) : `${fmtNum(v)} units`);
+  // safety-stock money with one decimal on $M ("$56.2M"), the same precision in every sentence of the view
+  const money = (v: number) => fmtMoney(v, 1);
+  const fv = (v: number) => (usd ? money(v) : fmtNum(v));
+  const fvu = (v: number) => (usd ? money(v) : `${fmtNum(v)} units`);
   const has = tot.meanU > 0;
   const winSpan = `${monthName(m.months[m.w0])} – ${monthName(m.months[m.nMonths - 1])}`;
 
@@ -74,7 +81,7 @@ export default function Procurement() {
     return {
       ...baseOption(t),
       grid,
-      xAxis: categoryAxis(t, labels, { axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9, interval: narrow ? 5 : 2, formatter: (v: string) => monthName(v).replace(" 20", " ’") } }),
+      xAxis: categoryAxis(t, labels, { axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 9, interval: narrow ? 5 : 2, formatter: (v: string) => monthName(v) } }),
       yAxis: valueAxis(t, { max: yMax, usd }),
       tooltip: axisTooltip(t, (items) => {
         const k = items[0]?.dataIndex ?? 0;
@@ -109,7 +116,7 @@ export default function Procurement() {
           type: "bar",
           stack: "q",
           barMaxWidth: BAR_MAX,
-          data: bufV.map((v, k) => ({ value: v, label: { show: k === peak && v > 0, position: "top", distance: 5, color: t.ink2, fontFamily: FONT, fontSize: 11.5, fontWeight: 600, formatter: () => fv(tops[k]) } })),
+          data: bufV.map((v, k) => ({ value: v, label: { show: k === peak && v > 0, position: "top", distance: 5, color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), fontWeight: 600, formatter: () => fv(tops[k]) } })),
           itemStyle: barStyle(t.accent),
           z: 3,
         },
@@ -124,16 +131,16 @@ export default function Procurement() {
     const pct = plan.curve.map((c) => (c.naive.d > 0 ? (c.naive.d - c.buf.d) / c.naive.d : 0));
     return { pooled, naive, pct };
   }, [plan, usd]);
-  const curveTitle = render(CURVE_TEMPLATES.title, { label, pct: curve.pct }).text;
+  const curveTitle = render(CURVE_TEMPLATES.title, { label, pct: curve.pct, L }).text;
   const curveOpt = useMemo<EChartsCoreOption>(() => {
     const xs = plan.curve.map((c) => (c.L === 1 ? "1 month" : `${c.L} months`));
     const { pooled, naive, pct } = curve;
     const yMax = niceMax(Math.max(1, ...naive, ...pooled) * 1.12);
-    const end = { show: true, color: t.ink2, fontFamily: FONT, fontSize: 11.5, distance: 8 };
+    const end = { show: true, color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), distance: 8 };
     return {
       ...baseOption(t),
       grid: { left: narrow ? 40 : 46, right: narrow ? 78 : 96, top: 24, bottom: 30 },
-      xAxis: categoryAxis(t, xs, { boundaryGap: false, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9, interval: 0, formatter: (v: string) => `${v.split(" ")[0]} mo` } }),
+      xAxis: categoryAxis(t, xs, { boundaryGap: false, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 9, interval: 0, formatter: (v: string) => `${v.split(" ")[0]} mo` } }),
       yAxis: valueAxis(t, { max: yMax, usd }),
       tooltip: axisTooltip(t, (items) => {
         const k = items[0]?.dataIndex ?? 0;
@@ -156,7 +163,7 @@ export default function Procurement() {
             value: v,
             symbolSize: k + 1 === L ? 12 : 7,
             itemStyle: k + 1 === L ? { color: t.orange, borderColor: t.paper, borderWidth: 2 } : { color: t.accent, borderColor: t.paper, borderWidth: 1.5 },
-            label: { show: k + 1 === L && k > 0, position: "bottom", distance: 9, color: t.ink, fontFamily: FONT, fontSize: 11.5, fontWeight: 600, formatter: () => `saves ${fv(naive[k] - pooled[k])}` },
+            label: { show: k + 1 === L && k > 0, position: "bottom", distance: 9, color: t.ink, fontFamily: FONT, fontSize: fz(11.5), fontWeight: 600, formatter: () => `saves ${fv(naive[k] - pooled[k])}` },
           })),
           lineStyle: { color: t.accent, width: 2 },
           endLabel: { ...end, formatter: "Pooled" },
@@ -183,7 +190,7 @@ export default function Procurement() {
     { key: "reg", label: "Regions", value: (r) => r.regions, num: true },
     { key: "mean", label: `Mean, ${L} mo`, value: (r) => Math.round(r.meanU), render: (r) => fmtInt(r.meanU), num: true },
     { key: "bufU", label: "Buffer, units", value: (r) => Math.round(r.bufU), render: (r) => fmtInt(r.bufU), num: true },
-    { key: "bufD", label: "Buffer value", value: (r) => Math.round(r.bufD), render: (r) => <InlineBar value={r.bufD} max={maxD} label={fmtMoney(r.bufD)} lead={r === plan.skus[0]} width={72} />, num: true, fc: true },
+    { key: "bufD", label: "Buffer value", value: (r) => Math.round(r.bufD), render: (r) => <InlineBar value={r.bufD} max={maxD} label={money(r.bufD)} lead={r === plan.skus[0]} width={72} />, num: true, fc: true },
     { key: "pct", label: "Buffer / mean", value: (r) => (r.meanU > 0 ? Math.round((r.bufU / r.meanU) * 1000) / 1000 : null), render: (r) => (r.meanU > 0 ? fmtPct(r.bufU / r.meanU) : "–"), num: true },
   ];
 
@@ -204,22 +211,29 @@ export default function Procurement() {
         figure={
           <HeroFigure
             label={`Safety stock, ${L === 1 ? monthName(m.months[m.w0]) : monthSpan(m.months[m.w0], m.months[m.w0 + L - 1])}`}
-            value={fmtMoney(tot.bufD)}
+            value={usd ? money(tot.bufD) : fmtNum(tot.bufU)}
+            unit={usd ? undefined : "units"}
             visual={
               has && L > 1 ? (
                 <Ladder
                   rows={[
-                    { label: `Summed monthly ${label}s`, value: tot.naiveD },
-                    { label: `${label} of the ${L}-month total`, value: tot.bufD, me: true },
+                    { label: `Summed monthly ${label}s`, value: usd ? tot.naiveD : tot.naiveU },
+                    { label: `${label} of the ${L}-month total`, value: usd ? tot.bufD : tot.bufU, me: true },
                   ]}
-                  max={Math.max(tot.naiveD, tot.bufD) * 1.04}
-                  format={(v) => fmtMoney(v)}
+                  max={(usd ? Math.max(tot.naiveD, tot.bufD) : Math.max(tot.naiveU, tot.bufU)) * 1.04}
+                  format={(v) => (usd ? money(v) : fmtNum(v))}
                 />
               ) : undefined
             }
-            context={has ? `**${fmtNum(tot.bufU)} units** above a ${fmtNum(tot.meanU)}-unit mean, ${fmtPct(tot.meanU > 0 ? tot.bufU / tot.meanU : 0)} on top; at forecast prices` : "Nothing to cover in this selection."}
+            context={
+              has
+                ? usd
+                  ? `**${fmtNum(tot.bufU)} units** above a ${fmtNum(tot.meanU)}-unit mean, ${fmtPct(tot.meanU > 0 ? tot.bufU / tot.meanU : 0)} on top; at forecast prices`
+                  : `above a ${fmtNum(tot.meanU)}-unit mean, ${fmtPct(tot.meanU > 0 ? tot.bufU / tot.meanU : 0)} on top; worth **${money(tot.bufD)}** at forecast prices`
+                : "Nothing to cover in this selection."
+            }
             info={{
-              what: `The value of the safety stock the first order needs: for each SKU, the ${label} of its demand over ${L === 1 ? "the first forecast month" : `the first ${L} forecast months`} minus the mean, at forecast prices, summed over SKUs. The ladder compares it with stacking the monthly ${label} buffers.`,
+              what: `The safety stock the first order needs${usd ? ", at forecast prices" : ", in units"}: for each SKU, the ${label} of its demand over ${L === 1 ? "the first forecast month" : `the first ${L} forecast months`} minus the mean, summed over SKUs. The ladder compares it with stacking the monthly ${label} buffers. The Units / USD switch in the masthead changes the measure.`,
               how: "Each SKU pools the regions of the selection into one stock; SKUs are never pooled with each other. Quantiles come from the contract's lognormal aggregate: means and shared errors are summed before the quantile.",
               source: "forecast.json",
             }}
@@ -251,7 +265,7 @@ export default function Procurement() {
               how: "Buffer = quantile − mean of each SKU's month, from the contract's lognormal aggregate; summed over SKUs because parts cannot stand in for each other.",
               source: "forecast.json",
             }}
-            foot={`Gross requirements only: no inventory positions are provided. The forecast starts after the last actual, ${monthName(m.months[m.asOf])}${p90Held !== null ? `; in the backtest ${fmtPct(p90Held)} of monthly series actuals stayed at or below their P90 (target 90%)` : ""}.`}
+            foot={`Gross requirements only: no inventory positions are provided. The forecast starts after the last actual, ${monthName(m.months[m.asOf])}${p90Held !== null ? `; in the backtest (each origin scored out of sample) ${fmtPct(p90Held)} of monthly series actuals stayed at or below their P90 (target 90%)` : ""}.`}
           >
             <EChart option={monthlyOpt} height={H1} ariaLabel={`${monthlyTitle}. Mean demand in light orange and the buffer to ${label} in orange on top, per month, ${winSpan}.`} />
           </Module>

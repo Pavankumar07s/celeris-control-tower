@@ -2,12 +2,108 @@
 // machine (a forecast made at a past origin against what happened).  Built on the shared helpers in
 // charts/theme.ts; colours are theme roles only (ink = past, orange = our forecast, dashed = another forecast).
 import type { EChartsCoreOption } from "echarts/core";
-import { FONT, axisTick, axisTooltip, baseOption, categoryAxis, niceMax, onFill, scaleLegend, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, valueAxis, type Theme, type TooltipItem } from "../../charts/theme";
+import { FONT, fz, fpx, axisTick, axisTooltip, baseOption, categoryAxis, niceMax, scaleLegend, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, valueAxis, type Theme, type TooltipItem } from "../../charts/theme";
 import type { Model } from "../../data/model";
 import { fmtInt, fmtMoney, fmtPct, monthLong, monthName, fmtSignedPct } from "../../data/format";
 import type { HorizonData } from "../../insights/accuracy";
 
-const endLab = (t: Theme, text: string, strong = false) => ({ show: true, formatter: text, color: strong ? t.ink : t.ink3, fontFamily: FONT, fontSize: 11.5, fontWeight: strong ? 600 : 400, distance: 6 });
+// ---- colour helpers: label text that stays readable on any heatmap cell, in both themes ------------------------
+function rgb(c: string): [number, number, number] | null {
+  const h = c.trim().match(/^#([0-9a-f]{6})$/i);
+  if (h) return [0, 2, 4].map((i) => parseInt(h[1].slice(i, i + 2), 16)) as [number, number, number];
+  const m = c.match(/rgba?\(([^)]+)\)/i);
+  if (m) {
+    const p = m[1].split(",").map((x) => parseFloat(x));
+    return [p[0], p[1], p[2]];
+  }
+  return null;
+}
+const lum = (c: [number, number, number]) => {
+  const ch = (v: number) => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2]);
+};
+const contrast = (a: [number, number, number], b: [number, number, number]) => {
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+/** WCAG contrast ratio between two colours (hex or rgb()); 1 when either cannot be parsed. */
+export function contrastOf(a: string, b: string): number {
+  const x = rgb(a);
+  const y = rgb(b);
+  return x && y ? contrast(x, y) : 1;
+}
+/** The theme's ink or paper, whichever reads better on `fill` (computed WCAG contrast, both themes). */
+export function readableOn(t: Theme, fill: string): string {
+  const f = rgb(fill);
+  const ink = rgb(t.ink);
+  const paper = rgb(t.paper);
+  if (!f || !ink || !paper) return t.ink;
+  return contrast(f, ink) >= contrast(f, paper) ? t.ink : t.paper;
+}
+/** The colour of a continuous ramp at x in [0, 1], interpolated in RGB like the ECharts visualMap legend. */
+export function rampAt(stops: string[], x: number): string {
+  const v = Math.max(0, Math.min(1, x)) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(v));
+  const a = rgb(stops[i]);
+  const b = rgb(stops[i + 1]);
+  if (!a || !b) return stops[Math.round(v)];
+  const k = v - i;
+  const c = a.map((p, j) => Math.round(p + (b[j] - p) * k));
+  return `#${c.map((p) => p.toString(16).padStart(2, "0")).join("")}`;
+}
+
+// ---- end labels that never overlap: a custom series that lays them out in pixels at render time ---------------
+export interface EndLabel {
+  /** x as a category index, y as a data value (the line's last point). */
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  strong?: boolean;
+}
+/** End labels placed right of each line's last point, spread to at least `gap` px apart (scaled with the type)
+ *  with a short leader when a label had to move.  Add it as the LAST series; tooltips should skip its index. */
+export function endLabelSeries(t: Theme, items: EndLabel[], gap = 15) {
+  const size = fz(11.5);
+  const minGap = Math.max(gap * (size / 11.5), size + 3);
+  return {
+    type: "custom" as const,
+    name: "__end-labels",
+    silent: true,
+    z: 20,
+    clip: false,
+    tooltip: { show: false },
+    data: [[0, items[0]?.y ?? 0]],
+    renderItem: (params: { coordSys: { x: number; y: number; width: number; height: number } }, api: { coord: (v: [number, number]) => number[] }) => {
+      const cs = params.coordSys;
+      const pts = items
+        .filter((it) => Number.isFinite(it.y))
+        .map((it) => {
+          const p = api.coord([it.x, it.y]);
+          return { ...it, px: p[0], py: p[1], ly: p[1] };
+        })
+        .sort((a, b) => a.py - b.py);
+      // push down, then pull back inside the plot from the bottom, keeping the minimum gap
+      for (let i = 1; i < pts.length; i++) if (pts[i].ly - pts[i - 1].ly < minGap) pts[i].ly = pts[i - 1].ly + minGap;
+      const bottom = cs.y + cs.height + size / 2;
+      if (pts.length && pts[pts.length - 1].ly > bottom) {
+        pts[pts.length - 1].ly = bottom;
+        for (let i = pts.length - 2; i >= 0; i--) if (pts[i + 1].ly - pts[i].ly < minGap) pts[i].ly = pts[i + 1].ly - minGap;
+      }
+      const children: unknown[] = [];
+      for (const p of pts) {
+        const moved = Math.abs(p.ly - p.py) > 2;
+        const tx = p.px + (moved ? 14 : 7);
+        if (moved) children.push({ type: "line", shape: { x1: p.px + 3, y1: p.py, x2: p.px + 11, y2: p.ly }, style: { stroke: t.ink3, lineWidth: 1 } });
+        children.push({ type: "text", x: tx, y: p.ly, style: { text: p.text, fill: p.strong ? t.ink : t.ink3, font: `${p.strong ? 600 : 400} ${size}px ${FONT}`, align: "left", verticalAlign: "middle" } });
+      }
+      return { type: "group", children };
+    },
+  };
+}
 
 /** WAPE by horizon: our model in orange with an end label, benchmarks dashed (another forecast), the
  *  in-hindsight floor as a thin ink hairline.  End labels replace the legend (<= 4 lines). */
@@ -24,14 +120,24 @@ export function horizonOption(t: Theme, h: HorizonData, final: string, labels: R
     oracle: { color: t.ink, width: 1, dash: false, z: 2 },
     [final]: { color: t.accent, width: 2, dash: false, z: 5 },
   };
+  // end labels: the last scored point of each line, laid out without overlap
+  const ends: EndLabel[] = order
+    .map((md): EndLabel | null => {
+      const d = src[md] ?? [];
+      let i = d.length - 1;
+      while (i >= 0 && (d[i] === null || !Number.isFinite(d[i] as number))) i--;
+      return i >= 0 ? { x: i, y: d[i] as number, text: labels[md] ?? md, color: style[md].color, strong: md === final } : null;
+    })
+    .filter((e): e is EndLabel => e !== null);
   return {
     ...baseOption(t),
-    grid: { left: 40, right: narrow ? 104 : 112, top: 18, bottom: 34 },
-    xAxis: categoryAxis(t, h.xs, { name: h.fine ? "months ahead" : "months ahead (bucket)", nameLocation: "middle", nameGap: 26, nameTextStyle: { color: t.ink3, fontSize: 11.5, fontFamily: FONT }, boundaryGap: !h.fine, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9, interval: h.fine ? (i: number) => i === 0 || i === 5 || i === 11 || i === h.xs.length - 1 : 0 } }),
+    grid: { left: fpx(40), right: fpx(narrow ? 104 : 118), top: 18, bottom: 34 },
+    xAxis: categoryAxis(t, h.xs, { name: h.fine ? "months ahead" : "months ahead (bucket)", nameLocation: "middle", nameGap: 26, nameTextStyle: { color: t.ink3, fontSize: fz(11.5), fontFamily: FONT }, boundaryGap: !h.fine, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 9, interval: h.fine ? (i: number) => i === 0 || i === 5 || i === 11 || i === h.xs.length - 1 : 0 } }),
     yAxis: isBias ? { ...valueAxis(t, { max, min: -max, percent: true }), splitNumber: 4 } : valueAxis(t, { max, percent: true }),
     tooltip: axisTooltip(t, (items: TooltipItem[]) => {
       const head = ttHead(h.fine ? `${items[0]?.axisValue} month${items[0]?.axisValue === "1" ? "" : "s"} ahead` : `${items[0]?.axisValue} months ahead`, isBias ? "bias" : "WAPE");
-      const rows = [...items]
+      const rows = items
+        .filter((it) => it.seriesIndex < order.length)
         .sort((a, b) => Number(a.value ?? 0) - Number(b.value ?? 0))
         .map((it) => {
           const md = order[it.seriesIndex];
@@ -41,7 +147,7 @@ export function horizonOption(t: Theme, h: HorizonData, final: string, labels: R
         .join("");
       return head + rows + ttEnd();
     }),
-    series: order.map((md, i) => ({
+    series: [...order.map((md, i) => ({
       name: labels[md] ?? md,
       type: "line",
       data: src[md],
@@ -52,10 +158,8 @@ export function horizonOption(t: Theme, h: HorizonData, final: string, labels: R
       connectNulls: false,
       lineStyle: { width: style[md].width, color: style[md].color, type: style[md].dash ? [4, 3] : "solid" },
       itemStyle: { color: style[md].color, borderColor: t.paper, borderWidth: 2 },
-      endLabel: endLab(t, labels[md] ?? md, md === final),
-      labelLayout: { moveOverlap: "shiftY" },
       z: style[md].z,
-    })),
+    })), endLabelSeries(t, ends)],
   } as EChartsCoreOption;
 }
 
@@ -74,23 +178,21 @@ export function biasOption(t: Theme, m: Model, cells: { fam: number; reg: number
   const regs = m.dims.regions;
   const absMax = Math.max(0.02, ...cells.map((c) => Math.abs(c.bias ?? 0)));
   const lim = Math.ceil(absMax * 100 / 2) * 2 / 100; // round up to an even percentage
-  const color = (b: number) => {
-    const k = Math.max(0, Math.min(8, Math.round(((b + lim) / (2 * lim)) * 8)));
-    return t.diverging[k];
-  };
+  // the cell's colour exactly as the continuous legend paints it, so the label colour is chosen on the real fill
+  const color = (b: number) => rampAt(t.diverging, (b + lim) / (2 * lim));
   const data = cells.map((c) => {
     const on = (sel.fam === null || sel.fam === c.fam) && (sel.reg === null || sel.reg === c.reg) && (sel.fam !== null || sel.reg !== null);
     return {
       value: [c.reg, c.fam, c.bias],
       itemStyle: { borderColor: on ? t.ink : t.paper, borderWidth: on ? 2 : 2 },
-      label: { color: c.bias === null ? t.ink3 : onFill(t, color(c.bias)) },
+      label: { color: c.bias === null ? t.ink3 : readableOn(t, color(c.bias)) },
     };
   });
   return {
     ...baseOption(t),
     grid: { left: narrow ? 44 : 168, right: 8, top: 4, bottom: narrow ? 64 : 82 },
-    xAxis: { ...categoryAxis(t, regs.map((r) => (narrow ? (CODE_REGION[r] ?? r) : (SHORT_REGION[r] ?? r)))), axisLine: { show: false }, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, interval: 0, lineHeight: 14, margin: 8 } },
-    yAxis: { ...categoryAxis(t, narrow ? m.dims.families.code : fams), inverse: true, axisLine: { show: false }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: 12, margin: 10 } },
+    xAxis: { ...categoryAxis(t, regs.map((r) => (narrow ? (CODE_REGION[r] ?? r) : (SHORT_REGION[r] ?? r)))), axisLine: { show: false }, axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), interval: 0, lineHeight: 14, margin: 8 } },
+    yAxis: { ...categoryAxis(t, narrow ? m.dims.families.code : fams), inverse: true, axisLine: { show: false }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: fz(12), margin: 10 } },
     visualMap: { ...scaleLegend(t, { min: -lim, max: lim, colors: t.diverging, format: (v) => fmtSignedPct(v, 0), low: narrow ? "under" : "under-forecast", high: narrow ? "over" : "over-forecast" }), bottom: 0, itemHeight: narrow ? 120 : 180 },
     tooltip: {
       ...tooltipStyle(t),
@@ -105,7 +207,7 @@ export function biasOption(t: Theme, m: Model, cells: { fam: number; reg: number
       {
         type: "heatmap",
         data,
-        label: { show: true, fontFamily: FONT, fontSize: 11.5, formatter: (p: { value: (number | null)[] }) => (p.value[2] === null ? "–" : fmtSignedPct(p.value[2] as number, Math.abs(p.value[2] as number) < 0.095 ? 1 : 0)) },
+        label: { show: true, fontFamily: FONT, fontSize: fz(11.5), formatter: (p: { value: (number | null)[] }) => (p.value[2] === null ? "–" : fmtSignedPct(p.value[2] as number, Math.abs(p.value[2] as number) < 0.095 ? 1 : 0)) },
         emphasis: { itemStyle: { borderColor: t.ink, borderWidth: 2 } },
       },
     ],
@@ -141,9 +243,9 @@ export function timeMachineOption(
     grid: a.narrow ? { left: 34, right: 16, top: 48, bottom: 30 } : { left: 46, right: 40, top: 48, bottom: 30 },
     xAxis: categoryAxis(t, labels, {
       boundaryGap: false,
-      axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, margin: 9, interval: (i: number) => i % 6 === 0, formatter: (v: string) => monthName(v).replace(" 20", " ’") },
+      axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), margin: 9, interval: (i: number) => i % (a.narrow ? 12 : 6) === 0, formatter: (v: string) => monthName(v) },
     }),
-    yAxis: { ...valueAxis(t, { max: yMax, usd: a.usd }), axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, formatter: (v: number) => axisTick(v, a.usd) } },
+    yAxis: { ...valueAxis(t, { max: yMax, usd: a.usd }), axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), formatter: (v: number) => axisTick(v, a.usd) } },
     tooltip: axisTooltip(t, (items: TooltipItem[]) => {
       const i = start + (items[0]?.dataIndex ?? 0);
       const h = i - a.origin;
@@ -171,7 +273,7 @@ export function timeMachineOption(
           silent: true,
           symbol: ["none", "none"],
           lineStyle: { color: t.ink, width: 1, type: "solid" },
-          label: { show: true, position: "end", formatter: `${monthName(m.months[a.origin])}\nforecast made`, color: t.ink2, fontFamily: FONT, fontSize: 11.5, lineHeight: 15 },
+          label: { show: true, position: "end", formatter: `${monthName(m.months[a.origin])}\nforecast made`, color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), lineHeight: 15 },
           data: [{ xAxis: div }],
         },
       },

@@ -60,6 +60,12 @@ export function filtersFrom(m: Model, p: URLSearchParams): Filters {
   };
 }
 
+/** Filter values in the hash that match nothing in the bundle (a mistyped or stale link), e.g. ["fam=XXX"]. */
+export function unknownFilterValues(m: Model, p: URLSearchParams): string[] {
+  const lists: [string, string[]][] = [["fam", m.dims.families.code], ["sku", m.dims.skus.id], ["reg", m.dims.regions], ["ch", m.dims.channels], ["cust", m.dims.customers]];
+  return lists.filter(([k, list]) => p.get(k) !== null && !list.includes(p.get(k) as string)).map(([k]) => `${k}=${p.get(k)}`);
+}
+
 export function filterPatch(m: Model, f: Filters): Record<string, string | null> {
   return {
     fam: f.family === null ? null : m.dims.families.code[f.family],

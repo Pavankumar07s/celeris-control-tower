@@ -10,8 +10,8 @@ import type { EChartsCoreOption } from "echarts/core";
 import { useApp } from "../app/context";
 import { useSelection, useElementWidth } from "../app/hooks";
 import { EChart } from "../charts/EChart";
-import { eventTitle, laneEvents, timelineAnnotations, type TimelineModel, type TimelineSpec } from "../charts/timeline";
-import { BAR_MAX, FONT, baseOption, categoryAxis, niceMax, scaleLegend, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, valueAxis, type Theme } from "../charts/theme";
+import { eventTitle, laneEvents, timelineAnnotations, type TimelineModel, type TimelineSpec, markPresence } from "../charts/timeline";
+import { BAR_MAX, FONT, fz, baseOption, categoryAxis, niceMax, scaleLegend, tooltipStyle, ttEnd, ttHead, ttNote, ttRow, valueAxis, type Theme } from "../charts/theme";
 import { Tabs } from "../components/controls";
 import { HeroFigure, Lede } from "../components/Figure";
 import { Key, Module, timelineKey } from "../components/Module";
@@ -24,7 +24,7 @@ import type { Filters, Model } from "../data/model";
 import type { StockoutFile } from "../data/types";
 import { cap, renderFirst, render, selectionWords } from "../insights/headlines";
 import { filterPatch } from "../state/url";
-import { STOCKOUT_HEADLINES, STOCKOUT_TEMPLATES, breakdownTitle, stockoutFacts, type Share, type StockoutFacts } from "../insights/stockouts";
+import { STOCKOUT_HEADLINES, STOCKOUT_TEMPLATES, breakdownTitle, roundParts, stockoutFacts, type Share, type StockoutFacts } from "../insights/stockouts";
 import { SplitBar } from "./g1/parts";
 import { TimelineChart } from "../charts/TimelineChart";
 import "./g1/g1.css";
@@ -142,21 +142,21 @@ export default function Stockouts() {
         }
       />
 
-      <Module
-        title={tTitle}
-        dek={tDek}
-        info={{
-          what: "The selection's history: cleaned shipments against unconstrained demand, the basis of the forecast (business rule 7). The gap between them is the demand that stock-outs hid.",
-          how: "Demand = Requested_Units on listed stock-outs, imputed on unlisted semiconductor months and hidden stock-outs; the back-order catch-up is removed from the following month. ERP blanks of unknown size are kept out of the gap.",
-          source: "history.json, dims.json (events)",
-        }}
-      >
-        <Key items={timelineKey({ fc: false, rebuilt: false, columns: single !== null })} />
-        {f.demand > 0 ? <TimelineChart spec={spec} annotate={annotate} height={single !== null ? 300 : 330} ariaLabel={`${tTitle}. ${tDek}`} /> : <Empty title="No history for this selection">Clear the customer filter to widen the view.</Empty>}
-      </Module>
+      <MonthlyModule m={m} theme={theme} so={S} keep={keep} constraintAt={constraintAt} lead />
 
       <div className="cols-7-5">
-        <MonthlyModule m={m} theme={theme} so={S} keep={keep} constraintAt={constraintAt} />
+        <Module
+          title={tTitle}
+          dek={tDek}
+          info={{
+            what: "Context for the bars above: the selection's history, cleaned shipments against unconstrained demand, the basis of the forecast (business rule 7). The gap between them is the demand that stock-outs hid; at this scale it is thin except in the worst months.",
+            how: "Demand = Requested_Units on listed stock-outs, imputed on unlisted semiconductor months and hidden stock-outs; the back-order catch-up is removed from the following month. ERP blanks of unknown size are kept out of the gap.",
+            source: "history.json, dims.json (events)",
+          }}
+        >
+          <Key items={timelineKey({ fc: false, rebuilt: false, columns: single !== null, present: markPresence(spec) })} />
+          {f.demand > 0 ? <TimelineChart spec={spec} annotate={annotate} height={single !== null ? 240 : 250} ariaLabel={`${tTitle}. ${tDek}`} /> : <Empty title="No history for this selection">Clear the customer filter to widen the view.</Empty>}
+        </Module>
         <BreakdownModule f={f} by={by} onBy={(v) => setParam({ by: v === "year" ? null : v }, true)} />
       </div>
 
@@ -171,7 +171,7 @@ export default function Stockouts() {
 }
 
 // ---- lost and back-ordered by month ---------------------------------------------------------------------------------
-function MonthlyModule({ m, theme: t, so, keep, constraintAt }: { m: Model; theme: Theme; so: StockoutFile; keep: number[]; constraintAt: (t: number) => string | null }) {
+function MonthlyModule({ m, theme: t, so, keep, constraintAt, lead }: { m: Model; theme: Theme; so: StockoutFile; keep: number[]; constraintAt: (t: number) => string | null; lead?: boolean }) {
   const n = m.asOf + 1;
   const { lost, bo, peak } = useMemo(() => {
     const c = so.cells;
@@ -191,7 +191,7 @@ function MonthlyModule({ m, theme: t, so, keep, constraintAt }: { m: Model; them
     () => ({
       ...baseOption(t),
       grid: { left: 46, right: 16, top: 26, bottom: 30 },
-      xAxis: categoryAxis(t, labels, { axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, interval: (_: number, v: string) => v.endsWith("-01"), formatter: (v: string) => v.slice(0, 4) } }),
+      xAxis: categoryAxis(t, labels, { axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), interval: (_: number, v: string) => v.endsWith("-01"), formatter: (v: string) => v.slice(0, 4) } }),
       yAxis: valueAxis(t, { max: niceMax(maxV * 1.12 || 1) }),
       tooltip: {
         trigger: "axis",
@@ -208,7 +208,7 @@ function MonthlyModule({ m, theme: t, so, keep, constraintAt }: { m: Model; them
           name: "Lost",
           type: "bar",
           stack: "s",
-          data: Array.from(lost, (v, k) => (v <= 0 ? null : k === peak ? { value: v, label: { show: true, position: "top", formatter: `${monthName(labels[k])}: ${fmtInt(v)} lost`, color: t.ink, fontFamily: FONT, fontSize: 11.5, fontWeight: 600, distance: 4 } } : v)),
+          data: Array.from(lost, (v, k) => (v <= 0 ? null : k === peak ? { value: v, label: { show: true, position: "top", formatter: `${monthName(labels[k])}: ${fmtInt(v)} lost`, color: t.ink, fontFamily: FONT, fontSize: fz(11.5), fontWeight: 600, distance: 4 } } : v)),
           barMaxWidth: BAR_MAX,
           barCategoryGap: "18%",
           itemStyle: { color: t.lossFill, borderColor: t.loss, borderWidth: 1 },
@@ -233,7 +233,7 @@ function MonthlyModule({ m, theme: t, so, keep, constraintAt }: { m: Model; them
           { kind: "box", color: "var(--hist-4)", label: "Back-ordered, shipped next month" },
         ]}
       />
-      {total > 0 || maxV > 0 ? <EChart option={option} height={270} ariaLabel={`${title}. Lost and back-ordered units by month.`} /> : <Empty title="No stock-out in this selection">Shipments met demand in every month.</Empty>}
+      {total > 0 || maxV > 0 ? <EChart option={option} height={lead ? 320 : 270} ariaLabel={`${title}. Lost and back-ordered units by month.`} /> : <Empty title="No stock-out in this selection">Shipments met demand in every month.</Empty>}
     </Module>
   );
 }
@@ -243,6 +243,11 @@ function BreakdownModule({ f, by, onBy }: { f: StockoutFacts; by: By; onBy: (v: 
   const rows: Share[] = by === "year" ? f.byYear : by === "family" ? f.byFamily : by === "region" ? f.byRegion : f.byReason;
   const leader = rows.reduce<Share | null>((a, r) => (!a || r.v > a.v ? r : a), null);
   const usd = f.measure === "usd";
+  // printed rows add up to the printed total: whole units (largest remainder), or USD at the hero's one
+  // decimal of $M when every row is printed in millions; otherwise a rounding note
+  const exact = !usd || rows.every((r) => r.v === 0 || r.v >= 1e6);
+  const alloc = exact ? roundParts(rows.map((x) => x.v), usd ? 1e5 : 1) : null;
+  const shown = new Map(rows.map((r, k) => [r, alloc ? alloc[k] : r.v]));
   return (
     <Module
       title={breakdownTitle(f, rows, by)}
@@ -259,10 +264,15 @@ function BreakdownModule({ f, by, onBy }: { f: StockoutFacts; by: By; onBy: (v: 
           cols={[
             { key: "l", label: BY_WORD[by], kind: "label", value: (r) => (by === "reason" ? cap(r.label) : r.label), width: by === "reason" ? "44%" : "36%" },
             { key: "b", label: "Lost", kind: "bar" },
-            { key: "v", label: usd ? "USD" : "Units", kind: "num", value: (r) => (usd ? fmtMoney(r.v, 2) : fmtInt(r.v)), width: "17%" },
+            { key: "v", label: usd ? "USD" : "Units", kind: "num", value: (r) => (usd ? fmtMoney(shown.get(r) ?? r.v, 1) : fmtInt(shown.get(r) ?? r.v)), width: "17%" },
             { key: "p", label: "Share", kind: "num", value: (r) => (f.lost > 0 ? fmtPct(r.v / f.lost, 0) : "–"), width: "13%" },
           ]}
         />
+      ) : null}
+      {f.lost > 0 ? (
+        <p className="bt-note">
+          {exact ? `Rows are rounded so that they add up to the ${usd ? fmtMoney(f.lost, 1) : `${fmtInt(f.lost)} units`} above; shares are rounded on their own.` : "Rows are rounded separately, so they may not add up to the total exactly."}
+        </p>
       ) : (
         <p className="state">No unit of this selection was lost.</p>
       )}
@@ -324,8 +334,8 @@ function HeatModule({ m, theme: t, so, keep, segs, filters, events }: { m: Model
     return {
       ...baseOption(t),
       grid: { left: 4, right: 14, top: marks.length ? 26 : 8, bottom: 62, containLabel: true },
-      xAxis: categoryAxis(t, labels, { axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, interval: (_: number, v: string) => v.endsWith("-01") && (!narrow || Number(v.slice(0, 4)) % 2 === 1), formatter: (v: string) => v.slice(0, 4) } }),
-      yAxis: { type: "category", data: model.present.map((r) => shortLabels[r]), inverse: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: 11.5, width: narrow ? 96 : 170, overflow: "truncate" }, splitLine: { show: false } },
+      xAxis: categoryAxis(t, labels, { axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), interval: (_: number, v: string) => v.endsWith("-01") && (!narrow || Number(v.slice(0, 4)) % 2 === 1), formatter: (v: string) => v.slice(0, 4) } }),
+      yAxis: { type: "category", data: model.present.map((r) => shortLabels[r]), inverse: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), width: narrow ? 96 : 170, overflow: "truncate" }, splitLine: { show: false } },
       visualMap: { ...scaleLegend(t, { min: 0, max, colors: [t.hist[1], t.hist[3], t.hist[5], t.hist[6]], format: (v) => fmtPct(v, 0), high: narrow ? "short" : "of the month's demand short", low: "" }), dimension: 2, itemHeight: narrow ? 120 : 160 },
       tooltip: {
         trigger: "item",
@@ -341,7 +351,7 @@ function HeatModule({ m, theme: t, so, keep, segs, filters, events }: { m: Model
           markArea: {
             silent: true,
             itemStyle: { color: "rgba(0,0,0,0)", borderColor: t.ink3, borderWidth: 1 },
-            label: { show: true, position: "top", color: t.ink, fontFamily: FONT, fontSize: 12, fontWeight: 600, distance: 4 },
+            label: { show: true, position: "top", color: t.ink, fontFamily: FONT, fontSize: fz(12), fontWeight: 600, distance: 4 },
             data: marks.map((x) => [{ xAxis: labels[x.a], name: `${x.title}, ${monthSpan(labels[x.a], labels[x.b])}` }, { xAxis: labels[x.b] }]),
           },
         },
@@ -395,6 +405,9 @@ function MechanicsModule({ so, keepListed }: { so: StockoutFile; keepListed: num
   const se = byClass.get("semiconductor");
   const shares = rows.map((r) => r.share).filter(Number.isFinite);
   const top = rows.filter((r) => Number.isFinite(r.share)).sort((a, b) => b.share - a.share)[0];
+  // the one ink bar goes to a reason that leads at the printed precision; a tie at the top marks none
+  const pct0 = (v: number) => Math.round(v * 100);
+  const soleTop = top && rows.filter((r) => Number.isFinite(r.share) && pct0(r.share) === pct0(top.share)).length === 1 ? top : null;
   const title =
     op && se && Number.isFinite(op.share) && Number.isFinite(se.share)
       ? `Operational stock-outs back-order ${fmtPct(op.share, 0)} of the shortfall; semiconductor allocation ${fmtPct(se.share, 0)}`
@@ -414,7 +427,7 @@ function MechanicsModule({ so, keepListed }: { so: StockoutFile; keepListed: num
           ariaLabel="Back-order mechanics by reason"
           rows={rows}
           rowKey={(r) => r.label}
-          bar={{ value: (r) => (Number.isFinite(r.share) ? r.share : 0), tone: "history", leader: (r) => rows.every((x) => (Number.isFinite(x.share) ? x.share : 0) <= (Number.isFinite(r.share) ? r.share : 0)), max: 1 }}
+          bar={{ value: (r) => (Number.isFinite(r.share) ? r.share : 0), tone: "history", leader: (r) => r === soleTop, max: 1 }}
           cols={[
             { key: "l", label: "Reason", kind: "label", value: (r) => r.label, width: "36%" },
             { key: "n", label: "Rows short", kind: "num", value: (r) => fmtInt(r.n), width: "13%", hideNarrow: true },
@@ -468,11 +481,15 @@ function TopSeriesModule({ m, so, keep, f, usd, onOpen }: { m: Model; so: Stocko
   );
 }
 
+// value, then a fixed 56px track whose bar grows from the track's left edge, so every row's bar starts at
+// the same baseline (a bar flush against a right-aligned number grew leftwards from a ragged start)
 function IBar({ v, max, text }: { v: number; max: number; text: string }) {
   return (
     <span className="ibar loss">
       <span>{text}</span>
-      <i style={{ width: Math.max(1, (v / (max || 1)) * 56) }} aria-hidden="true" />
+      <span style={{ display: "inline-flex", width: "calc(56 * var(--u, 1px))", flex: "none" }} aria-hidden="true">
+        <i style={{ width: `${Math.max(2, (v / (max || 1)) * 100)}%` }} />
+      </span>
     </span>
   );
 }

@@ -9,8 +9,8 @@ import type { EChartsCoreOption } from "echarts/core";
 import { useApp } from "../app/context";
 import { useSelection } from "../app/hooks";
 import { EChart } from "../charts/EChart";
-import { eventTitle, laneEvents, rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec } from "../charts/timeline";
-import { FONT, baseOption, categoryAxis, tooltipStyle, ttEnd, ttHead, ttRow, type Theme } from "../charts/theme";
+import { eventTitle, laneEvents, rangePresets, rangeStart, timelineAnnotations, type RangePreset, type TimelineModel, type TimelineSpec, markPresence } from "../charts/timeline";
+import { FONT, fz, baseOption, categoryAxis, tooltipStyle, ttEnd, ttHead, ttRow, type Theme } from "../charts/theme";
 import { MoreLink, RangePresets, Segmented, StatusPill } from "../components/controls";
 import { Delta, HeroFigure, Lede, Rich } from "../components/Figure";
 import { Search } from "../components/icons";
@@ -24,7 +24,7 @@ import { historyPrice, seriesMatches, type Filters, type Model } from "../data/m
 import type { ExceptionFile, ForecastDetail, ProfilesFile } from "../data/types";
 import { exceptionRowsIn } from "../insights/briefing";
 import { cap, countWord, fractionWord, plural, render, renderFirst, selectionWords } from "../insights/headlines";
-import { CYCLE_KIND, EXPLORER_HEADLINES, EXPLORER_TEMPLATES, SEASON_TEMPLATES, cycleWords, explorerFacts, noHistoryWords, seasonFacts, zeroStats, type ExplorerFacts, type SeasonFacts, type ZeroStats } from "../insights/explorer";
+import { EXPLORER_HEADLINES, EXPLORER_TEMPLATES, SEASON_TEMPLATES, cycleWords, explorerFacts, noHistoryWords, seasonFacts, zeroStats, type ExplorerFacts, type SeasonFacts, type ZeroStats } from "../insights/explorer";
 import { SplitBar } from "./g1/parts";
 import "./g1/g1.css";
 import { TimelineChart } from "../charts/TimelineChart";
@@ -145,7 +145,8 @@ export default function Explorer() {
         demand: demandArr,
         fc: fcArr,
         z,
-        lastOrder: (pv("last_order_month") as string | null) ?? (single !== null ? m.dims.series.lost_since[single] : null),
+        // the LAST ORDER month: the profile's, else the month before the series went silent (lost_since is the first silent month)
+        lastOrder: (pv("last_order_month") as string | null) ?? (single !== null && m.dims.series.lost_since[single] ? m.months[Math.max(0, m.months.indexOf(m.dims.series.lost_since[single] as string) - 1)] ?? null : null),
         cycleBefore: pv("cycle_pattern_before") as string | null,
         cycleChange: pv("cycle_change_month") as string | null,
         eventTitleAt: disruptionAt,
@@ -232,7 +233,7 @@ export default function Explorer() {
             <RangePresets value={range} options={rangePresets(m)} onChange={(v) => setParam({ tl: v === (single !== null ? "recent" : "all") ? null : v }, true)} />
             <Segmented size="sm" ariaLabel="Continue into the forecast" value={withForecast ? "fc" : "hist"} onChange={(v) => setParam({ fc: v === "fc" ? null : "0" }, true)} options={[{ value: "fc", label: "With forecast" }, { value: "hist", label: "History only" }]} />
           </div>
-          <Key items={timelineKey({ latent, fc: withForecast, columns: single !== null, rebuilt: !latent, lost: !latent })} />
+          <Key items={timelineKey({ latent, fc: withForecast, columns: single !== null, rebuilt: !latent, lost: !latent, present: markPresence(spec) })} />
           {latent && withForecast && detail.loading ? (
             <Notice tone="info">Loading latent demand for the forecast window…</Notice>
           ) : facts.cells === 0 && !(withForecast && facts.next12 > 0) ? (
@@ -273,17 +274,36 @@ function CycleStrip({ m, s, z }: { m: Model; s: number; z: ZeroStats }) {
         ))}
       </div>
       <span className="cap">
-        {code ? `${CYCLE_KIND[code[0]] ?? code}, cycle ${code}` : "No ordering cycle yet"}
+        {code ? <span title={`Cycle code ${code}`}>{cap(cycleWords(code))}</span> : "No ordering cycle yet"}
       </span>
     </div>
   );
 }
 
-const KIND_ORDER = ["M", "A", "B", "Q", "T", "unknown"];
+/** The ordering cycles of the series in view, folded to four classes (monthly with or without one shutdown
+ *  month; two months in three; every second month; quarterly), under a caption that names what is counted:
+ *  series, not the units of the figure above it. */
+const KIND_FOLD: { label: string; kinds: string[]; color: string }[] = [
+  { label: "Monthly", kinds: ["M", "A"], color: "var(--hist-7)" },
+  { label: "Two months in three", kinds: ["T"], color: "var(--hist-5)" },
+  { label: "Every second month", kinds: ["B"], color: "var(--hist-4)" },
+  { label: "Quarterly", kinds: ["Q"], color: "var(--hist-3)" },
+];
 function CycleMix({ facts }: { facts: ExplorerFacts }) {
-  const shades = ["var(--hist-7)", "var(--hist-6)", "var(--hist-5)", "var(--hist-4)", "var(--hist-3)", "var(--hist-2)"];
-  const parts = KIND_ORDER.filter((k) => facts.kinds[k]).map((k) => ({ value: facts.kinds[k], color: shades[KIND_ORDER.indexOf(k)], label: CYCLE_KIND[k] ?? k, text: fmtInt(facts.kinds[k]) }));
-  return <SplitBar parts={parts} ariaLabel={`Ordering cycles of the ${fmtInt(facts.nSeries)} series: ${parts.map((p) => `${p.label} ${p.text}`).join(", ")}`} />;
+  const parts = KIND_FOLD.map((g) => ({ value: g.kinds.reduce((a, k) => a + (facts.kinds[k] ?? 0), 0), color: g.color, label: g.label }))
+    .filter((p) => p.value > 0)
+    .map((p) => ({ ...p, text: fmtInt(p.value) }));
+  const none = facts.kinds.unknown ?? 0;
+  const counted = parts.reduce((a, p) => a + p.value, 0);
+  return (
+    <div className="g1-cyclemix">
+      <span className="cap">
+        How the <b>{fmtInt(facts.nSeries)}</b> series in view order (series counts, by ordering cycle)
+      </span>
+      <SplitBar parts={parts} ariaLabel={`Ordering cycles of the ${fmtInt(counted)} series with history: ${parts.map((p) => `${p.label} ${p.text}`).join(", ")}`} />
+      {none > 0 && <span className="cap">and {fmtInt(none)} with no history yet</span>}
+    </div>
+  );
 }
 
 // ---- navigator ---------------------------------------------------------------------------------------------------
@@ -307,7 +327,7 @@ function NavigatorModule({ m, filters, nav, usd, setFilters }: { m: Model; filte
           ? `${nav.nodes[0].label} is the only customer of this series`
           : "No customer has bought this series yet"
       : top && nav.total > 0 && nav.nodes.length > 1
-        ? `${top.label} leads with ${fmtPct(top.vol / nav.total, 0)} of the last 12 months`
+        ? `${top.label} leads with ${fmtPct(top.vol / nav.total, 1)} of the last 12 months`
         : `${cap(many)} in this selection`;
   return (
     <Module
@@ -387,8 +407,13 @@ function NavigatorModule({ m, filters, nav, usd, setFilters }: { m: Model; filte
 // ---- seasonality ---------------------------------------------------------------------------------------------------
 function seasonOption(s: SeasonFacts, t: Theme): EChartsCoreOption {
   const all = [...s.years.flatMap((y) => y.idx), ...s.avg];
-  const lo = Math.max(0, Math.floor(Math.min(...all, 1) * 10 - 0.5) / 10);
-  const hi = Math.ceil(Math.max(...all, 1) * 10 + 0.5) / 10;
+  // round ticks: snap the axis ends to a step from 0.1 / 0.2 / 0.5 / 1 that gives at most five intervals,
+  // so ECharts never prints an unrounded extreme as an extra, colliding tick
+  const dataLo = Math.min(...all, 1);
+  const dataHi = Math.max(...all, 1);
+  const step = [0.1, 0.2, 0.5, 1, 2].find((st) => Math.ceil(dataHi / st) - Math.floor(dataLo / st) <= 5) ?? 2;
+  const lo = Math.max(0, Math.floor(dataLo / step - 1e-9) * step);
+  const hi = Math.ceil(dataHi / step + 1e-9) * step;
   const latest = s.years[s.years.length - 1];
   // the two end labels (latest year, average) sit apart when their values are close
   const close = latest && Math.abs(latest.idx[11] - s.avg[11]) < (hi - lo) * 0.09;
@@ -397,15 +422,15 @@ function seasonOption(s: SeasonFacts, t: Theme): EChartsCoreOption {
   return {
     ...baseOption(t),
     grid: { left: 34, right: 62, top: 14, bottom: 28 },
-    xAxis: categoryAxis(t, MONTHS_SHORT, { axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, interval: (i: number) => i % 3 === 0, formatter: (v: string) => v } }),
+    xAxis: categoryAxis(t, MONTHS_SHORT, { axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), interval: (i: number) => i % 3 === 0, formatter: (v: string) => v } }),
     yAxis: {
       type: "value",
       min: lo,
       max: hi,
-      splitNumber: 4,
+      interval: step,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: 11.5, formatter: (v: number) => `${v.toFixed(1)}×` },
+      axisLabel: { color: t.ink3, fontFamily: FONT, fontSize: fz(11.5), formatter: (v: number) => `${v.toFixed(step < 1 ? 1 : 0)}×` },
       splitLine: { lineStyle: { color: t.grid, width: 1, type: "solid" } },
     },
     tooltip: {
@@ -415,14 +440,14 @@ function seasonOption(s: SeasonFacts, t: Theme): EChartsCoreOption {
       formatter: (p: { dataIndex: number }[]) => {
         const i = p[0]?.dataIndex ?? 0;
         const vals = s.years.map((y) => y.idx[i]);
-        return `${ttHead(MONTHS_SHORT[i], "index")}${latest ? ttRow(t.ink, String(latest.y), `${latest.idx[i].toFixed(2)}×`) : ""}${ttRow(t.ink3, "average", `${s.avg[i].toFixed(2)}×`, true)}${ttRow(t.ink4, `range of ${s.years.length} years`, `${Math.min(...vals).toFixed(2)}–${Math.max(...vals).toFixed(2)}×`)}${ttEnd()}`;
+        return `${ttHead(MONTHS_SHORT[i], "index")}${latest ? ttRow(t.ink, String(latest.y), `${latest.idx[i].toFixed(2)}×`) : ""}${ttRow(t.ink3, "average", `${s.avg[i].toFixed(2)}×`)}${ttRow(t.ink4, `range of ${s.years.length} years`, `${Math.min(...vals).toFixed(2)}–${Math.max(...vals).toFixed(2)}×`)}${ttEnd()}`;
       },
     },
     series: [
       { name: "base", type: "line", data: MONTHS_SHORT.map(() => 1), symbol: "none", silent: true, lineStyle: { color: t.ruleStrong, width: 1 }, z: 1 },
       ...s.years.slice(0, -1).map((y) => ({ name: String(y.y), type: "line", data: y.idx, symbol: "none", silent: true, lineStyle: { color: t.ink4, width: 1 }, z: 2 })),
-      { name: "Average", type: "line", data: s.avg, symbol: "none", lineStyle: { color: t.ink3, width: 1.5, type: [4, 3] }, z: 3, endLabel: { show: true, formatter: "Average", color: t.ink2, fontFamily: FONT, fontSize: 11.5, distance: 6, offset: off(!up) } },
-      ...(latest ? [{ name: String(latest.y), type: "line", data: latest.idx, symbol: "none", lineStyle: { color: t.ink, width: 2, join: "round" }, z: 4, endLabel: { show: true, formatter: String(latest.y), color: t.ink, fontFamily: FONT, fontSize: 11.5, fontWeight: 600, distance: 6, offset: off(!!up) } }] : []),
+      { name: "Average", type: "line", data: s.avg, symbol: "none", lineStyle: { color: t.ink3, width: 1.5, type: "solid" }, z: 3, endLabel: { show: true, formatter: "Average", color: t.ink2, fontFamily: FONT, fontSize: fz(11.5), distance: 6, offset: off(!up) } },
+      ...(latest ? [{ name: String(latest.y), type: "line", data: latest.idx, symbol: "none", lineStyle: { color: t.ink, width: 2, join: "round" }, z: 4, endLabel: { show: true, formatter: String(latest.y), color: t.ink, fontFamily: FONT, fontSize: fz(11.5), fontWeight: 600, distance: 6, offset: off(!!up) } }] : []),
     ],
   } as EChartsCoreOption;
 }
@@ -537,7 +562,7 @@ function ZeroModule({ m, facts, z, single, segs, onCell }: { m: Model; facts: Ex
               <i className="sched" /> Every zero scheduled
             </span>
             <span>
-              <i className="unexp" style={{ fontSize: 10, fontWeight: 600 }}>
+              <i className="unexp" style={{ fontSize: fz(10), fontWeight: 600 }}>
                 n
               </i>{" "}
               Zeros on an order month
@@ -648,24 +673,27 @@ function SeriesCard({ m, s, prof, loading, facts }: { m: Model; s: number; prof:
         <dt>Ordering cycle</dt>
         <dd>
           {cap(cycleWords(m.dims.series.cycle[s]))}
-          <span className="sub">
-            Cycle {m.dims.series.cycle[s] ?? "–"}
-            {v("cycle_pattern_before") ? `; was ${String(v("cycle_pattern_before"))} until ${monthName(String(v("cycle_change_month")))}` : ""}
-          </span>
+          {v("cycle_pattern_before") ? (
+            <span className="sub" title={`Cycle code ${m.dims.series.cycle[s] ?? "–"}, was ${String(v("cycle_pattern_before"))}`}>
+              Until {monthName(String(v("cycle_change_month")))}: {cycleWords(String(v("cycle_pattern_before")))}
+            </span>
+          ) : null}
         </dd>
         {p && (
           <>
             <dt>Demand</dt>
             <dd>
-              {fmt1(Number(v("level_last12")))} units a month over the last 12
+              {fmt1(Number(v("level_last12")))} units a month on average over the last 12
               <span className="sub">
-                {fmtInt(Number(v("n_orders")))} orders, {fmt1(Number(v("mean_order")))} units each; ADI {Number(v("sbc_adi")).toFixed(2)}, CV² {Number(v("sbc_cv2")).toFixed(2)}
+                <span title={`Syntetos–Boylan: ADI ${Number(v("sbc_adi")).toFixed(2)} (average months between orders), CV² ${Number(v("sbc_cv2")).toFixed(2)} (variation of order size)`}>
+                  {fmtInt(Number(v("n_orders")))} orders, {fmtInt(Number(v("mean_order")))} units each on average; {Number(v("sbc_adi")) <= 1.05 ? "an order every month" : `an order every ${fmt1(Number(v("sbc_adi")))} months`}
+                </span>
               </span>
             </dd>
             <dt>Stock-outs</dt>
             <dd>
               {Number(v("n_stockout_listed")) + Number(v("n_stockout_inferred")) > 0 ? `${fmtInt(Number(v("n_stockout_listed")))} listed, ${fmtInt(Number(v("n_stockout_inferred")))} inferred` : "None"}
-              {Number(v("lost_units")) > 0 && <span className="sub">{fmt1(Number(v("lost_units")))} units lost</span>}
+              {Number(v("lost_units")) > 0 && <span className="sub">{fmtInt(Number(v("lost_units")))} units lost</span>}
             </dd>
             <dt>Cleaning</dt>
             <dd>
@@ -681,7 +709,10 @@ function SeriesCard({ m, s, prof, loading, facts }: { m: Model; s: number; prof:
             <dt>Account</dt>
             <dd>
               <StatusPill tone="crit">Lost</StatusPill>
-              <span className="sub">No order since {facts.lastOrder ? monthName(facts.lastOrder) : "–"}; the forecast is zero</span>
+              <span className="sub">
+                Last order {facts.lastOrder ? monthName(facts.lastOrder) : "–"}
+                {facts.silent ? `; silent ${fmtInt(facts.silent)} ${plural(facts.silent, "month")}` : ""}; the forecast is zero
+              </span>
             </dd>
           </>
         )}

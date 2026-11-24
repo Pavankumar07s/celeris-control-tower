@@ -2,7 +2,7 @@
 // in orange for forecast or ink for history, the rest tinted) and the LEDGER (DataTable) for registers and
 // inboxes (sortable, paged, CSV twin, mono identifiers, 2-line clamps, inline bars).  Numbers are always
 // right-aligned with tabular numerals; rows never grow beyond about 64px.
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, Download } from "./icons";
 
 export type BarTone = "forecast" | "history" | "loss";
@@ -186,6 +186,11 @@ export interface DataTableProps<R> {
   initialSort?: { key: string; desc: boolean };
   empty?: string;
   ariaLabel?: string;
+  /** Expandable rows: a disclosure button opens a full-width detail row under the row (keyboard and touch
+   *  reach the full text that a clamped cell cuts).  `rowKey` keeps the open rows across sorting and paging. */
+  expand?: (r: R) => ReactNode;
+  expandLabel?: string;
+  rowKey?: (r: R) => string | number;
 }
 
 /** The ledger: sortable (▾ on the active column), paged, keyboard rows (Enter opens), CSV twin. */
@@ -212,12 +217,28 @@ export function DataTable<R>(props: DataTableProps<R>) {
   useEffect(() => setPage(0), [props.rows]);
   const pages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const view = sorted.slice(page * pageSize, page * pageSize + pageSize);
+  const [open, setOpen] = useState<Set<string | number>>(() => new Set());
+  const uid = useId();
+  const keyOf = (r: R, i: number) => (props.rowKey ? props.rowKey(r) : page * pageSize + i);
+  const toggle = (k: string | number) =>
+    setOpen((o) => {
+      const n = new Set(o);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
+  const nCols = props.cols.length + (props.expand ? 1 : 0);
   return (
     <div>
       <div className="table-wrap">
         <table className="ledger dt" aria-label={props.ariaLabel}>
           <thead>
             <tr>
+              {props.expand && (
+                <th scope="col" className="dt-exp">
+                  <span className="visually-hidden">Details</span>
+                </th>
+              )}
               {props.cols.map((c) => (
                 <th
                   key={c.key}
@@ -236,14 +257,37 @@ export function DataTable<R>(props: DataTableProps<R>) {
             </tr>
           </thead>
           <tbody>
-            {view.map((r, i) => (
+            {view.map((r, i) => {
+              const k = keyOf(r, i);
+              const isOpen = !!props.expand && open.has(k);
+              const detailId = `${uid}-d${String(k)}`;
+              return (
+              <Fragment key={k}>
               <tr
-                key={i}
-                className={`${props.onRow ? "clickable" : ""} ${props.selected?.(r) ? "sel" : ""}`}
+                className={`${props.onRow ? "clickable" : ""} ${props.selected?.(r) ? "sel" : ""} ${isOpen ? "open" : ""}`}
                 onClick={() => props.onRow?.(r)}
                 tabIndex={props.onRow ? 0 : undefined}
-                onKeyDown={props.onRow ? (e) => e.key === "Enter" && props.onRow?.(r) : undefined}
+                onKeyDown={props.onRow ? (e) => e.target === e.currentTarget && e.key === "Enter" && props.onRow?.(r) : undefined}
               >
+                {props.expand && (
+                  <td className="dt-exp">
+                    <button
+                      type="button"
+                      className="dt-toggle"
+                      aria-expanded={isOpen}
+                      aria-controls={isOpen ? detailId : undefined}
+                      aria-label={`${isOpen ? "Hide" : "Show"} ${props.expandLabel ?? "details"}`}
+                      title={`${isOpen ? "Hide" : "Show"} ${props.expandLabel ?? "details"}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggle(k);
+                      }}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <ChevronDown size={12} style={{ transform: isOpen ? "rotate(180deg)" : undefined }} />
+                    </button>
+                  </td>
+                )}
                 {props.cols.map((c) => {
                   const raw = c.value(r);
                   return (
@@ -253,10 +297,17 @@ export function DataTable<R>(props: DataTableProps<R>) {
                   );
                 })}
               </tr>
-            ))}
+              {isOpen && props.expand && (
+                <tr className="dt-detail" id={detailId}>
+                  <td colSpan={nCols}>{props.expand(r)}</td>
+                </tr>
+              )}
+              </Fragment>
+              );
+            })}
             {!view.length && (
               <tr>
-                <td colSpan={props.cols.length}>
+                <td colSpan={nCols}>
                   <div className="state">{props.empty ?? "Nothing matches the current filters. Widen or reset the filters above."}</div>
                 </td>
               </tr>

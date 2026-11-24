@@ -1,6 +1,6 @@
 // Floating surfaces: popover, the "i" info popover (what · how · source), drawer and toasts.
 // Only these float: they get --raised, a 1px rule border, a 10px radius and --shadow-pop.
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Close } from "./icons";
 
 /** Close on outside click and on Escape while `open`. */
@@ -97,9 +97,15 @@ export interface DrawerProps {
   width?: number;
 }
 
-/** Right-hand drawer over a 30 % paper scrim (case file, lineage).  Escape closes; focus moves inside. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Right-hand drawer over a 30 % paper scrim (case file, lineage).  A modal dialog: named by its headline,
+ *  focus moves inside on open, Tab and Shift+Tab cycle inside it (focus cannot reach the page behind the
+ *  scrim), Escape closes and focus returns to where it was.  `width` is in design px (scaled by --u on
+ *  extra-large screens); the drawer's right edge sits on the page's right edge, near the content it explains. */
 export function Drawer({ title, sub, eyebrow, onClose, children, width }: DrawerProps) {
   const ref = useRef<HTMLElement>(null);
+  const titleId = useId();
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -107,19 +113,44 @@ export function Drawer({ title, sub, eyebrow, onClose, children, width }: Drawer
     window.addEventListener("keydown", on);
     const prev = document.activeElement as HTMLElement | null;
     ref.current?.focus();
+    // keep focus inside the dialog: anything focused behind the scrim is pulled back
+    const onFocusIn = (e: FocusEvent) => {
+      const el = ref.current;
+      if (el && e.target instanceof Node && !el.contains(e.target)) el.focus();
+    };
+    document.addEventListener("focusin", onFocusIn);
     return () => {
       window.removeEventListener("keydown", on);
+      document.removeEventListener("focusin", onFocusIn);
       prev?.focus?.();
     };
   }, []);
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLElement>) => {
+    if (e.key !== "Tab" || !ref.current) return;
+    const items = Array.from(ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((x) => x.offsetParent !== null || x === document.activeElement);
+    if (!items.length) {
+      e.preventDefault();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const cur = document.activeElement;
+    if (e.shiftKey && (cur === first || cur === ref.current)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && cur === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
   return (
     <>
       <div className="drawer-back" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-modal="true" ref={ref} tabIndex={-1} style={width ? { width: `min(${width}px, 94vw)` } : undefined}>
+      <aside className="drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} tabIndex={-1} onKeyDown={onKeyDown} style={width ? ({ "--dw": width } as CSSProperties) : undefined}>
         <div className="drawer-head">
           <div>
             {eyebrow && <span className="kicker">{eyebrow}</span>}
-            <h2>{title}</h2>
+            <h2 id={titleId}>{title}</h2>
             {sub && <div className="sub">{sub}</div>}
           </div>
           <button className="icon-btn" type="button" onClick={onClose} aria-label="Close">

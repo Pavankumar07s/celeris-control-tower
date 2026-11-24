@@ -26,7 +26,19 @@ export function Masthead({ themeName, onToggleTheme }: { themeName: ThemeName; o
         <span className="view">{def.title}</span>
         <span className="sep" aria-hidden="true" />
         <span className="section">{group?.eyebrow}</span>
-        <Info what={def.blurb} how="Every figure on this page is computed in the browser from the pipeline's data bundle for the filters below; headlines and titles are deterministic templates over those figures." align="left" size="sm" label="About this view" />
+        <Info
+          what={def.blurb}
+          how={
+            <>
+              Every figure on this page is computed in the browser from the pipeline&rsquo;s data bundle for the filters below; headlines and titles are deterministic templates over those figures.
+              <br />
+              <b>Words used here.</b> <i>Orders as booked</i>: demand in the month the customer booked it. <i>Latent demand</i>: each order spread over the months it covers, so ordering-cycle zeros disappear. <i>Unconstrained demand</i>: shipments with stock-out losses added back. <i>Cycle-aware naive</i>: last year&rsquo;s demand placed on the customer&rsquo;s ordering cycle. <i>In-hindsight floor</i>: the error a forecast that knew each series&rsquo; level in hindsight would still make.
+            </>
+          }
+          align="left"
+          size="sm"
+          label="About this view and its terms"
+        />
         {m.meta.provisional && (
           <Popover
             trigger={

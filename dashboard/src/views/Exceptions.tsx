@@ -6,7 +6,7 @@
 //  -> where the risk sits (family or region x cause heat table) -> how each rule prices its risk.
 // Status and notes are kept per viewer in this browser.  In-view state lives in the URL hash:
 // cause=<rule> st=all xg=1 (cause groups) grp=<group> case=<row>|off.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../app/context";
 import { useSelection, useMedia } from "../app/hooks";
 import { LineageDrawer, decodeCell, encodeCell, type CellRef } from "../components/Lineage";
@@ -22,7 +22,7 @@ import type { ExceptionFile } from "../data/types";
 import { exceptionRowsIn } from "../insights/briefing";
 import { render, selectionWords } from "../insights/headlines";
 import { CaseFile } from "./g3/CaseFile";
-import { halfCount, inboxFacts, tidy, INBOX_TEMPLATES, LIST_TEMPLATES, rankRows, ruleMany, ruleTitle, STATUS_LABEL, STATUS_TONE, WHERE_TEMPLATES, type Status } from "../insights/inbox";
+import { halfCount, inboxFacts, reasonFull, reasonRow, tidy, INBOX_TEMPLATES, LIST_TEMPLATES, rankRows, ruleMany, ruleTitle, STATUS_LABEL, STATUS_TONE, WHERE_TEMPLATES, type Status } from "../insights/inbox";
 import "./g3/inbox.css";
 
 const STORE = "celeris-exceptions";
@@ -112,7 +112,14 @@ function Inbox({ E }: { E: ExceptionFile }) {
   );
   useEffect(() => setPage(0), [cause, grpParam, st, filters]);
   const explicit = caseParam !== null && caseParam !== "off" && Number.isInteger(Number(caseParam)) && Number(caseParam) >= 0 && Number(caseParam) < E.rule.length ? Number(caseParam) : null;
-  const open: number | null = caseParam === "off" ? null : explicit !== null ? explicit : wide ? (shown[0] ?? null) : null;
+  // A case stays open while it belongs to the list in view (the status filter may hide it after you resolve
+  // it).  A case left outside the filters, the cause tab or the group by a later change gives way to the
+  // first case in view; only a case named by the link the page was opened with stays docked outside them.
+  const deepLink = useRef(caseParam);
+  const rowSet = useMemo(() => new Set(rows), [rows]);
+  const inScope = (i: number) => rowSet.has(i) && (!cause || E.rule[i] === cause) && (!grpParam || E.group[i] === grpParam);
+  const keep = explicit !== null && (inScope(explicit) || deepLink.current === String(explicit));
+  const open: number | null = caseParam === "off" ? null : keep ? explicit : wide ? (shown[0] ?? null) : null;
   const pick = (i: number | null) => setParam({ case: i === null ? "off" : String(i) }, true);
 
   // ---- the lede
@@ -143,7 +150,7 @@ function Inbox({ E }: { E: ExceptionFile }) {
     { key: "region", label: "Region", value: (i) => where(i).region },
     { key: "first", label: "First month", value: (i) => m.months[Math.min(E.start[i], m.nMonths - 1)] },
     { key: "last", label: "Last month", value: (i) => m.months[Math.min(E.end[i], m.nMonths - 1)] },
-    { key: "cause", label: "Root cause", value: (i) => E.cause[i] },
+    { key: "cause", label: "Root cause", value: (i) => reasonFull(E, i) },
     { key: "action", label: "Recommended action", value: (i) => E.action[i] },
     { key: "units", label: "Impact units", value: (i) => E.impact_units[i] },
     { key: "usd", label: "Revenue at risk (USD)", value: (i) => Math.round(E.revenue_at_risk[i]) },
@@ -213,7 +220,8 @@ function Inbox({ E }: { E: ExceptionFile }) {
     pick(next);
   };
 
-  const ruleTabs = [{ key: "", title: "All causes", n: rows.length, usd: facts.total, resolved: byStatus.resolved }, ...rules];
+  // the tabs print each rule's amount rounded so the six add up to the "All causes" total (largest remainder)
+  const ruleTabs = [{ key: "", title: "All causes", n: rows.length, usd: facts.total, usdShown: facts.total, resolved: byStatus.resolved }, ...rules];
   const maxRule = Math.max(1e-9, ...rules.map((r) => r.usd));
 
   return (
@@ -279,7 +287,7 @@ function Inbox({ E }: { E: ExceptionFile }) {
             title={r.key ? E.rules[r.key]?.at_risk.replace(/ x /g, " × ") : "Every rule"}
           >
             <span className="nm">{r.title}</span>
-            <span className="amt">{fmtMoney(r.usd)}</span>
+            <span className="amt">{fmtMoney(r.usdShown)}</span>
             <span className="n">
               {fmtInt(r.n)} {r.n === 1 ? "case" : "cases"}
               {r.resolved > 0 ? `, ${fmtInt(r.resolved)} resolved` : ""}
@@ -393,8 +401,8 @@ function Inbox({ E }: { E: ExceptionFile }) {
                           </td>
                           <td>
                             <RuleChip title={E.rules[E.rule[i]]?.at_risk}>{ruleTitle(E, E.rule[i])}</RuleChip>
-                            <span className="why" title={tidy(E.cause[i])}>
-                              {tidy(E.cause[i].split(". ")[0])}
+                            <span className="why" title={reasonFull(E, i)}>
+                              {reasonRow(E, i)}
                             </span>
                           </td>
                           <td className="r">

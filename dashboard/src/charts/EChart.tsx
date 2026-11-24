@@ -3,7 +3,7 @@
 //  - `onLayout(chart)` fires after every setOption and resize: annotation overlays re-place themselves;
 //  - children render in an absolutely positioned layer over the canvas (the HTML annotation overlay);
 //  - keyboard: with focus, Left / Right move the axis crosshair month by month (Esc hides it).
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import * as echarts from "echarts/core";
 import { BarChart, CustomChart, HeatmapChart, LineChart, ScatterChart } from "echarts/charts";
 import {
@@ -19,6 +19,7 @@ import {
 } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 import type { EChartsCoreOption, ECharts } from "echarts/core";
+import { chartHeight } from "./theme";
 
 echarts.use([
   BarChart,
@@ -43,7 +44,12 @@ export type ChartEvent = { componentType?: string; seriesName?: string; seriesIn
 
 interface Props {
   option: EChartsCoreOption;
+  /** Design height at 1440px.  On screens wider than 1600px the chart grows (see `chartHeight`): with
+   *  `aspect` it keeps about that width:height ratio, otherwise it grows with the viewport.  `fixedHeight`
+   *  turns growth off (the caller already sized it, e.g. TimelineChart). */
   height: number;
+  aspect?: number;
+  fixedHeight?: boolean;
   onClick?: (e: ChartEvent) => void;
   /** Click anywhere in a grid: the category index of x-axis 0 under the pointer (grid `xGrid`, default 0). */
   onXClick?: (index: number) => void;
@@ -58,8 +64,10 @@ interface Props {
   children?: ReactNode;
 }
 
-export function EChart({ option, height, onClick, onXClick, xGrid = 0, ariaLabel, className, busy, onLayout, children }: Props) {
+export function EChart({ option, height, aspect, fixedHeight, onClick, onXClick, xGrid = 0, ariaLabel, className, busy, onLayout, children }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const h = fixedHeight ? height : chartHeight(height, width, aspect);
   const chart = useRef<ECharts | null>(null);
   const clickRef = useRef(onClick);
   clickRef.current = onClick;
@@ -92,6 +100,7 @@ export function EChart({ option, height, onClick, onXClick, xGrid = 0, ariaLabel
     const ro = new ResizeObserver(() => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
+        setWidth(el.clientWidth);
         c.resize();
         layoutRef.current?.(c);
       });
@@ -134,7 +143,7 @@ export function EChart({ option, height, onClick, onXClick, xGrid = 0, ariaLabel
   };
 
   return (
-    <div className={`chartbox ${className ?? ""}`} style={{ height }}>
+    <div className={`chartbox ${className ?? ""}`} style={{ height: h }}>
       <div ref={ref} className={`chart-canvas ${busy ? "busy" : ""}`} style={{ position: "absolute", inset: 0 }} role="img" aria-label={ariaLabel} tabIndex={0} onKeyDown={onKey} />
       {children}
     </div>

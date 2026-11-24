@@ -4,6 +4,7 @@
 // chart; below 640px only the zone and end labels remain and the rest become a numbered list.
 import { useEffect, useMemo, useState } from "react";
 import type { ECharts } from "echarts/core";
+import { fpx, fz } from "./theme";
 
 export interface Annotation {
   id: string;
@@ -51,12 +52,23 @@ interface Placed {
   dot?: { x: number; y: number };
 }
 
-const TITLE_FONT = '600 12.5px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif';
-const TEXT_FONT = '400 12px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif';
-const ZONE_FONT = '600 11px "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif';
-const TITLE_LH = 17;
-const TEXT_LH = 16.5;
-const MAX_W = 190;
+// Sizes follow the type scale (fz / fpx: 1 up to a 1600px viewport), the same factor as the CSS `--u` that
+// sizes the .anno text, so measured boxes match the rendered labels on extra-large screens too.
+const FAMILY = '"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif';
+let TITLE_FONT = `600 12.5px ${FAMILY}`;
+let TEXT_FONT = `400 12px ${FAMILY}`;
+let ZONE_FONT = `600 11px ${FAMILY}`;
+let TITLE_LH = 17;
+let TEXT_LH = 16.5;
+let MAX_W = 190;
+function scaleFonts() {
+  TITLE_FONT = `600 ${fz(12.5)}px ${FAMILY}`;
+  TEXT_FONT = `400 ${fz(12)}px ${FAMILY}`;
+  ZONE_FONT = `600 ${fz(11)}px ${FAMILY}`;
+  TITLE_LH = fz(17);
+  TEXT_LH = fz(16.5);
+  MAX_W = fpx(190);
+}
 const MAX_STORY = 5;
 
 let ctx: CanvasRenderingContext2D | null = null;
@@ -99,10 +111,13 @@ const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: num
 export interface LayoutResult {
   placed: Placed[];
   listed: Annotation[];
+  /** Where each listed annotation sits on the plot, so the numbered list under the chart has its numbers on the data. */
+  marks?: { n: number; x: number; y: number }[];
 }
 
 /** Place annotations on a rendered chart.  Pure apart from convertToPixel / text measurement. */
 export function layoutAnnotations(chart: ECharts, items: Annotation[], f: AnnotationFrame): LayoutResult {
+  scaleFonts();
   const W = chart.getWidth();
   const px = (i: number, v: number): [number, number] => {
     const p = chart.convertToPixel({ xAxisIndex: 0, yAxisIndex: 0 }, [i, v]) as unknown as number[];
@@ -224,7 +239,11 @@ export function layoutAnnotations(chart: ECharts, items: Annotation[], f: Annota
       story++;
     } else listed.push(a);
   }
-  return { placed, listed };
+  const marks = listed.map((a, k) => {
+    const [x, y] = px(a.at, a.value);
+    return { n: k + 1, x, y };
+  }).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  return { placed, listed, marks };
 }
 
 /** Overlay that re-lays itself whenever the chart reports a new layout (`version`) or fonts finish loading. */
@@ -239,9 +258,14 @@ export function AnnotationLayer({ chart, items, frame, version, onListed }: { ch
   }, []);
   const res = useMemo(() => (chart && frame && !chart.isDisposed() ? layoutAnnotations(chart, items, frame) : { placed: [], listed: [] }), [chart, items, frame, version, fontsReady]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => onListed?.(res.listed), [res, onListed]);
-  if (!res.placed.length) return null;
+  if (!res.placed.length && !res.marks?.length) return null;
   return (
     <div className="annos" aria-hidden="true">
+      {res.marks?.map((p) => (
+        <span key={`n-${p.n}`} className="anno-num" style={{ left: Math.round(p.x), top: Math.round(p.y) }}>
+          {p.n}
+        </span>
+      ))}
       <svg>
         {res.placed.map((p) =>
           p.leader ? <line key={`l-${p.a.id}`} x1={p.leader.x} x2={p.leader.x} y1={p.leader.y1} y2={p.leader.y2} stroke="var(--ink-3)" strokeWidth={1} shapeRendering="crispEdges" /> : null,

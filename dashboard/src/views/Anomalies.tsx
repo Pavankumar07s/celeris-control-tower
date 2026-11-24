@@ -8,7 +8,7 @@
 import { useCallback, useMemo } from "react";
 import { useApp } from "../app/context";
 import { useSelection } from "../app/hooks";
-import { anomalyAnnotations, type TimelineAnomaly, type TimelineModel, type TimelineSpec } from "../charts/timeline";
+import { anomalyAnnotations, markPresence, type TimelineAnomaly, type TimelineModel, type TimelineSpec } from "../charts/timeline";
 import { Button, MoreLink, Segmented, Select } from "../components/controls";
 import { Download } from "../components/icons";
 import { HeroFigure, Lede } from "../components/Figure";
@@ -22,6 +22,7 @@ import { filterPatch } from "../state/url";
 import type { AnomalyFile } from "../data/types";
 import { readableMonths } from "../insights/briefing";
 import { cap, render, selectionWords } from "../insights/headlines";
+import { repairFacts } from "../insights/health";
 import { ANOMALY_TEMPLATES, anomalyFacts, lab, rowsInSelection, typeLabel, type TypeRow } from "../insights/anomalies";
 import { ConfMeter, SplitBar } from "./g1/parts";
 import "./g1/g1.css";
@@ -34,7 +35,7 @@ const REAL = "var(--cat-7)";
 
 export default function Anomalies() {
   const { m, theme, filters, measure, lens, params, setParam, go } = useApp();
-  const { series, single, h } = useSelection();
+  const { series, segs, single, h } = useSelection();
   const reg = useResource<AnomalyFile>("anomalies.json");
   const usd = measure === "usd";
   const latent = lens === "latent";
@@ -50,7 +51,9 @@ export default function Anomalies() {
   const inSel = useMemo(() => (reg.data ? rowsInSelection(m, filters, reg.data, seriesSet) : []), [reg.data, m, filters, seriesSet]);
   const sel = useMemo(() => selectionWords(m, filters), [m, filters]);
   const name = single !== null ? `${m.dims.skus.id[m.sSku[single]]} in ${m.dims.regions[m.sRegion[single]]}` : sel.name;
-  const facts = useMemo(() => (reg.data ? anomalyFacts(m, reg.data, inSel, name, single !== null) : null), [reg.data, m, inSel, name, single]);
+  // units unknown: one variable with the Overview figure and Data health (history flags of the selection)
+  const unknownHist = useMemo(() => repairFacts(m, segs, "family").total.unknown, [m, segs]);
+  const facts = useMemo(() => (reg.data ? anomalyFacts(m, reg.data, inSel, name, single !== null, unknownHist) : null), [reg.data, m, inSel, name, single, unknownHist]);
   const rows = useMemo(() => {
     if (!reg.data) return [];
     const a = reg.data;
@@ -174,12 +177,12 @@ export default function Anomalies() {
                   ariaLabel={`${fmtInt(facts.realCells)} real events and ${fmtInt(facts.errCells)} data errors among ${fmtInt(facts.cells)} flagged cells`}
                   parts={[
                     { value: facts.realCells, color: REAL, label: "Real events, kept", text: fmtInt(facts.realCells), mark: "triangle" },
-                    { value: facts.errCells, color: ERR, label: "Data errors, fixed", text: fmtInt(facts.errCells), mark: "diamond" },
+                    { value: facts.errCells, color: ERR, label: "Data errors", text: fmtInt(facts.errCells), mark: "diamond" },
                   ]}
                 />
               ) : undefined
             }
-            context={facts.cells ? `of **${fmtInt(facts.cells)}** flagged cells; errors were corrected at source, real events stay in the history` : "No single cell of this selection was flagged."}
+            context={facts.cells ? `of **${fmtInt(facts.cells)}** flagged cells; errors were corrected${facts.unknownCells ? ` (or, where units stay unknown, kept out of fitting)` : ""}, real events stay in the history` : "No single cell of this selection was flagged."}
             link={{ label: "Every fix in Data health", onClick: () => go("health", { cell: null, cls: null, lvl: null, type: null, grp: null }) }}
             info={{
               what: "Cell-level flags of the anomaly register inside the selection, split into data errors (wrong or missing values, corrected) and real events (stock-outs, one-off orders, launches, holidays: kept and modelled, or masked from fitting).",
@@ -195,16 +198,16 @@ export default function Anomalies() {
         title={tTitle}
         dek={tDek}
         info={{
-          what: "The selection's history with the anomaly flags: hollow rose diamonds are data errors that were fixed, jade triangles are real events kept in the history. The three largest are labelled with their type and reason.",
+          what: "The selection's history with the anomaly flags, each drawn on its month's value: hollow rose diamonds are data errors (corrected, or kept out of fitting where units are unknown), jade triangles are real events kept in the history. The three largest are labelled with their type and reason.",
           how: "Cell-level register rows matched to the selected series (customer at the time); the register filters below apply to the marks too.",
           source: "anomalies.json, history.json",
         }}
       >
         <Key
           items={[
-            ...timelineKey({ latent, fc: false, rebuilt: false, columns: single !== null }),
+            ...timelineKey({ latent, fc: false, rebuilt: false, columns: single !== null, present: markPresence(spec) }),
             "sep",
-            { kind: "diamond", color: ERR, label: "Data error, fixed" },
+            { kind: "diamond", color: ERR, label: "Data error" },
             { kind: "triangle", color: REAL, label: "Real event, kept" },
           ]}
         />
@@ -239,9 +242,13 @@ export default function Anomalies() {
 
 // ---- flags by type: errors | real events ----------------------------------------------------------------------
 function TypesModule({ facts, type, onType, usd }: { facts: ReturnType<typeof anomalyFacts>; type: string; onType: (code: string) => void; usd: boolean }) {
+  // one series: only the types that flagged its own cells (episodes, most of them file-wide, are in the register)
+  const listOf = (rows: TypeRow[]) => (facts.single ? rows.filter((r) => r.cells > 0) : rows);
+  // ONE bar scale for both tables: side-by-side bars invite comparison, so 5,005 and 982 cells must not look equal
+  const sharedMax = Math.max(1, ...[...listOf(facts.realTypes), ...listOf(facts.errTypes)].slice(0).map((r) => r.cells));
+  const fixedCells = facts.errCells - facts.unknownCells;
   const table = (rows: TypeRow[], kind: "data_error" | "real_event") => {
-    // one series: only the types that flagged its own cells (market-wide episodes are in the register)
-    const list = facts.single ? rows.filter((r) => r.cells > 0) : rows;
+    const list = listOf(rows);
     const shown = list.slice(0, 8);
     const rest = list.slice(8);
     const restCells = rest.reduce((x, r) => x + r.cells, 0);
@@ -251,7 +258,9 @@ function TypesModule({ facts, type, onType, usd }: { facts: ReturnType<typeof an
       <div>
         <h3 className="g1-h3 g1-type" style={{ marginTop: 4 }}>
           <KeyMark kind={kind === "data_error" ? "diamond" : "triangle"} color={kind === "data_error" ? ERR : REAL} />
-          {kind === "data_error" ? `Data errors, fixed: ${fmtInt(facts.errCells)} ${facts.errCells === 1 ? "cell" : "cells"}` : `Real events, kept: ${fmtInt(facts.realCells)} ${facts.realCells === 1 ? "cell" : "cells"}`}
+          {kind === "data_error"
+            ? `Data errors: ${fmtInt(facts.errCells)} ${facts.errCells === 1 ? "cell" : "cells"}${facts.unknownCells ? `, ${fmtInt(fixedCells)} ${facts.errTypes.some((r) => r.code === "DE.MISSING_ROW" && r.cells > 0) ? "corrected or rebuilt" : "corrected"}, ${fmtInt(facts.unknownCells)} units unknown` : ", corrected"}`
+            : `Real events, kept: ${fmtInt(facts.realCells)} ${facts.realCells === 1 ? "cell" : "cells"}`}
         </h3>
         {shown.length ? (
           <BarTable<TypeRow>
@@ -260,13 +269,15 @@ function TypesModule({ facts, type, onType, usd }: { facts: ReturnType<typeof an
             rowKey={(r) => r.code}
             onRow={(r) => onType(r.code)}
             selected={(r) => r.code === type}
-            bar={{ value: (r) => r.cells, tone: "history", leader: (r) => r === shown[0] }}
+            bar={{ value: (r) => r.cells, tone: "history", leader: (r) => r === shown[0], max: sharedMax }}
             cols={[
               { key: "l", label: "Type", kind: "label", value: (r) => cap(r.label), width: "36%", title: (r) => r.code },
               { key: "b", label: "Flagged cells", kind: "bar" },
               { key: "c", label: "", kind: "num", value: (r) => fmtInt(r.cells), width: "13%" },
-              { key: "e", label: "Episodes", kind: "num", value: (r) => (r.episodes ? fmtInt(r.episodes) : "–"), width: "13%", hideNarrow: true, title: (r) => (r.episodes ? `${fmtInt(r.episodes)} episode-level flags covering ${fmtInt(r.covered)} cells` : "no episode-level flag") },
-              { key: "u", label: usd ? "|Impact|" : "|Impact|, units", kind: "num", value: (r) => (usd ? fmtMoney(r.usd, 1) : fmtInt(r.units)), width: "17%", hideNarrow: true },
+              ...(facts.single
+                ? []
+                : [{ key: "e", label: "Episodes", kind: "num" as const, value: (r: TypeRow) => (r.episodes ? fmtInt(r.episodes) : "–"), width: "13%", hideNarrow: true, title: (r: TypeRow) => (r.episodes ? `${fmtInt(r.episodes)} episode-level flags covering ${fmtInt(r.covered)} cells` : "no episode-level flag") }]),
+              { key: "u", label: usd ? "Impact" : "Impact, units", kind: "num", value: (r) => (usd ? fmtMoney(r.usd, 1) : fmtInt(r.units)), width: "17%", hideNarrow: true, title: () => "Absolute demand the flags moved, in either direction" },
             ]}
           />
         ) : (
@@ -276,7 +287,7 @@ function TypesModule({ facts, type, onType, usd }: { facts: ReturnType<typeof an
           <p className="g1-legend-line">
             <span>
               All {fmtInt(list.length)} types: <b>{fmtInt(total)}</b> flagged {total === 1 ? "cell" : "cells"}
-              {totalEp ? (
+              {totalEp && !facts.single ? (
                 <>
                   , <b>{fmtInt(totalEp)}</b> {totalEp === 1 ? "episode" : "episodes"}
                 </>
@@ -291,7 +302,7 @@ function TypesModule({ facts, type, onType, usd }: { facts: ReturnType<typeof an
   return (
     <Module
       title={render(ANOMALY_TEMPLATES.typesTitle, facts).text}
-      dek="Flags in the selection by type, ranked by flagged cells; episodes are flags on a whole block (a date format, a price change) and are counted apart. Click a type to filter the register and the marks."
+      dek={`Flags in the selection by type, ranked by flagged cells, on one shared bar scale; episodes are flags on a whole block (a date format, a price change) and are counted apart${facts.single ? " in the register" : ""}. Click a type to filter the register and the marks.`}
       info={{
         what: "Every type of flag in the register: DE = data error, RC = reference conflict (master data against transactions), RE = real event, ST = structural or lifecycle change.",
         how: "Cells per type in the selection; |impact| is the absolute demand the flag moved, in units or at invoice prices.",
@@ -437,9 +448,70 @@ function RegisterModule({ a, m, rows, inSel, cls, level, lvlDefault, type, group
       </div>
       <div style={{ marginTop: 8 }}>
         {grouped ? (
-          <DataTable rows={groups} cols={gcols} pageSize={12} initialSort={{ key: "imp", desc: true }} ariaLabel="Anomaly register grouped by cause" />
+          <DataTable
+            rows={groups}
+            cols={gcols}
+            pageSize={12}
+            initialSort={{ key: "imp", desc: true }}
+            ariaLabel="Anomaly register grouped by cause"
+            rowKey={(r) => `${r.type}|${r.cause}`}
+            expandLabel="the full reason and action"
+            expand={(r) => (
+              <dl>
+                <dt>Type</dt>
+                <dd>{cap(typeLabel(r.type))} ({r.cls === "data_error" ? "data error" : "real event"}), {r.type}</dd>
+                <dt>Reason</dt>
+                <dd>{readableMonths(r.cause)}</dd>
+                <dt>Action</dt>
+                <dd>{readableMonths(r.action)}</dd>
+                <dt>Flags · cells</dt>
+                <dd>
+                  {fmtInt(r.n)} · {fmtInt(r.cells)}
+                </dd>
+              </dl>
+            )}
+          />
         ) : (
-          <DataTable rows={rows} cols={cols} pageSize={12} onRow={onRow} initialSort={{ key: "imp", desc: true }} ariaLabel="Anomaly register" empty="No flag matches these filters. Choose All types or another class." />
+          <DataTable
+            rows={rows}
+            cols={cols}
+            pageSize={12}
+            onRow={onRow}
+            initialSort={{ key: "imp", desc: true }}
+            ariaLabel="Anomaly register"
+            empty="No flag matches these filters. Choose All types or another class."
+            rowKey={(i) => i}
+            expandLabel="the full reason and action"
+            expand={(i) => (
+              <dl>
+                <dt>Type</dt>
+                <dd>
+                  {cap(typeLabel(lab(a.type, i)))} ({lab(a.class, i) === "data_error" ? "data error" : "real event"}, {lab(a.level, i) === "cell" ? "one cell" : `episode of ${fmtInt(a.n_cells[i] ?? 0)} cells`}), {lab(a.type, i)}
+                </dd>
+                <dt>Series or scope</dt>
+                <dd>
+                  {scope(i)} · {period(i)}
+                </dd>
+                <dt>Reason</dt>
+                <dd>{readableMonths(lab(a.cause, i) ?? "–")}</dd>
+                {a.evidence[i] && (
+                  <>
+                    <dt>Evidence</dt>
+                    <dd>{readableMonths(a.evidence[i] ?? "")}</dd>
+                  </>
+                )}
+                <dt>How it was found</dt>
+                <dd>{readableMonths(lab(a.detection, i) ?? "–")}</dd>
+                <dt>Action</dt>
+                <dd>{readableMonths(lab(a.action, i) ?? "–")}</dd>
+                <dt>Confidence · impact</dt>
+                <dd>
+                  {cap(lab(a.confidence, i) ?? "–")} · {fmtImpact(impact(i))}
+                  {usd ? "" : " units"}
+                </dd>
+              </dl>
+            )}
+          />
         )}
       </div>
     </Module>

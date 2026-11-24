@@ -134,7 +134,7 @@ export const PLAN_TEMPLATES = {
     id: "procurement.headline",
     when: (f) => f.L >= 2 && f.tot.bufD > 0 && f.savingPct >= 0.005,
     text: (f) => `Pooling ${f.L} months cuts the ${f.label} safety stock by ${fmtPctAbs(f.savingPct, 0)}`,
-    fallback: (f) => (f.tot.meanU > 0 ? `A ${months(f.L)} ${f.label} cover needs ${fmtMoney(f.tot.bufD)} of safety stock` : "No forecast demand to cover in this selection"),
+    fallback: (f) => (f.tot.meanU > 0 ? `A ${months(f.L)} ${f.label} cover needs ${fmtMoney(f.tot.bufD, 1)} of safety stock` : "No forecast demand to cover in this selection"),
   },
   /** "The first order, covering November 2026 to January 2027, needs 41.2K units above a mean of 450K to
    *   reach P90 for the 520 SKUs in view; summing monthly P90s would ask for 59.8K." */
@@ -168,18 +168,24 @@ export const MONTHLY_TEMPLATES = {
 
 export interface CurveFacts {
   label: string;
-  pct: number[]; // saving share at L = 1..LEAD_MAX
+  pct: number[]; // saving share at L = 1..LEAD_MAX: 1 - pooled / summed (the headline's "cuts ... by")
+  L: number; // the lead time being planned
 }
 export const CURVE_TEMPLATES = {
-  /** "Summed monthly P90s overstate the buffer more the longer the lead time: 23% at two months, 43% at six". */
+  /** "Pooling saves more the longer the lead time: 22% at two months, 31% at three, 42% at six" — the same
+   *  saving (share of the summed monthly buffers) the headline cuts by. */
   title: {
     id: "procurement.curve",
     when: (c) => c.pct.length >= 3 && c.pct.slice(1).every((v, i) => v >= c.pct[i] - 1e-9) && c.pct[c.pct.length - 1] > 0.005,
     text: (c) => {
       const n = c.pct.length;
       const k = c.pct.findIndex((v, i) => i > 0 && v >= 0.005);
-      const last = `${fmtPctAbs(c.pct[n - 1], 0)} at ${countWord(n)} months`;
-      return `Summed monthly ${c.label}s overstate the buffer more the longer the lead time: ${k > 0 && k < n - 1 ? `${fmtPctAbs(c.pct[k], 0)} at ${countWord(k + 1)} months, ` : ""}${last}`;
+      const pts: number[] = [];
+      if (k > 0 && k < n - 1) pts.push(k);
+      if (c.L - 1 > k && c.L - 1 < n - 1) pts.push(c.L - 1);
+      pts.push(n - 1);
+      const words = pts.map((i, j) => `${fmtPctAbs(c.pct[i], 0)} at ${countWord(i + 1)}${j === 0 ? " months" : ""}`);
+      return `Pooling saves more the longer the lead time: ${words.join(", ")}`;
     },
     fallback: (c) => `Safety stock by lead time: the ${c.label} of the total against summed monthly ${c.label}s`,
   },
@@ -197,7 +203,7 @@ export const SKU_TEMPLATES = {
   title: {
     id: "procurement.skus",
     when: (s) => s.n >= 4 && s.half < s.n / 2,
-    text: (s) => `${fmtInt(s.half)} of ${fmtInt(s.n)} SKUs hold half of the ${fmtMoney(s.total)} safety stock`,
+    text: (s) => `${fmtInt(s.half)} of ${fmtInt(s.n)} SKUs hold half of the ${fmtMoney(s.total, 1)} safety stock`,
     fallback: (s) => (s.n === 0 ? "No SKU to plan in this selection" : s.oneSku ? `${s.oneSku} needs ${fmtNum(s.oneBufU)} units of safety stock for this cover` : `${countWord(s.n, true)} SKUs ranked by safety-stock value`),
   },
 } satisfies Record<string, Template<SkuFacts>>;
