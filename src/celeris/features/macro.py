@@ -94,17 +94,34 @@ def era_scale(months: np.ndarray, era_factor: float) -> np.ndarray:
     return np.where((months >= ERA_MUTED[0]) & (months <= ERA_MUTED[1]), era_factor, 1.0)
 
 
-def soft_cap(u: np.ndarray, enabled: bool = True) -> np.ndarray:
-    """Soft upward saturation of the log multiplier: slope 1 below the knee, ``SOFT_CAP_SLOPE`` above (MI.v)."""
+def soft_cap(u: np.ndarray, enabled: bool = True, smooth: float = 0.0) -> np.ndarray:
+    """Soft upward saturation of the log multiplier: slope 1 below the knee, ``SOFT_CAP_SLOPE`` above (MI.v).
+
+    ``smooth`` > 0 rounds the knee: the slope falls linearly from 1 to ``SOFT_CAP_SLOPE`` over ``knee +- smooth``
+    (at most ``smooth x (1 - SOFT_CAP_SLOPE) / 4`` from the hinge). The hinge is not differentiable, so a SKU whose
+    fitted path touches the knee never settles and keeps the backfit from converging.
+    """
+    u = np.asarray(u, dtype=float)
     if not enabled:
         return u
-    return np.where(u > SOFT_CAP_KNEE, SOFT_CAP_KNEE + SOFT_CAP_SLOPE * (u - SOFT_CAP_KNEE), u)
+    hinge = np.where(u > SOFT_CAP_KNEE, SOFT_CAP_KNEE + SOFT_CAP_SLOPE * (u - SOFT_CAP_KNEE), u)
+    if smooth <= 0:
+        return hinge
+    inside = np.abs(u - SOFT_CAP_KNEE) < smooth
+    rounded = u - (1.0 - SOFT_CAP_SLOPE) * (u - SOFT_CAP_KNEE + smooth) ** 2 / (4.0 * smooth)
+    return np.where(inside, rounded, hinge)
 
 
-def soft_cap_slope(u: np.ndarray, enabled: bool = True) -> np.ndarray:
+def soft_cap_slope(u: np.ndarray, enabled: bool = True, smooth: float = 0.0) -> np.ndarray:
+    """Derivative of ``soft_cap``."""
+    u = np.asarray(u, dtype=float)
     if not enabled:
         return np.ones_like(u)
-    return np.where(u > SOFT_CAP_KNEE, SOFT_CAP_SLOPE, 1.0)
+    hinge = np.where(u > SOFT_CAP_KNEE, SOFT_CAP_SLOPE, 1.0)
+    if smooth <= 0:
+        return hinge
+    inside = np.abs(u - SOFT_CAP_KNEE) < smooth
+    return np.where(inside, 1.0 - (1.0 - SOFT_CAP_SLOPE) * (u - SOFT_CAP_KNEE + smooth) / (2.0 * smooth), hinge)
 
 
 @dataclass(frozen=True)
@@ -122,6 +139,10 @@ class MacroConfig:
     model_sd: float = 0.03  # floor on the sd of a monthly log index (family x month residual, dossier 4.7)
     min_months: int = 18
     fixed_damping: float | None = None  # Aftermarket damping; None = estimate (dossier 9.1 #9: 0.37 vs 0.42)
+    switch_margin: float | None = None  # keep the incumbent driver set unless a new one is better by this (None: off)
+    cap_iter: int = 2  # Gauss-Newton steps of the soft-capped SKU fit
+    cap_line_search: bool = False  # step halving so that no Gauss-Newton step raises a SKU's loss
+    cap_smooth: float = 0.0  # half-width of the rounded soft-cap knee (0: hinge)
 
 
 @dataclass(frozen=True)
@@ -182,9 +203,8 @@ def _design(macro: MacroData, months: np.ndarray, indicators: tuple[str, ...], l
     return np.stack(cols, axis=1) if cols else np.zeros((len(months), 0))
 
 
-def select_drivers(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig) -> Drivers:
-    """Forward selection of up to ``max_drivers`` indicators (economic sign) at their best lag 0..6 (family stage)."""
-    era = era_scale(months, config.era_factor)
+def _forward_selection(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig, era: np.ndarray) -> tuple[list[str], list[int], list[float]]:
+    """Greedy forward selection: indicators, MAP lags and the RSS gain of each added driver."""
     chosen: list[str] = []
     lags: list[int] = []
     gains: list[float] = []
@@ -207,6 +227,39 @@ def select_drivers(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: Macr
         rss = best[0]
         chosen.append(best[1])
         lags.append(best[2])
+    return chosen, lags, gains
+
+
+def _penalised_rss(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig, era: np.ndarray, names: tuple[str, ...], lags: tuple[int, ...]) -> float:
+    """``RSS + min_gain x k`` of a driver set (the forward selection's own criterion); inf if a sign is wrong."""
+    beta, rss = _wls(r, w, _design(macro, months, names, lags, era))
+    if names and np.any(beta * np.array([SIGN[n] for n in names]) <= 0):
+        return float("inf")
+    return rss + config.min_gain * len(names)
+
+
+def _sequential_gains(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, era: np.ndarray, names: tuple[str, ...], lags: tuple[int, ...]) -> list[float]:
+    """RSS gain of each driver of a set when added in the set's order (reporting)."""
+    rss = [_wls(r, w, _design(macro, months, names[:k], lags[:k], era))[1] for k in range(len(names) + 1)]
+    return [round(rss[k] - rss[k + 1], 2) for k in range(len(names))]
+
+
+def select_drivers(r: np.ndarray, w: np.ndarray, months: np.ndarray, macro: MacroData, config: MacroConfig, incumbent: Drivers | None = None) -> Drivers:
+    """Forward selection of up to ``max_drivers`` indicators (economic sign) at their best lag 0..6 (family stage).
+
+    With ``config.switch_margin`` and an ``incumbent`` (the set selected at the previous backfit iteration), the
+    incumbent is kept unless the new selection lowers the penalised RSS by more than the margin. Forward selection is
+    discontinuous: when two sets are nearly tied, each choice moves the levels and factors enough to favour the other
+    one at the next iteration and the backfit cycles (Precision Machined Parts at 2025-03: gains 158.38 vs 157.99).
+    """
+    era = era_scale(months, config.era_factor)
+    chosen, lags, gains = _forward_selection(r, w, months, macro, config, era)
+    if config.switch_margin is not None and incumbent is not None and (tuple(chosen), tuple(lags)) != (incumbent.indicators, incumbent.lags):
+        new = _penalised_rss(r, w, months, macro, config, era, tuple(chosen), tuple(lags))
+        old = _penalised_rss(r, w, months, macro, config, era, incumbent.indicators, incumbent.lags)
+        if old - new <= config.switch_margin:
+            chosen, lags = list(incumbent.indicators), list(incumbent.lags)
+            gains = _sequential_gains(r, w, months, macro, era, incumbent.indicators, incumbent.lags)
     posterior = np.zeros((len(chosen), MAX_LAG + 1))
     for k, name in enumerate(chosen):
         profile = np.empty(MAX_LAG + 1)
@@ -248,7 +301,7 @@ class SkuPaths:
 
     def log_multiplier(self, sku_rows: np.ndarray, aftermarket: np.ndarray, macro: MacroData) -> np.ndarray:
         """(n, 113) log macro multiplier for series with SKU row ``sku_rows`` (-1 = family prior handled upstream)."""
-        capped = soft_cap(self.u[sku_rows], self.config.soft_cap)
+        capped = soft_cap(self.u[sku_rows], self.config.soft_cap, self.config.cap_smooth)
         fuel = macro.lagged(FUEL_LAG)[:, INDICATORS.index("fuel")]
         am = self.damping * capped + self.fuel * fuel[None, :]
         return np.where(np.asarray(aftermarket)[:, None], am, capped)
@@ -263,13 +316,16 @@ def fit_sku_paths(
     am_index: GroupIndex,
     macro: MacroData,
     config: MacroConfig,
+    incumbent: dict[str, Drivers] | None = None,
 ) -> SkuPaths:
-    """Steps 1-3 of the module docstring. Index arrays cover months ``0..T-1`` (T = as_of + 1)."""
+    """Steps 1-3 of the module docstring. Index arrays cover months ``0..T-1`` (T = as_of + 1). ``incumbent``: the
+    family driver sets of the previous backfit iteration (see ``select_drivers``)."""
     n_months = sku_index.observed.shape[1]
     months = np.arange(n_months)
     era = era_scale(months, config.era_factor)
     r_f, w_f = _weights(family_index, config)
-    drivers = {name: select_drivers(r_f[k], w_f[k], months, macro, config) for k, name in enumerate(family_names)}
+    previous = incumbent or {}
+    drivers = {name: select_drivers(r_f[k], w_f[k], months, macro, config, previous.get(name)) for k, name in enumerate(family_names)}
     r_s, w_s = _weights(sku_index, config)
     n_sku = len(sku_names)
     posterior = np.zeros((n_sku, 3, MAX_LAG + 1))
@@ -301,14 +357,7 @@ def fit_sku_paths(
         signs = np.array([SIGN[n] for n in d.indicators])
         b = np.where(b * signs > 0, b, 0.0)
         if config.soft_cap:
-            full_x = x
-            for _ in range(2):
-                u = np.einsum("ntj,nj->nt", full_x, b)
-                slope = soft_cap_slope(u)
-                offset = soft_cap(u) - slope * u
-                jac = full_x * slope[:, :, None]
-                b = _batched_ridge(r - offset, w, jac, d.coef, config.prior_sd)
-                b = np.where(b * signs > 0, b, 0.0)
+            b = _soft_cap_fit(r, w, x, b, d.coef, config.prior_sd, signs, config.cap_iter, config.cap_line_search, config.cap_smooth)
         b[~enough] = d.coef
         posterior[rows, :k] = post
         coef[rows, :k] = b
@@ -345,6 +394,54 @@ def _batched_single_rss(r: np.ndarray, w: np.ndarray, x: np.ndarray) -> np.ndarr
     return (w * (rc - beta[:, None] * xc) ** 2).sum(axis=1)
 
 
+def _cap_loss(r: np.ndarray, w: np.ndarray, x: np.ndarray, b: np.ndarray, prior: np.ndarray, prior_sd: float, smooth: float = 0.0) -> np.ndarray:
+    """Per row: weighted RSS of ``r ~ a + soft_cap(x b)`` (intercept profiled) plus the Gaussian prior penalty."""
+    resid = r - soft_cap(np.einsum("ntj,nj->nt", x, b), smooth=smooth)
+    sw = np.maximum(w.sum(axis=1), 1e-12)
+    resid = resid - ((w * resid).sum(axis=1) / sw)[:, None]
+    return (w * resid**2).sum(axis=1) + ((b - prior[None, :]) ** 2).sum(axis=1) / prior_sd**2
+
+
+def _soft_cap_fit(
+    r: np.ndarray, w: np.ndarray, x: np.ndarray, b: np.ndarray, prior: np.ndarray, prior_sd: float, signs: np.ndarray, n_iter: int,
+    line_search: bool = True, smooth: float = 0.0,
+) -> np.ndarray:
+    """Penalised least squares of the soft-capped path by projected Gauss-Newton with step halving.
+
+    Each step linearises the cap at the current path and solves the ridge problem (signs clipped to the economic
+    sign); a row moves only if its loss does not increase, halving the step up to five times. Plain Gauss-Newton
+    can alternate between two linearisations for a SKU whose path crosses the knee, and inside the backfit that
+    alternation becomes a cycle (CSS-015, ELA-039, BSS-077 at 2022-10).
+    """
+    loss = _cap_loss(r, w, x, b, prior, prior_sd, smooth) if line_search else np.zeros(len(b))
+    for _ in range(n_iter):
+        u = np.einsum("ntj,nj->nt", x, b)
+        slope = soft_cap_slope(u, smooth=smooth)
+        target = _batched_ridge(r - (soft_cap(u, smooth=smooth) - slope * u), w, x * slope[:, :, None], prior, prior_sd)
+        target = np.where(target * signs > 0, target, 0.0)
+        if not line_search:
+            b = target
+            continue
+        step = target - b
+        new_b, new_loss = b.copy(), loss.copy()
+        pending = np.ones(len(b), dtype=bool)
+        for _ in range(6):
+            trial = b[pending] + step[pending]
+            trial_loss = _cap_loss(r[pending], w[pending], x[pending], trial, prior, prior_sd, smooth)
+            better = trial_loss <= loss[pending]
+            rows = np.flatnonzero(pending)
+            new_b[rows[better]], new_loss[rows[better]] = trial[better], trial_loss[better]
+            pending[rows[better]] = False
+            if not pending.any():
+                break
+            step = step * 0.5
+        moved = float(np.max(np.abs(new_b - b))) if len(b) else 0.0
+        b, loss = new_b, new_loss
+        if moved < 1e-9:
+            break
+    return b
+
+
 def _batched_ridge(r: np.ndarray, w: np.ndarray, x: np.ndarray, prior: np.ndarray, prior_sd: float) -> np.ndarray:
     """Per row: weighted regression of r on [1, x] with a N(prior, prior_sd^2) prior on the slopes."""
     sw = np.maximum(w.sum(axis=1), 1e-12)
@@ -362,7 +459,7 @@ def _fit_aftermarket(am_index: GroupIndex, u: np.ndarray, macro: MacroData, conf
     r, w = _weights(am_index, config)
     n_months = r.shape[1]
     fuel = macro.lagged(FUEL_LAG)[:n_months, INDICATORS.index("fuel")]
-    capped = soft_cap(u, config.soft_cap)
+    capped = soft_cap(u, config.soft_cap, config.cap_smooth)
     sw = np.maximum(w.sum(axis=1), 1e-12)
     keep = w.sum(axis=1) > 0
     def centred(v: np.ndarray) -> np.ndarray:

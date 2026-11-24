@@ -34,7 +34,7 @@ from celeris.models.context import ModelInputs, origin_context
 from celeris.models.gbm import GbmModel, feature_frame, importance, inner_origins, predict_gbm, train_gbm
 from celeris.models.intermittent import intermittent_forecasts
 from celeris.models.quantiles import noise_moments
-from celeris.models.structural import StructuralConfig, fit_structural, predict
+from celeris.models.structural import StructuralConfig, fit_structural, predict, refit_levels, shares_factors
 
 OUTER_ORIGINS = (74, 69, 57, 45)  # 2025-03, 2024-10, 2023-10, 2022-10
 STRESS_ORIGIN = 33  # 2021-10
@@ -246,11 +246,15 @@ def run_backtest_folds(
             frame["structural_level_source"] = fit.level_source[targets["u"].to_numpy()]
             frame["oracle"] = oracle_floor(frame, frame["structural"].to_numpy())
             fold = FoldResult(origin, frame)
+            cache: dict[StructuralConfig, np.ndarray] = {config: frame["structural"].to_numpy()}
             for experiment, variants in experiments.items():
                 subset = _subset(experiment, frame)
                 for variant, cfg in variants.items():
-                    pred = frame["structural"].to_numpy() if cfg == config else predict(fit_structural(inputs, ctx, cfg), targets)["mean"].to_numpy()
-                    fold.experiments.extend(_score_row(origin, experiment, variant, frame, pred, subset))
+                    if cfg not in cache:
+                        variant_fit = refit_levels(fit, ctx, cfg) if shares_factors(cfg, config) else fit_structural(inputs, ctx, cfg)
+                        cache[cfg] = predict(variant_fit, targets)["mean"].to_numpy()
+                    fold.experiments.extend(_score_row(origin, experiment, variant, frame, cache[cfg], subset))
+            del cache
             for shade in (1.0, 0.985):
                 fold.experiments.extend(_score_row(origin, "point_shading", f"c{shade:g}", frame, frame["structural"].to_numpy() * shade, None))
             p = ctx.state.panel
