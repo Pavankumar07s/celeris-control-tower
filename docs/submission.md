@@ -91,63 +91,48 @@ make source-zip     # = git archive --worktree-attributes --format=zip -9 -o dis
 
 ## Instructions to Run
 
-Paste as plain text. The commands were checked against the `Makefile` with a dry run (`make -n`).
+Paste as plain text. Verified on 25 Nov 2026 by following these exact steps in a fresh copy unpacked from the source
+zip: the dashboard served, the environment installed, `make all` rebuilt all 51 outputs and the 24 dashboard data files
+byte for byte (submission identical), and `make test` gave 234 passed.
 
 ```
-The live dashboard: https://pavankumar07s.github.io/celeris-control-tower/
+LIVE DEMO (nothing to install): https://pavankumar07s.github.io/celeris-control-tower/
+REPOSITORY: https://github.com/Pavankumar07s/celeris-control-tower
 
-About the data: the seven CSV files of the dataset are distributed by the hackathon organisers and are NOT in the
-repository. Every pipeline output (outputs/) and the built dashboard (dashboard/dist) are committed, so a reviewer can
-inspect every result without them. Only rebuilding needs them, in data/raw/.
+All results are already included: the forecast (outputs/forecast/submission.csv),
+every pipeline output (outputs/) and the built dashboard (dashboard/dist).
+The raw dataset is NOT included; it is only needed to rebuild (part B).
 
-Viewing the dashboard locally (no data, no Python or Node setup needed):
-
-1. git clone https://github.com/Pavankumar07s/celeris-control-tower.git celeris && cd celeris
+A) View the dashboard locally (no setup, no data needed)
+1. Unzip the source zip and enter the folder:
+     unzip celeris_source.zip && cd celeris-control-tower
+   (or: git clone https://github.com/Pavankumar07s/celeris-control-tower.git && cd celeris-control-tower)
 2. python3 -m http.server 8000 -d dashboard/dist
-3. Open http://localhost:8000 in a browser. (Opening index.html from disk does not work: browsers block fetch from file://.)
+3. Open http://localhost:8000 in a browser
+   (opening index.html directly from disk does not work)
 
-Rebuilding everything from the raw data:
+B) Rebuild everything from the raw data (Linux, macOS, or Windows with WSL)
+1. Install uv if you do not have it:
+     pip install uv
+2. Create the environment (uv downloads Python 3.12 if needed):
+     uv venv --python 3.12 .venv
+     uv pip install --python .venv/bin/python -e ".[test]"
+3. Copy the 7 hackathon CSV files into data/raw/:
+     mkdir -p data/raw
+     cp /path/to/student_data/*.csv data/raw/
+   Expected: train.csv, test.csv, sku_master.csv, macro_indicators.csv,
+   events_calendar.csv, inventory_stockouts.csv, sample_submission.csv
+4. Run the full pipeline (10-20 minutes, about 3 GB of memory):
+     make all
+   This rebuilds every output, including outputs/forecast/submission.csv,
+   byte for byte identical to the committed files.
+5. Run the tests (234 tests, about 3 minutes):
+     make test
 
-Linux or macOS. On Windows use WSL: the backtest's worker pool needs the "forkserver" start method. (CELERIS_WORKERS=1
-avoids the pool, but the project is not tested on Windows.)
-
-1. Install Python 3.12 and uv (or use pip; see step 3).
-2. Create the environment:
-      uv venv --python 3.12 .venv
-      uv pip install --python .venv/bin/python -e ".[test]"
-   For the exact versions that rebuild the committed outputs byte for byte:
-      uv pip install --python .venv/bin/python -r requirements.lock.txt
-      uv pip install --python .venv/bin/python -e . --no-deps
-3. Or, with pip:
-      python3.12 -m venv .venv
-      .venv/bin/pip install -e ".[test]"
-4. Put the seven CSV files distributed by the hackathon organisers in data/raw/ (they are not in the repository;
-   without them every pipeline command stops with a short message naming the missing files):
-      mkdir -p data/raw
-      cp /path/to/student_data/*.csv data/raw/
-   Expected files: events_calendar.csv, inventory_stockouts.csv, macro_indicators.csv, sample_submission.csv,
-   sku_master.csv, test.csv, train.csv
-5. Run the whole pipeline (about 11 minutes):
-      make all
-   (without make: .venv/bin/python -m celeris all)
-   This writes outputs/ (clean data, data-quality report, anomaly register, features, backtest, forecast)
-   and the dashboard data in dashboard/public/data/.
-6. Run the tests (about 3 minutes; 234 tests, the slow end-to-end test is deselected):
-      make test
-7. Rebuild and open the dashboard (needs Node 20.19 or later):
-      make dashboard
-      python3 -m http.server 8000 -d dashboard/dist
-   Then open http://localhost:8000
-
-Key outputs:
-- Submission file: outputs/forecast/submission.csv (58,219 rows)
-- Data-quality report: outputs/quality/dq_report.json
-- Anomaly register: outputs/anomalies/anomaly_register.csv
-- Backtest summary: outputs/backtest/summary.json
-- Documentation: README.md, docs/methodology.md, docs/requirements_traceability.md
+No make? Use: .venv/bin/python -m celeris all   and   .venv/bin/python -m pytest
+Optional: rebuild the dashboard with "make dashboard" (needs Node 20.19+).
+More detail: README.md and docs/methodology.md.
 ```
-
----
 
 ## Two-minute demo script
 

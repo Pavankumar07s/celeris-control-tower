@@ -97,7 +97,7 @@ python3 -m http.server 8000 -d dashboard/dist    # then open http://localhost:80
 **Rebuild everything from the raw data** (Linux or macOS; Python 3.12)
 
 ```bash
-# 1. set up
+# 1. set up (pip install uv, if you do not have it)
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -e ".[test]"
 
@@ -105,7 +105,7 @@ uv pip install --python .venv/bin/python -e ".[test]"
 mkdir -p data/raw && cp /path/to/student_data/*.csv data/raw/
 
 # 3. run
-make all     # about 11 minutes; rebuilds every output byte for byte
+make all     # 10-20 minutes; rebuilds every output byte for byte
 make test    # 234 tests, about 3 minutes
 ```
 
