@@ -1,3 +1,5 @@
+<p align="center"><a href="https://pavankumar07s.github.io/celeris-control-tower/"><img src="docs/banner/banner.png" alt="Celeris planning control tower: 600 SKUs × 6 regions cleaned, explained and forecast 19 months ahead. Backtest WAPE 26.1 %, 2.81M units forecast, 7,917 cells repaired." width="100%"></a></p>
+
 # Celeris Automobili Industrial: Demand Forecasting & Planning Control Tower
 
 ## Ten minutes with this submission

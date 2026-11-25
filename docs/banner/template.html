@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:Plex;src:url(plex-sans-var.woff2) format("woff2");font-weight:100 700}
+@font-face{font-family:PlexMono;src:url(plex-mono-400.woff2) format("woff2");font-weight:400}
+@font-face{font-family:PlexMono;src:url(plex-mono-500.woff2) format("woff2");font-weight:500}
+@font-face{font-family:Serif;src:url(source-serif-4-normal-400-700.woff2) format("woff2");font-weight:400 700}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1600px;height:440px;background:#0a0a0a;overflow:hidden}
+.b{position:relative;width:1600px;height:440px;background:#0a0a0a;
+  background-image:radial-gradient(rgba(242,237,227,.13) 1px,transparent 1.2px);background-size:22px 22px;background-position:11px 11px;color:#f2ede3}
+.b::after{content:"";position:absolute;left:0;right:0;bottom:0;height:7px;background:#ff6a13}
+.l{position:absolute;left:72px;top:62px;width:900px}
+.k{font:500 13px/1 PlexMono;letter-spacing:.32em;color:#a39d90;text-transform:uppercase}
+.k b{color:#ff6a13;font-weight:500}
+h1{margin-top:24px;font:600 80px/0.92 Plex;letter-spacing:-.025em;color:#f2ede3;white-space:nowrap}
+h1 i{font-style:normal;color:#ff6a13;font-weight:400;margin:0 .04em}
+h1 span{font-weight:300;color:#f2ede3}
+.t{margin-top:24px;font:400 30px/1.2 Serif;color:#f2ede3}
+.t em{font-style:normal;color:#ff6a13}
+.s{margin-top:12px;font:400 15px/1.5 PlexMono;color:#a39d90}
+.c{margin-top:28px;display:flex;gap:14px}
+.chip{white-space:nowrap;border:1px solid #3a3833;padding:11px 16px 10px;font:500 12px/1 PlexMono;letter-spacing:.14em;text-transform:uppercase;color:#f2ede3;display:flex;gap:10px;align-items:baseline;background:rgba(10,10,10,.85)}
+.chip b{font:600 19px/1 Plex;letter-spacing:0;color:#ff6a13}
+.r{position:absolute;right:48px;top:70px;width:640px}
+.r svg .yr{font:400 11px PlexMono;fill:#7d776b;text-anchor:middle}
+.r svg .lab{font:500 11px PlexMono;letter-spacing:.2em;fill:#a39d90}
+.r svg .lab.or{fill:#ff6a13}
+.r svg .ann{font:400 11px PlexMono;fill:#a39d90}
+.r svg .end{font:500 11px PlexMono;letter-spacing:.12em;fill:#ff6a13}
+</style></head><body><div class="b">
+<div class="l">
+  <div class="k">Celeris Automobili Industrial <b>·</b> Planning control tower</div>
+  <h1>CELERIS<i>/</i><span>FORECAST</span></h1>
+  <div class="t">Ink is the past. <em>Orange is the future.</em></div>
+  <div class="s">600 SKUs × 6 regions · cleaned, explained, forecast 19 months ahead</div>
+  <div class="c">
+    <div class="chip"><b>26.1%</b>backtest WAPE</div>
+    <div class="chip"><b>2.81M</b>units forecast</div>
+    <div class="chip"><b>7,917</b>cells repaired</div>
+  </div>
+</div>
+<div class="r">{{CHART}}</div>
+</div></body></html>
