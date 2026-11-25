@@ -64,5 +64,5 @@ install:
 ##   other untracked files are never included. Commit first: uncommitted changes are not in the zip.
 source-zip:
 	mkdir -p dist_zip
-	git archive --worktree-attributes --format=zip -9 -o dist_zip/celeris_source.zip HEAD
+	git archive --worktree-attributes --format=zip -9 --prefix=celeris-control-tower/ -o dist_zip/celeris_source.zip HEAD
 	@ls -l dist_zip/celeris_source.zip
